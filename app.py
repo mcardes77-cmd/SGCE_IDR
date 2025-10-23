@@ -584,11 +584,6 @@ def api_professores():
     professores = get_professores()
     return jsonify(professores)
 
-@app.route('/api/salas')
-def api_salas():
-    salas = get_salas()
-    return jsonify(salas)
-
 @app.route('/api/alunos_por_sala/<int:sala_id>')
 def api_alunos_por_sala(sala_id):
     alunos = get_alunos_por_sala(sala_id)
@@ -868,6 +863,7 @@ def api_ocorrencia_nova():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
