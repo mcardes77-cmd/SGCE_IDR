@@ -318,25 +318,20 @@ def api_tutor_por_aluno(aluno_id):
 
 @app.route('/api/registrar_ocorrencia', methods=['POST'])
 def api_registrar_ocorrencia():
-    """Registra uma nova ocorrência no sistema"""
     try:
         dados = request.get_json()
-
-        # Validar campos obrigatórios (sem professor_id)
         campos_obrigatorios = ['aluno_id', 'professor_nome', 'descricao', 'atendimento_professor']
         for campo in campos_obrigatorios:
-            if campo not in dados or not str(dados[campo]).strip():
+            if campo not in dados or dados[campo] is None or str(dados[campo]).strip() == '':
                 return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
 
         aluno_id = dados['aluno_id']
 
         # Buscar dados do aluno
-        response_aluno = supabase.table('d_alunos').select('nome, sala_id, tutor_nome').eq('id', aluno_id).execute()
+        response_aluno = supabase.table('d_alunos').select('nome, sala_id, tutor').eq('id', aluno_id).execute()
         aluno_data = handle_supabase_response(response_aluno)
-
         if not aluno_data:
             return jsonify({'error': 'Aluno não encontrado'}), 400
-
         aluno = aluno_data[0]
 
         # Buscar nome da sala
@@ -344,7 +339,7 @@ def api_registrar_ocorrencia():
         sala_data = handle_supabase_response(response_sala)
         sala_nome = sala_data[0]['nome'] if sala_data else ''
 
-        # Gerar próximo número de ocorrência (caso tabela esteja vazia, começa em 1)
+        # Gerar próximo número de ocorrência
         response_ultima = supabase.table('ocorrencias').select('numero').order('numero', desc=True).limit(1).execute()
         ultima_ocorrencia = handle_supabase_response(response_ultima)
         proximo_numero = ultima_ocorrencia[0]['numero'] + 1 if ultima_ocorrencia else 1
@@ -358,7 +353,7 @@ def api_registrar_ocorrencia():
             'professor_nome': dados['professor_nome'],
             'sala_id': aluno['sala_id'],
             'sala_nome': sala_nome,
-            'tutor_nome': aluno.get('tutor_nome', ''),
+            'tutor_nome': aluno.get('tutor', ''),
             'atendimento_professor': dados['atendimento_professor'],
             'solicitado_tutor': dados.get('solicitar_tutor', False),
             'solicitado_coordenacao': dados.get('solicitar_coordenacao', False),
@@ -369,23 +364,63 @@ def api_registrar_ocorrencia():
             'updated_at': datetime.now().isoformat()
         }
 
-        # Inserir no banco
         response_insert = supabase.table('ocorrencias').insert(nova_ocorrencia).execute()
         ocorrencia_salva = handle_supabase_response(response_insert)
 
         if ocorrencia_salva:
-            return jsonify({
-                'success': True,
-                'numero': proximo_numero,
-                'message': 'Ocorrência registrada com sucesso'
-            })
-        else:
-            return jsonify({'error': 'Erro ao salvar ocorrência'}), 500
+            return jsonify({'success': True, 'numero': proximo_numero, 'message': 'Ocorrência registrada com sucesso'})
+        return jsonify({'error': 'Erro ao salvar ocorrência'}), 500
 
     except Exception as e:
         logger.exception("Erro ao registrar ocorrência")
         return jsonify({'error': str(e)}), 500
 
+# --- Detalhes da ocorrência pelo número ---
+@app.route('/api/ocorrencia_detalhes', methods=['GET'])
+def api_ocorrencia_detalhes():
+    numero = request.args.get('numero')
+    if not numero:
+        return jsonify({'error': 'Número da ocorrência não fornecido'}), 400
+    try:
+        response = supabase.table('ocorrencias').select('*').eq('numero', int(numero)).execute()
+        ocorrencias = handle_supabase_response(response)
+        if not ocorrencias:
+            return jsonify({'error': 'Ocorrência não encontrada'}), 404
+        return jsonify(ocorrencias[0])
+    except Exception as e:
+        logger.exception("Erro ao buscar ocorrência")
+        return jsonify({'error': str(e)}), 500
+
+# --- Salvar atendimento ---
+@app.route('/api/salvar_atendimento', methods=['POST'])
+def api_salvar_atendimento():
+    dados = request.get_json()
+    numero = dados.get('numero')
+    nivel = dados.get('nivel')
+    texto = dados.get('texto')
+
+    if not numero or not nivel or texto is None:
+        return jsonify({'error': 'Dados incompletos'}), 400
+
+    campo_atualizar = None
+    if nivel == 'tutor':
+        campo_atualizar = 'atendimento_tutor'
+    elif nivel == 'coordenacao':
+        campo_atualizar = 'atendimento_coordenacao'
+    elif nivel == 'gestao':
+        campo_atualizar = 'atendimento_gestao'
+    else:
+        return jsonify({'error': 'Nível inválido'}), 400
+
+    try:
+        response = supabase.table('ocorrencias').update({campo_atualizar: texto}).eq('numero', int(numero)).execute()
+        ocorrencia_atualizada = handle_supabase_response(response)
+        if not ocorrencia_atualizada:
+            return jsonify({'error': 'Falha ao atualizar ocorrência'}), 500
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("Erro ao salvar atendimento")
+        return jsonify({'error': str(e)}), 500
 # =============================================================
 # APIs de ocorrências (mantidas)
 # =============================================================
@@ -916,6 +951,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
