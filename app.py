@@ -260,6 +260,118 @@ def api_tutores_com_ocorrencias():
         logger.exception("Erro ao buscar tutores")
         return jsonify({'error': str(e)}), 500
 
+# =============================================================
+# APIs PARA NOVA OCORRÊNCIA (ADICIONAR ESTA SEÇÃO)
+# =============================================================
+
+@app.route('/api/salas_por_professor/<int:professor_id>')
+def api_salas_por_professor(professor_id):
+    """Retorna todas as salas (por enquanto) - pode ser filtrado depois por professor"""
+    try:
+        salas = get_salas()
+        return jsonify(salas)
+    except Exception as e:
+        logger.error(f"Erro ao buscar salas por professor: {e}")
+        return jsonify([])
+
+@app.route('/api/tutor_por_aluno/<int:aluno_id>')
+def api_tutor_por_aluno(aluno_id):
+    """Retorna o tutor de um aluno específico"""
+    try:
+        if supabase:
+            # Buscar aluno e seu tutor
+            response = supabase.table('d_alunos').select(
+                'id, nome, tutor_id, d_funcionarios!d_alunos_tutor_id_fkey(nome)'
+            ).eq('id', aluno_id).execute()
+            
+            aluno_data = handle_supabase_response(response)
+            if aluno_data:
+                aluno = aluno_data[0]
+                tutor_nome = aluno.get('d_funcionarios', [{}])[0].get('nome', '') if aluno.get('d_funcionarios') else ''
+                return jsonify({'tutor': tutor_nome})
+        
+        return jsonify({'tutor': ''})
+    except Exception as e:
+        logger.error(f"Erro ao buscar tutor do aluno: {e}")
+        return jsonify({'tutor': ''})
+
+@app.route('/api/registrar_ocorrencia', methods=['POST'])
+def api_registrar_ocorrencia():
+    """Registra uma nova ocorrência no sistema"""
+    try:
+        dados = request.get_json()
+        
+        # Buscar último número
+        ocorrencias = get_ocorrencias()
+        ultimo_numero = max([int(occ['numero']) for occ in ocorrencias]) if ocorrencias else 0
+        novo_numero = str(ultimo_numero + 1)
+        
+        aluno_id = dados.get('aluno_id')
+        alunos = get_d_alunos()
+        aluno = next((a for a in alunos if str(a['id']) == str(aluno_id)), None)
+        
+        if not aluno:
+            return jsonify({'error': 'Aluno não encontrado'}), 400
+        
+        # Buscar informações da sala e tutor
+        salas = get_salas()
+        sala = next((s for s in salas if s['id'] == aluno['sala_id']), {})
+        
+        # Buscar tutor do aluno
+        tutor_response = supabase.table('d_alunos').select(
+            'd_funcionarios!d_alunos_tutor_id_fkey(nome)'
+        ).eq('id', aluno_id).execute()
+        tutor_data = handle_supabase_response(tutor_response)
+        tutor_nome = ''
+        if tutor_data and tutor_data[0].get('d_funcionarios'):
+            tutor_nome = tutor_data[0]['d_funcionarios'][0].get('nome', '')
+        
+        nova_ocorrencia = {
+            'aluno': aluno['nome'],
+            'aluno_nome': aluno['nome'],
+            'sala': sala.get('nome', ''),
+            'sala_nome': sala.get('nome', ''),
+            'tutor': tutor_nome,
+            'tutor_nome': tutor_nome,
+            'numero': novo_numero,
+            'data': datetime.now().strftime('%Y-%m-%d'),
+            'data_hora': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'hora': datetime.now().strftime('%H:%M:%S'),
+            'professor': dados.get('professor_nome', ''),
+            'professor_nome': dados.get('professor_nome', ''),
+            'descricao': dados.get('descricao', ''),
+            'atendimento_professor': dados.get('atendimento_professor', ''),
+            'atendimento_tutor': '',
+            'atendimento_coordenacao': '',
+            'atendimento_gestao': '',
+            'solicitado_tutor': dados.get('solicitar_tutor', False),
+            'solicitado_coordenacao': dados.get('solicitar_coordenacao', False),
+            'solicitado_gestao': dados.get('solicitar_gestao', False),
+            'status': 'ATENDIMENTO',
+            'tipo': 'Geral',
+            'impressao_pdf': False,
+            'aluno_id': aluno_id,
+            'sala_id': aluno['sala_id']
+        }
+        
+        # Salvar no banco
+        response = supabase.table('ocorrencias').insert(nova_ocorrencia).execute()
+        ocorrencia_salva = handle_supabase_response(response)
+        
+        if ocorrencia_salva:
+            return jsonify({
+                'success': True,
+                'message': 'Ocorrência registrada com sucesso',
+                'numero': novo_numero,
+                'id': ocorrencia_salva[0]['id'] if ocorrencia_salva else None
+            })
+        else:
+            return jsonify({'error': 'Erro ao salvar ocorrência'}), 500
+        
+    except Exception as e:
+        logger.exception("Erro ao registrar ocorrência")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/salas_com_ocorrencias')
 def api_salas_com_ocorrencias():
     try:
@@ -858,6 +970,7 @@ def api_ocorrencia_nova():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
