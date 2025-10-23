@@ -138,317 +138,117 @@
         let ocorrenciaAtual = null;
         let nivelAtual = null;
 
-        // Mapeamento dos níveis para os campos
         const mapaNiveis = {
-            'T': { 
-                campo: 'atendimento_tutor', 
-                nome: 'TUTOR', 
-                cor: 'bg-tutor-color', 
-                texto: 'text-white',
-                nivel_api: 'tutor'
-            },
-            'C': { 
-                campo: 'atendimento_coordenacao', 
-                nome: 'COORDENAÇÃO', 
-                cor: 'bg-coord-color', 
-                texto: 'text-white',
-                nivel_api: 'coordenacao'
-            },
-            'G': { 
-                campo: 'atendimento_gestao', 
-                nome: 'GESTÃO', 
-                cor: 'bg-gestao-color', 
-                texto: 'text-white',
-                nivel_api: 'gestao'
-            }
+            'T': { campo: 'atendimento_tutor', nome: 'TUTOR', cor: 'bg-tutor-color', texto: 'text-white', nivel_api: 'tutor' },
+            'C': { campo: 'atendimento_coordenacao', nome: 'COORDENAÇÃO', cor: 'bg-coord-color', texto: 'text-white', nivel_api: 'coordenacao' },
+            'G': { campo: 'atendimento_gestao', nome: 'GESTÃO', cor: 'bg-gestao-color', texto: 'text-white', nivel_api: 'gestao' }
         };
 
-        // Função principal que inicia quando a página carrega
         function iniciarPagina() {
-            console.log('🚀 Iniciando página de edição...');
-            
-            // Carregar parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('id');
+            ocorrenciaAtual = urlParams.get('numero'); // <-- pega número da ocorrência
             nivelAtual = urlParams.get('nivel');
-            
-            console.log('📋 Parâmetros da URL:');
-            console.log('   - ID:', ocorrenciaAtual);
-            console.log('   - Nível:', nivelAtual);
-            
+
             if (ocorrenciaAtual) {
-                console.log('✅ Ocorrência encontrada, carregando dados...');
                 carregarOcorrencia(ocorrenciaAtual);
             } else {
-                console.log('❌ Nenhuma ocorrência especificada');
                 mostrarMensagem('Erro: Nenhuma ocorrência especificada', 'error');
                 document.getElementById('numero').textContent = 'ERRO';
             }
         }
 
-        // Carregar dados da ocorrência
         async function carregarOcorrencia(numero) {
             try {
-                console.log('🔍 Buscando dados da ocorrência:', numero);
-                
-                // Mostrar estado de carregamento
-                document.getElementById('numero').textContent = 'Carregando...';
-                document.getElementById('aluno').textContent = 'Carregando...';
-                document.getElementById('sala').textContent = 'Carregando...';
-                document.getElementById('professor').textContent = 'Carregando...';
-                document.getElementById('tutor').textContent = 'Carregando...';
-                document.getElementById('status').textContent = 'Carregando...';
-                document.getElementById('descricao').value = 'Carregando...';
-                document.getElementById('atendimento_professor').value = 'Carregando...';
-                document.getElementById('atendimento_tutor').value = 'Carregando...';
-                document.getElementById('atendimento_coordenacao').value = 'Carregando...';
-                document.getElementById('atendimento_gestao').value = 'Carregando...';
-                
-                // Fazer requisição para a API
                 const response = await fetch(`/api/ocorrencia_detalhes?numero=${numero}`);
-                
-                console.log('📡 Status da resposta:', response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`Erro na API: ${response.status}`);
-                }
-                
+                if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
                 const ocorrencia = await response.json();
-                console.log('📨 Dados recebidos:', ocorrencia);
-                
-                if (ocorrencia.error) {
-                    throw new Error(ocorrencia.error);
-                }
-                
-                // Preencher os dados na página
+                if (ocorrencia.error) throw new Error(ocorrencia.error);
+
                 preencherDadosOcorrencia(ocorrencia);
-                
-                // Aplicar regras de edição
                 aplicarRegrasEdicao(nivelAtual);
-                
-                console.log('✅ Dados carregados com sucesso!');
-                
+
             } catch (error) {
-                console.error('💥 Erro ao carregar ocorrência:', error);
                 mostrarMensagem('Erro ao carregar dados: ' + error.message, 'error');
-                
-                // Mostrar estado de erro
-                document.getElementById('numero').textContent = 'Erro';
-                document.getElementById('aluno').textContent = 'Erro ao carregar';
-                document.getElementById('sala').textContent = 'Erro ao carregar';
-                document.getElementById('professor').textContent = 'Erro ao carregar';
-                document.getElementById('tutor').textContent = 'Erro ao carregar';
-                document.getElementById('status').textContent = 'Erro';
-                document.getElementById('descricao').value = 'Erro ao carregar dados';
-                document.getElementById('atendimento_professor').value = 'Erro ao carregar dados';
-                document.getElementById('atendimento_tutor').value = 'Erro ao carregar dados';
-                document.getElementById('atendimento_coordenacao').value = 'Erro ao carregar dados';
-                document.getElementById('atendimento_gestao').value = 'Erro ao carregar dados';
             }
         }
 
-        // Preencher dados da ocorrência na interface
         function preencherDadosOcorrencia(ocorrencia) {
             document.getElementById('numero').textContent = ocorrencia.numero || 'N/A';
-            document.getElementById('aluno').textContent = ocorrencia.aluno_nome || ocorrencia.aluno || 'N/A';
-            document.getElementById('sala').textContent = ocorrencia.sala_nome || ocorrencia.sala || 'N/A';
-            document.getElementById('professor').textContent = ocorrencia.professor_nome || ocorrencia.professor || 'N/A';
-            document.getElementById('tutor').textContent = ocorrencia.tutor_nome || ocorrencia.tutor || 'N/A';
+            document.getElementById('aluno').textContent = ocorrencia.aluno_nome || 'N/A';
+            document.getElementById('sala').textContent = ocorrencia.sala_nome || 'N/A';
+            document.getElementById('professor').textContent = ocorrencia.professor_nome || 'N/A';
+            document.getElementById('tutor').textContent = ocorrencia.tutor_nome || 'N/A';
             document.getElementById('status').textContent = ocorrencia.status || 'N/A';
-            
-            // Preencher textareas
             document.getElementById('descricao').value = ocorrencia.descricao || '';
             document.getElementById('atendimento_professor').value = ocorrencia.atendimento_professor || '';
             document.getElementById('atendimento_tutor').value = ocorrencia.atendimento_tutor || '';
             document.getElementById('atendimento_coordenacao').value = ocorrencia.atendimento_coordenacao || '';
             document.getElementById('atendimento_gestao').value = ocorrencia.atendimento_gestao || '';
-            
-            console.log('✅ Dados preenchidos:');
-            console.log('   - Aluno:', ocorrencia.aluno_nome || ocorrencia.aluno);
-            console.log('   - Tutor:', ocorrencia.atendimento_tutor || 'VAZIO');
-            console.log('   - Coordenação:', ocorrencia.atendimento_coordenacao || 'VAZIO');
-            console.log('   - Gestão:', ocorrencia.atendimento_gestao || 'VAZIO');
         }
 
-        // Aplicar regras de edição baseadas no nível
         function aplicarRegrasEdicao(nivel) {
-            console.log('🎯 Aplicando regras para nível:', nivel);
-            
-            // Por padrão, todos os campos de atendimento ficam readonly
-            const camposAtendimento = [
-                'atendimento_tutor', 
-                'atendimento_coordenacao',
-                'atendimento_gestao'
-            ];
-
-            // Deixar todos os campos readonly inicialmente
+            const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao'];
             camposAtendimento.forEach(campo => {
                 const element = document.getElementById(campo);
                 element.readOnly = true;
                 element.classList.add('readonly');
                 element.classList.remove('editable');
             });
-
-            // Esconder o botão salvar inicialmente
             document.getElementById('btn-salvar').classList.add('hidden');
 
-            // Se tiver um nível específico, liberar apenas aquele campo
             if (nivel && mapaNiveis[nivel]) {
                 const config = mapaNiveis[nivel];
-                const campoParaEditar = config.campo;
-                const element = document.getElementById(campoParaEditar);
-                
-                if (element) {
-                    // Liberar o campo para edição
-                    element.readOnly = false;
-                    element.classList.remove('readonly');
-                    element.classList.add('editable');
-                    
-                    // Mostrar badge do nível
-                    const badge = document.getElementById('badge-nivel');
-                    badge.textContent = `EDITANDO: ${config.nome}`;
-                    badge.className = `badge-nivel ${config.cor} ${config.texto}`;
-                    badge.classList.remove('hidden');
+                const element = document.getElementById(config.campo);
+                element.readOnly = false;
+                element.classList.remove('readonly');
+                element.classList.add('editable');
 
-                    // Mostrar botão salvar
-                    document.getElementById('btn-salvar').classList.remove('hidden');
+                const badge = document.getElementById('badge-nivel');
+                badge.textContent = `EDITANDO: ${config.nome}`;
+                badge.className = `badge-nivel ${config.cor} ${config.texto}`;
+                badge.classList.remove('hidden');
 
-                    // Focar no campo editável
-                    setTimeout(() => {
-                        element.focus();
-                    }, 100);
-
-                    mostrarMensagem(`Agora você pode editar o atendimento de ${config.nome.toLowerCase()}`, 'info');
-                    
-                    console.log('✅ Campo liberado para edição:', campoParaEditar);
-                }
-            } else {
-                // Modo de visualização apenas
-                mostrarMensagem('Modo de visualização. Para editar, clique em T, C ou G na lista de ocorrências.', 'info');
-                console.log('👀 Modo de visualização apenas');
+                document.getElementById('btn-salvar').classList.remove('hidden');
+                setTimeout(() => { element.focus(); }, 100);
             }
         }
 
-        // Salvar atendimento
         async function salvarAtendimento() {
-            if (!ocorrenciaAtual || !nivelAtual) {
-                mostrarMensagem('Nenhum nível de atendimento selecionado para edição', 'error');
-                return;
-            }
-
+            if (!ocorrenciaAtual || !nivelAtual) return;
             const config = mapaNiveis[nivelAtual];
-            if (!config) {
-                mostrarMensagem('Nível de atendimento inválido', 'error');
-                return;
-            }
-
-            const campo = config.campo;
-            const texto = document.getElementById(campo).value;
-
-            if (!texto.trim()) {
-                mostrarMensagem('Por favor, preencha o campo de atendimento', 'error');
-                return;
-            }
+            const texto = document.getElementById(config.campo).value;
+            if (!texto.trim()) return;
 
             try {
-                mostrarMensagem('Salvando atendimento...', 'info');
-
-                // Preparar dados para envio
-                const dadosEnviar = {
-                    id: ocorrenciaAtual,
-                    nivel: config.nivel_api,
-                    texto: texto
-                };
-
-                console.log('📤 Enviando dados:', dadosEnviar);
-
+                const dadosEnviar = { numero: ocorrenciaAtual, nivel: config.nivel_api, texto: texto };
                 const response = await fetch('/api/salvar_atendimento', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dadosEnviar)
                 });
-
-                console.log('📡 Status da resposta:', response.status);
-                
                 const result = await response.json();
-                console.log('📨 Resposta do servidor:', result);
-
                 if (response.ok && result.success) {
-                    let mensagem = '✅ Atendimento salvo com sucesso!';
-                    
-                    // Adicionar informações adicionais
-                    if (result.status_atualizado) {
-                        mensagem += ` Status atualizado para: ${result.status_atualizado}`;
-                    }
-                    
-                    if (result.atendimentos_pendentes && result.atendimentos_pendentes.length === 0) {
-                        mensagem += ' Todos os atendimentos foram concluídos.';
-                    }
-                    
-                    mensagem += ' Redirecionando...';
-                    
-                    mostrarMensagem(mensagem, 'success');
-                    
-                    // Aguardar 2 segundos antes de redirecionar
-                    setTimeout(() => {
-                        window.location.href = '/gestao_ocorrencia';
-                    }, 2000);
-                    
+                    mostrarMensagem('Atendimento salvo com sucesso! Redirecionando...', 'success');
+                    setTimeout(() => { window.location.href = '/gestao_ocorrencia'; }, 2000);
                 } else {
-                    const erro = result.error || 'Erro desconhecido ao salvar';
-                    console.error('❌ Erro do servidor:', erro);
-                    mostrarMensagem('❌ Erro ao salvar: ' + erro, 'error');
+                    mostrarMensagem('Erro ao salvar: ' + (result.error || 'Desconhecido'), 'error');
                 }
-
             } catch (error) {
-                console.error('💥 Erro ao salvar atendimento:', error);
-                mostrarMensagem('💥 Erro de conexão: ' + error.message, 'error');
+                mostrarMensagem('Erro de conexão: ' + error.message, 'error');
             }
         }
 
-        // Mostrar mensagens de status
         function mostrarMensagem(mensagem, tipo) {
             const elemento = document.getElementById('mensagem-status');
             elemento.textContent = mensagem;
             elemento.className = 'mb-4 p-3 rounded text-sm ';
-            
-            if (tipo === 'success') {
-                elemento.classList.add('bg-green-600', 'text-white');
-            } else if (tipo === 'error') {
-                elemento.classList.add('bg-red-600', 'text-white');
-            } else if (tipo === 'info') {
-                elemento.classList.add('bg-blue-600', 'text-white');
-            } else {
-                elemento.classList.add('bg-gray-600', 'text-white');
-            }
-            
+            if (tipo === 'success') elemento.classList.add('bg-green-600', 'text-white');
+            else if (tipo === 'error') elemento.classList.add('bg-red-600', 'text-white');
+            else elemento.classList.add('bg-blue-600', 'text-white');
             elemento.classList.remove('hidden');
-            
-            // Auto-esconder após 5 segundos (exceto para mensagens de info)
-            if (tipo !== 'info') {
-                setTimeout(() => {
-                    elemento.classList.add('hidden');
-                }, 5000);
-            }
+            if (tipo !== 'info') setTimeout(() => { elemento.classList.add('hidden'); }, 5000);
         }
 
-        // Função para teste manual (executar no console do navegador)
-        function testeCarregamento() {
-            console.log('🧪 TESTE MANUAL');
-            console.log('Ocorrência:', ocorrenciaAtual);
-            console.log('Nível:', nivelAtual);
-            
-            if (ocorrenciaAtual) {
-                fetch(`/api/ocorrencia_detalhes?numero=${ocorrenciaAtual}`)
-                    .then(r => r.json())
-                    .then(data => console.log('Dados:', data))
-                    .catch(err => console.error('Erro:', err));
-            }
-        }
-
-        // Iniciar a página quando o DOM estiver pronto
         document.addEventListener('DOMContentLoaded', iniciarPagina);
     </script>
 </body>
