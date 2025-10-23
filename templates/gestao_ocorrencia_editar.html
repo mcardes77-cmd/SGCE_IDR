@@ -146,7 +146,7 @@
 
         function iniciarPagina() {
             const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('numero'); // <-- pega número da ocorrência
+            ocorrenciaAtual = urlParams.get('numero'); 
             nivelAtual = urlParams.get('nivel');
 
             if (ocorrenciaAtual) {
@@ -221,10 +221,10 @@
 
             try {
                 const dadosEnviar = {
-    numero: ocorrenciaAtual,
-    nivel: config.nivel_api,
-    texto: texto
-};
+                    numero: ocorrenciaAtual,
+                    nivel: config.nivel_api,
+                    texto: texto
+                };
                 const response = await fetch('/api/salvar_atendimento', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -257,4 +257,3 @@
     </script>
 </body>
 </html>
-
