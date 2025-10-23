@@ -443,6 +443,7 @@ def api_ocorrencias_todas():
 
 @app.route('/api/ocorrencias_filtrar')
 def api_ocorrencias_filtrar():
+    """Filtrar ocorrências - CORRIGIDO para usar tutor_id"""
     try:
         sala_id = request.args.get('sala_id', '')
         tutor_id = request.args.get('tutor_id', '')
@@ -454,26 +455,17 @@ def api_ocorrencias_filtrar():
         if sala_id and sala_id != 'all':
             query = query.eq('sala_id', sala_id)
         if tutor_id and tutor_id != 'all':
-            tutores_resp = supabase.table('ocorrencias').select('tutor').execute()
-            tutores = list(set([occ['tutor'] for occ in handle_supabase_response(tutores_resp) if occ.get('tutor')]))
-            if tutor_id.isdigit() and int(tutor_id) < len(tutores):
-                tutor_nome = tutores[int(tutor_id)]
-                query = query.eq('tutor', tutor_nome)
+            query = query.eq('tutor_id', tutor_id)  # Mudou de 'tutor' para 'tutor_id'
         if status and status != 'all':
             query = query.eq('status', status)
         if aluno_id and aluno_id != 'all':
-            aluno_resp = supabase.table('d_alunos').select('nome').eq('id', aluno_id).execute()
-            aluno_data = handle_supabase_response(aluno_resp)
-            if aluno_data:
-                aluno_nome = aluno_data[0]['nome']
-                query = query.eq('aluno', aluno_nome)
+            query = query.eq('aluno_id', aluno_id)  # Mudou de 'aluno' para 'aluno_id'
 
         response = query.execute()
         return jsonify(handle_supabase_response(response))
     except Exception as e:
         logger.exception("Erro ao filtrar ocorrências")
         return jsonify({'error': str(e)}), 500
-
 @app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
 def api_gerar_pdf_ocorrencias():
     try:
@@ -901,3 +893,4 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
