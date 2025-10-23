@@ -1,11 +1,10 @@
 # app.py
-from flask import Flask, render_template, Blueprint
+from flask import Flask, render_template, Blueprint, request, jsonify
 import os
 import logging
 from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from flask import Flask, render_template, Blueprint, request, jsonify
 
 # --- Importa Blueprints de API ---
 from routes_frequencia import frequencia_bp
@@ -34,7 +33,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 else:
     print("⚠️  AVISO: SUPABASE_URL ou SUPABASE_KEY não configurados")
 
-# Funções para interagir com Supabase
+# =============================================
+# FUNÇÕES PARA INTERAGIR COM SUPABASE
+# =============================================
+
 def get_salas():
     try:
         if supabase:
@@ -74,6 +76,138 @@ def get_professores():
     except Exception as e:
         print(f"Erro ao buscar professores: {e}")
         return []
+
+def get_ocorrencias():
+    try:
+        if supabase:
+            response = supabase.table('ocorrencias').select('*').order('id', desc=True).execute()
+            return response.data
+        return []
+    except Exception as e:
+        print(f"Erro ao buscar ocorrências: {e}")
+        return []
+
+def get_ocorrencia_por_numero(numero):
+    try:
+        if supabase:
+            response = supabase.table('ocorrencias').select('*').eq('numero', numero).execute()
+            return response.data[0] if response.data else None
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar ocorrência: {e}")
+        return None
+
+# =============================================
+# APIs DE OCORRÊNCIAS
+# =============================================
+
+@app.route('/api/tutores_com_ocorrencias')
+def api_tutores_com_ocorrencias():
+    try:
+        if supabase:
+            # Buscar todos os tutores únicos das ocorrências
+            response = supabase.table('ocorrencias').select('tutor').execute()
+            
+            if response.data:
+                # Extrair tutores únicos e remover valores nulos/vazios
+                tutores = list(set([occ['tutor'] for occ in response.data if occ.get('tutor')]))
+                
+                # Formatar para o frontend
+                tutores_formatados = [{'id': i, 'nome': tutor} for i, tutor in enumerate(tutores)]
+                return jsonify(tutores_formatados)
+            else:
+                return jsonify([])
+        return jsonify([])
+    except Exception as e:
+        print(f"Erro ao buscar tutores: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salas_com_ocorrencias')
+def api_salas_com_ocorrencias():
+    try:
+        if supabase:
+            response = supabase.table('ocorrencias').select('sala_id').execute()
+            sala_ids = list(set([occ['sala_id'] for occ in response.data if occ.get('sala_id')]))
+            
+            salas_com_ocorrencias = []
+            for sala_id in sala_ids:
+                sala_response = supabase.table('salas').select('*').eq('id', sala_id).execute()
+                if sala_response.data:
+                    salas_com_ocorrencias.append(sala_response.data[0])
+            
+            return jsonify(salas_com_ocorrencias)
+        return jsonify([])
+    except Exception as e:
+        print(f"Erro ao buscar salas com ocorrências: {e}")
+        return jsonify([])
+
+@app.route('/api/ocorrencias_todas')
+def api_ocorrencias_todas():
+    try:
+        ocorrencias = get_ocorrencias()
+        return jsonify(ocorrencias)
+    except Exception as e:
+        print(f"Erro ao buscar ocorrências: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ocorrencias_filtrar')
+def api_ocorrencias_filtrar():
+    try:
+        sala_id = request.args.get('sala_id', '')
+        tutor_id = request.args.get('tutor_id', '')
+        status = request.args.get('status', '')
+        aluno_id = request.args.get('aluno_id', '')
+        
+        query = supabase.table('ocorrencias').select('*')
+        
+        if sala_id and sala_id != 'all':
+            query = query.eq('sala_id', sala_id)
+        if tutor_id and tutor_id != 'all':
+            # Buscar o nome do tutor pelo ID
+            tutores_resp = supabase.table('ocorrencias').select('tutor').execute()
+            tutores = list(set([occ['tutor'] for occ in tutores_resp.data if occ.get('tutor')]))
+            if int(tutor_id) < len(tutores):
+                tutor_nome = tutores[int(tutor_id)]
+                query = query.eq('tutor', tutor_nome)
+        if status and status != 'all':
+            query = query.eq('status', status)
+        if aluno_id and aluno_id != 'all':
+            # Buscar aluno pelo ID para obter o nome
+            aluno_resp = supabase.table('alunos').select('nome').eq('id', aluno_id).execute()
+            if aluno_resp.data:
+                aluno_nome = aluno_resp.data[0]['nome']
+                query = query.eq('aluno', aluno_nome)
+            
+        response = query.execute()
+        return jsonify(response.data)
+        
+    except Exception as e:
+        print(f"Erro ao filtrar ocorrências: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
+def api_gerar_pdf_ocorrencias():
+    try:
+        dados = request.get_json()
+        numeros = dados.get('numeros', [])
+        
+        # Aqui você implementaria a geração do PDF
+        # Por enquanto, apenas marca como impresso
+        for numero in numeros:
+            dados_atualizacao = {
+                'impressao_pdf': True,
+                'status': 'ASSINADA'
+            }
+            if supabase:
+                supabase.table('ocorrencias').update(dados_atualizacao).eq('numero', numero).execute()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'{len(numeros)} ocorrências processadas para PDF'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # =============================================
 # FUNÇÕES DE FREQUÊNCIA UNIFICADA
@@ -406,7 +540,10 @@ def api_alunos_por_sala(sala_id):
     alunos = get_alunos_por_sala(sala_id)
     return jsonify(alunos)
 
-# --- 1. Definição do Blueprint Principal ---
+# =============================================
+# BLUEPRINT PRINCIPAL E ROTAS
+# =============================================
+
 main_bp = Blueprint('main', __name__)
 
 # Rota principal (Menu Inicial)
@@ -579,7 +716,7 @@ def gestao_tecnologia_ocorrencia():
     return render_template('gestao_tecnologia_ocorrencia.html')
 
 # ===============================================
-# 3. REGISTRO DOS BLUEPRINTS
+# REGISTRO DOS BLUEPRINTS
 # ===============================================
 
 app.register_blueprint(main_bp, url_prefix='/')
