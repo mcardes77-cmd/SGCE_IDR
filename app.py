@@ -644,5 +644,288 @@ def _quebrar_texto(texto, max_chars):
     
     return linhas
 
+# Adicione estas funções no app.py
+
+def salvar_frequencia_unificada(registros):
+    try:
+        if not supabase:
+            return False
+            
+        for registro in registros:
+            # Verificar se já existe registro
+            existing = supabase.table('f_frequencia')\
+                .select('*')\
+                .eq('aluno_id', registro['aluno_id'])\
+                .eq('data', registro['data'])\
+                .execute()
+            
+            if existing.data:
+                supabase.table('f_frequencia')\
+                    .update({
+                        'status': registro['status'],
+                        'updated_at': datetime.now().isoformat()
+                    })\
+                    .eq('id', existing.data[0]['id'])\
+                    .execute()
+            else:
+                supabase.table('f_frequencia').insert({
+                    **registro,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar frequência: {e}")
+        return False
+
+def salvar_atraso_unificado(dados):
+    try:
+        if not supabase:
+            return False
+            
+        # Verificar se já existe registro
+        existing = supabase.table('f_frequencia')\
+            .select('*')\
+            .eq('aluno_id', dados['aluno_id'])\
+            .eq('data', dados['data'])\
+            .execute()
+        
+        registro_atualizado = {
+            'aluno_id': dados['aluno_id'],
+            'sala_id': dados['sala_id'],
+            'data': dados['data'],
+            'hora_entrada': dados['hora_entrada'],
+            'motivo_atraso': dados['motivo_atraso'],
+            'responsavel_nome': dados['responsavel_nome'],
+            'responsavel_telefone': dados['responsavel_telefone'],
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        if existing.data:
+            # Se já existe, atualizar
+            status_atual = existing.data[0]['status']
+            if status_atual == 'PS':
+                novo_status = 'PSA'
+            else:
+                novo_status = 'PA'
+            
+            registro_atualizado['status'] = novo_status
+            
+            supabase.table('f_frequencia')\
+                .update(registro_atualizado)\
+                .eq('id', existing.data[0]['id'])\
+                .execute()
+        else:
+            # Se não existe, criar novo
+            registro_atualizado['status'] = 'PA'
+            registro_atualizado['created_at'] = datetime.now().isoformat()
+            
+            supabase.table('f_frequencia')\
+                .insert(registro_atualizado)\
+                .execute()
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar atraso: {e}")
+        return False
+
+def salvar_saida_unificado(dados):
+    try:
+        if not supabase:
+            return False
+            
+        # Verificar se já existe registro
+        existing = supabase.table('f_frequencia')\
+            .select('*')\
+            .eq('aluno_id', dados['aluno_id'])\
+            .eq('data', dados['data'])\
+            .execute()
+        
+        registro_atualizado = {
+            'aluno_id': dados['aluno_id'],
+            'sala_id': dados['sala_id'],
+            'data': dados['data'],
+            'hora_saida': dados['hora_saida'],
+            'motivo_saida': dados['motivo_saida'],
+            'responsavel_nome': dados['responsavel_nome'],
+            'responsavel_telefone': dados['responsavel_telefone'],
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        if existing.data:
+            # Se já existe, atualizar
+            status_atual = existing.data[0]['status']
+            if status_atual == 'PA':
+                novo_status = 'PSA'
+            else:
+                novo_status = 'PS'
+            
+            registro_atualizado['status'] = novo_status
+            
+            supabase.table('f_frequencia')\
+                .update(registro_atualizado)\
+                .eq('id', existing.data[0]['id'])\
+                .execute()
+        else:
+            # Se não existe, criar novo
+            registro_atualizado['status'] = 'PS'
+            registro_atualizado['created_at'] = datetime.now().isoformat()
+            
+            supabase.table('f_frequencia')\
+                .insert(registro_atualizado)\
+                .execute()
+        
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar saída: {e}")
+        return False
+
+# Atualize as APIs existentes:
+
+@app.route('/api/salvar_frequencia', methods=['POST'])
+def api_salvar_frequencia():
+    try:
+        dados = request.get_json()
+        
+        if not dados or not isinstance(dados, list):
+            return jsonify({'error': 'Dados inválidos'}), 400
+
+        success = salvar_frequencia_unificada(dados)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Frequência de {len(dados)} alunos salva com sucesso'
+            })
+        else:
+            return jsonify({'error': 'Erro ao salvar frequência'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salvar_atraso', methods=['POST'])
+def salvar_atraso():
+    try:
+        dados = request.get_json()
+        
+        campos_obrigatorios = ['aluno_id', 'sala_id', 'data', 'hora_entrada', 'motivo_atraso', 'responsavel_nome', 'responsavel_telefone']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
+
+        success = salvar_atraso_unificado(dados)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Atraso registrado com sucesso'
+            })
+        else:
+            return jsonify({'error': 'Erro ao salvar atraso'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salvar_saida_antecipada', methods=['POST'])
+def salvar_saida_antecipada():
+    try:
+        dados = request.get_json()
+        
+        campos_obrigatorios = ['aluno_id', 'sala_id', 'data', 'hora_saida', 'motivo_saida', 'responsavel_nome', 'responsavel_telefone']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
+
+        success = salvar_saida_unificado(dados)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Saída antecipada registrada com sucesso'
+            })
+        else:
+            return jsonify({'error': 'Erro ao salvar saída antecipada'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/frequencia_detalhes/<int:aluno_id>/<data>')
+def frequencia_detalhes(aluno_id, data):
+    try:
+        if supabase:
+            response = supabase.table('f_frequencia')\
+                .select('*')\
+                .eq('aluno_id', aluno_id)\
+                .eq('data', data)\
+                .execute()
+            
+            if response.data:
+                return jsonify(response.data[0])
+            else:
+                return jsonify({'error': 'Registro não encontrado'}), 404
+        return jsonify({'error': 'Supabase não configurado'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/frequencia')
+def api_frequencia():
+    try:
+        sala_id = request.args.get('sala')
+        mes = request.args.get('mes')
+        
+        if not sala_id or not mes:
+            return jsonify({'error': 'Sala e mês são obrigatórios'}), 400
+
+        if supabase:
+            # Buscar alunos da sala
+            alunos_response = supabase.table('alunos').select('*').eq('sala_id', sala_id).execute()
+            alunos = alunos_response.data
+            
+            # Buscar frequência do mês
+            ano = datetime.now().year
+            data_inicio = f"{ano}-{mes:0>2}-01"
+            data_fim = f"{ano}-{mes:0>2}-31"
+            
+            frequencia_response = supabase.table('f_frequencia')\
+                .select('*')\
+                .eq('sala_id', sala_id)\
+                .gte('data', data_inicio)\
+                .lte('data', data_fim)\
+                .execute()
+            
+            # Organizar dados
+            dados = []
+            for aluno in alunos:
+                aluno_data = {
+                    'id': aluno['id'],
+                    'nome': aluno['nome'],
+                    'frequencia': {}
+                }
+                
+                # Buscar frequência do aluno
+                freq_aluno = [f for f in frequencia_response.data if f['aluno_id'] == aluno['id']]
+                for freq in freq_aluno:
+                    aluno_data['frequencia'][freq['data']] = {
+                        'status': freq['status'],
+                        'hora_entrada': freq.get('hora_entrada'),
+                        'hora_saida': freq.get('hora_saida'),
+                        'motivo_atraso': freq.get('motivo_atraso'),
+                        'motivo_saida': freq.get('motivo_saida'),
+                        'responsavel_nome': freq.get('responsavel_nome'),
+                        'responsavel_telefone': freq.get('responsavel_telefone')
+                    }
+                
+                dados.append(aluno_data)
+            
+            return jsonify(dados)
+        
+        return jsonify([])
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
+
