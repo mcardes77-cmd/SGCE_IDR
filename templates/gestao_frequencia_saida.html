@@ -86,15 +86,14 @@
         return;
       }
 
-      const payload = {
-        aluno_id: Number(aluno_id),
-        sala_id: Number(sala_id),
-        data,
-        hora_saida,
-        motivo_saida,
-        responsavel_saida,
-        telefone_saida,
-        status: 'PS'
+    const payload = {
+    aluno_id: Number(aluno_id),
+    sala_id: Number(sala_id),
+    data,
+    hora_saida: hora_saida,
+    motivo_saida: motivo_saida,
+    responsavel_nome: responsavel_saida,
+    responsavel_telefone: telefone_saida
       };
 
       mostrarMensagem('Enviando...', 'info');
@@ -199,4 +198,5 @@
     </footer>
   </div>
 </body>
+
 </html>
