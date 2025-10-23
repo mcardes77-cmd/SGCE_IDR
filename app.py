@@ -272,14 +272,16 @@ def api_salas_por_professor(professor_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/alunos_por_sala/<int:sala_id>')
-def api_alunos_por_sala(sala_id):
-    """Retorna alunos da sala selecionada"""
+def alunos_por_sala(sala_id):
     try:
-        if supabase:
-            response = supabase.table('d_alunos').select('id, nome').eq('sala_id', sala_id).execute()
-            alunos = handle_supabase_response(response)
-            return jsonify(alunos)
-        return jsonify([])
+        response = supabase.table('d_alunos') \
+            .select('id, nome, tutor_nome') \
+            .eq('sala_id', sala_id) \
+            .order('nome', desc=False) \
+            .execute()
+
+        alunos = handle_supabase_response(response)
+        return jsonify(alunos)
     except Exception as e:
         logger.exception("Erro ao buscar alunos por sala")
         return jsonify({'error': str(e)}), 500
@@ -905,5 +907,6 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
