@@ -376,51 +376,39 @@ def api_registrar_ocorrencia():
         return jsonify({'error': str(e)}), 500
 
 # --- Detalhes da ocorrência pelo número ---
-@app.route('/api/ocorrencia_detalhes', methods=['GET'])
-def api_ocorrencia_detalhes():
-    numero = request.args.get('numero')
+def get_conn():
+    # Ajuste sua conexão com PostgreSQL / Supabase
+    conn = psycopg2.connect(
+        host="SEU_HOST",
+        dbname="SEU_DB",
+        user="SEU_USER",
+        password="SUA_SENHA",
+        cursor_factory=RealDictCursor
+    )
+    return conn
+
+@app.route("/api/ocorrencia_detalhes")
+def ocorrencia_detalhes():
+    numero = request.args.get("numero")
     if not numero:
-        return jsonify({'error': 'Número da ocorrência não fornecido'}), 400
-    try:
-        response = supabase.table('ocorrencias').select('*').eq('numero', int(numero)).execute()
-        ocorrencias = handle_supabase_response(response)
-        if not ocorrencias:
-            return jsonify({'error': 'Ocorrência não encontrada'}), 404
-        return jsonify(ocorrencias[0])
-    except Exception as e:
-        logger.exception("Erro ao buscar ocorrência")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": "Número da ocorrência não informado"}), 400
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM ocorrencias WHERE numero = %s", (numero,))
+    ocorrencia = cur.fetchone()
+    cur.close()
+    conn.close()
+    return jsonify(ocorrencia or {})
 
-# --- Salvar atendimento ---
-@app.route('/api/salvar_atendimento', methods=['POST'])
-def api_salvar_atendimento():
-    dados = request.get_json()
-    numero = dados.get('numero')
-    nivel = dados.get('nivel')
-    texto = dados.get('texto')
+@app.route("/api/salvar_atendimento", methods=["POST"])
+def salvar_atendimento():
+    data = request.json
+    numero = data.get("numero")
+    nivel = data.get("nivel")
+    texto = data.get("texto")
+    if not all([numero, nivel, texto]):
+        return jsonify({"success": False, "error": "Dados incompletos"}), 400
 
-    if not numero or not nivel or texto is None:
-        return jsonify({'error': 'Dados incompletos'}), 400
-
-    campo_atualizar = None
-    if nivel == 'tutor':
-        campo_atualizar = 'atendimento_tutor'
-    elif nivel == 'coordenacao':
-        campo_atualizar = 'atendimento_coordenacao'
-    elif nivel == 'gestao':
-        campo_atualizar = 'atendimento_gestao'
-    else:
-        return jsonify({'error': 'Nível inválido'}), 400
-
-    try:
-        response = supabase.table('ocorrencias').update({campo_atualizar: texto}).eq('numero', int(numero)).execute()
-        ocorrencia_atualizada = handle_supabase_response(response)
-        if not ocorrencia_atualizada:
-            return jsonify({'error': 'Falha ao atualizar ocorrência'}), 500
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.exception("Erro ao salvar atendimento")
-        return jsonify({'error': str(e)}), 500
 # =============================================================
 # APIs de ocorrências (mantidas)
 # =============================================================
@@ -1001,6 +989,7 @@ def salvar_atendimento():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
