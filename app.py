@@ -827,6 +827,41 @@ def api_alunos_por_sala(sala_id):
         logger.exception(f"Erro ao buscar alunos da sala {sala_id}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/ocorrencia_nova', methods=['POST'])
+def api_ocorrencia_nova():
+    """
+    Cria uma nova ocorrência na tabela `ocorrencias`.
+    O status inicial é sempre 'ATENDIMENTO'.
+    """
+    try:
+        dados = request.get_json()
+        campos_obrigatorios = ['responsavel_id', 'sala_id', 'aluno_id', 'tutor_id', 'descricao']
+
+        # Validar campos obrigatórios
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
+
+        registro = {
+            'responsavel_id': dados['responsavel_id'],
+            'sala_id': dados['sala_id'],
+            'aluno_id': dados['aluno_id'],
+            'tutor_id': dados['tutor_id'],
+            'descricao': dados['descricao'],
+            'data': datetime.now().isoformat(),
+            'status': 'ATENDIMENTO'  # status inicial
+        }
+
+        supabase = get_supabase()
+        if not supabase:
+            return jsonify({'error': 'Supabase não configurado'}), 500
+
+        supabase.table('ocorrencias').insert(registro).execute()
+        return jsonify({'success': True, 'message': 'Ocorrência registrada com sucesso'})
+
+    except Exception as e:
+        logger.exception("Erro ao salvar nova ocorrência")
+        return jsonify({'error': str(e)}), 500
 
 
 # =============================================================
@@ -835,4 +870,5 @@ def api_alunos_por_sala(sala_id):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
