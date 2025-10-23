@@ -1,7 +1,8 @@
 # =============================================================
-# APP UNIFICADO - GESTÃO ESCOLAR (COMPLETO)
+# APP UNIFICADO - GESTÃO ESCOLAR (AJUSTADO)
 # Conteúdo: merge de app (6).py + db_utils.py + routes_frequencia.py
-# Autor: gerado automaticamente
+# Ajustes: utiliza apenas d_alunos; compatível com f_frequencia
+# Autor: gerado automaticamente (ajustes)
 # =============================================================
 
 from flask import Flask, render_template, Blueprint, request, jsonify
@@ -79,17 +80,25 @@ def get_supabase():
 # handle response
 
 def handle_supabase_response(response):
+    """
+    Normaliza respostas do supabase-py:
+    - aceita objetos que têm .data e .error
+    - aceita dicts {'data': ..., 'error': ...}
+    - retorna a lista / objeto de dados
+    """
     try:
         if response is None:
             raise Exception("Resposta Supabase é None.")
-        if isinstance(response, dict):
-            if response.get("error"):
-                raise Exception(f"Erro Postgrest: {response['error']}")
-            return response.get("data", response)
+        # supabase-py v1: response is an object with .data / .error
         if hasattr(response, "error") and response.error:
             raise Exception(f"Erro Postgrest: {response.error}")
         if hasattr(response, "data"):
             return response.data
+        # fallback: dict-like
+        if isinstance(response, dict):
+            if response.get("error"):
+                raise Exception(f"Erro Postgrest: {response['error']}")
+            return response.get("data", response)
         return response
     except Exception:
         logger.exception("Erro ao tratar resposta Supabase.")
@@ -132,20 +141,24 @@ def safe_pdf_text(texto):
     return str(texto).replace('°', 'º').replace('ª', 'a').replace('º', 'o')
 
 # Exemplos de helpers para consultas (do db_utils)
-
 def get_alunos_por_sala_data(sala_id):
+    """
+    Retorna lista de alunos (d_alunos) da sala com dados do tutor (d_funcionarios).
+    Ajustado para d_alunos.
+    """
     try:
         supabase = get_supabase()
         if not supabase:
             return []
+        # tenta incluir join para pegar nome do tutor se existir tutor_id
         response = supabase.table('d_alunos').select('id, nome, tutor_id, d_funcionarios!d_alunos_tutor_id_fkey(nome)').eq('sala_id', sala_id).execute()
         alunos = []
         for aluno in handle_supabase_response(response):
             alunos.append({
-                'id': aluno['id'],
-                'nome': aluno['nome'],
+                'id': aluno.get('id'),
+                'nome': aluno.get('nome'),
                 'tutor_id': aluno.get('tutor_id'),
-                'tutor_nome': aluno.get('d_funcionarios', [{}])[0].get('nome', 'Tutor Não Definido')
+                'tutor_nome': (aluno.get('d_funcionarios') or [{}])[0].get('nome', 'Tutor Não Definido')
             })
         return alunos
     except Exception as e:
@@ -164,6 +177,7 @@ supabase = get_supabase()
 
 # =============================================================
 # Funções auxiliares do app original (mantidas)
+# Ajustadas para utilizar d_alunos em vez de alunos
 # =============================================================
 
 def get_salas():
@@ -176,20 +190,20 @@ def get_salas():
         logger.error(f"Erro ao buscar salas: {e}")
         return []
 
-def get_alunos():
+def get_d_alunos():
     try:
         if supabase:
-            response = supabase.table('alunos').select('*').execute()
+            response = supabase.table('d_alunos').select('*').execute()
             return handle_supabase_response(response)
         return []
     except Exception as e:
-        logger.error(f"Erro ao buscar alunos: {e}")
+        logger.error(f"Erro ao buscar d_alunos: {e}")
         return []
 
 def get_alunos_por_sala(sala_id):
     try:
         if supabase:
-            response = supabase.table('alunos').select('*').eq('sala_id', sala_id).execute()
+            response = supabase.table('d_alunos').select('*').eq('sala_id', sala_id).execute()
             return handle_supabase_response(response)
         return []
     except Exception as e:
@@ -289,13 +303,13 @@ def api_ocorrencias_filtrar():
         if tutor_id and tutor_id != 'all':
             tutores_resp = supabase.table('ocorrencias').select('tutor').execute()
             tutores = list(set([occ['tutor'] for occ in handle_supabase_response(tutores_resp) if occ.get('tutor')]))
-            if int(tutor_id) < len(tutores):
+            if tutor_id.isdigit() and int(tutor_id) < len(tutores):
                 tutor_nome = tutores[int(tutor_id)]
                 query = query.eq('tutor', tutor_nome)
         if status and status != 'all':
             query = query.eq('status', status)
         if aluno_id and aluno_id != 'all':
-            aluno_resp = supabase.table('alunos').select('nome').eq('id', aluno_id).execute()
+            aluno_resp = supabase.table('d_alunos').select('nome').eq('id', aluno_id).execute()
             aluno_data = handle_supabase_response(aluno_resp)
             if aluno_data:
                 aluno_nome = aluno_data[0]['nome']
@@ -323,20 +337,39 @@ def api_gerar_pdf_ocorrencias():
 
 # =============================================================
 # FUNÇÕES DE FREQUÊNCIA UNIFICADA (mantidas do app original)
-# Nota: essas funções foram mantidas, e serão compatíveis com
-# a tabela f_frequencia do Supabase.
+# Compatíveis com a tabela f_frequencia (colunas confirmadas)
 # =============================================================
 
 def salvar_frequencia_unificada(registros):
+    """
+    Espera lista de registros com chaves compatíveis com f_frequencia:
+    exemplo de registro: {'aluno_id': ..., 'sala_id': ..., 'data': 'YYYY-MM-DD', 'status': 'P', ...}
+    """
     try:
         if not supabase:
             return False
         for registro in registros:
-            existing = supabase.table('f_frequencia').select('*').eq('aluno_id', registro['aluno_id']).eq('data', registro['data']).execute()
-            if existing.data:
-                supabase.table('f_frequencia').update({'status': registro['status'], 'updated_at': datetime.now().isoformat()}).eq('id', existing.data[0]['id']).execute()
+            resp = supabase.table('f_frequencia').select('*').eq('aluno_id', registro['aluno_id']).eq('data', registro['data']).execute()
+            existing = handle_supabase_response(resp)
+            if existing:
+                # atualiza status e updated_at
+                supabase.table('f_frequencia').update({
+                    'status': registro.get('status'),
+                    'hora_entrada': registro.get('hora_entrada'),
+                    'hora_saida': registro.get('hora_saida'),
+                    'motivo_atraso': registro.get('motivo_atraso'),
+                    'motivo_saida': registro.get('motivo_saida'),
+                    'responsavel_nome': registro.get('responsavel_nome'),
+                    'responsavel_telefone': registro.get('responsavel_telefone'),
+                    'updated_at': datetime.now().isoformat()
+                }).eq('id', existing[0]['id']).execute()
             else:
-                supabase.table('f_frequencia').insert({**registro, 'created_at': datetime.now().isoformat(), 'updated_at': datetime.now().isoformat()}).execute()
+                insert_payload = {
+                    **registro,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                supabase.table('f_frequencia').insert(insert_payload).execute()
         return True
     except Exception as e:
         logger.exception("Erro ao salvar frequência unificada")
@@ -347,25 +380,26 @@ def salvar_atraso_unificado(dados):
     try:
         if not supabase:
             return False
-        existing = supabase.table('f_frequencia').select('*').eq('aluno_id', dados['aluno_id']).eq('data', dados['data']).execute()
+        resp = supabase.table('f_frequencia').select('*').eq('aluno_id', dados['aluno_id']).eq('data', dados['data']).execute()
+        existing = handle_supabase_response(resp)
         registro_atualizado = {
             'aluno_id': dados['aluno_id'],
-            'sala_id': dados['sala_id'],
+            'sala_id': dados.get('sala_id'),
             'data': dados['data'],
-            'hora_entrada': dados['hora_entrada'],
-            'motivo_atraso': dados['motivo_atraso'],
-            'responsavel_nome': dados['responsavel_nome'],
-            'responsavel_telefone': dados['responsavel_telefone'],
+            'hora_entrada': dados.get('hora_entrada'),
+            'motivo_atraso': dados.get('motivo_atraso'),
+            'responsavel_nome': dados.get('responsavel_nome'),
+            'responsavel_telefone': dados.get('responsavel_telefone'),
             'updated_at': datetime.now().isoformat()
         }
-        if existing.data:
-            status_atual = existing.data[0]['status']
+        if existing:
+            status_atual = existing[0].get('status')
             if status_atual == 'PS':
                 novo_status = 'PSA'
             else:
                 novo_status = 'PA'
             registro_atualizado['status'] = novo_status
-            supabase.table('f_frequencia').update(registro_atualizado).eq('id', existing.data[0]['id']).execute()
+            supabase.table('f_frequencia').update(registro_atualizado).eq('id', existing[0]['id']).execute()
         else:
             registro_atualizado['status'] = 'PA'
             registro_atualizado['created_at'] = datetime.now().isoformat()
@@ -380,25 +414,26 @@ def salvar_saida_unificado(dados):
     try:
         if not supabase:
             return False
-        existing = supabase.table('f_frequencia').select('*').eq('aluno_id', dados['aluno_id']).eq('data', dados['data']).execute()
+        resp = supabase.table('f_frequencia').select('*').eq('aluno_id', dados['aluno_id']).eq('data', dados['data']).execute()
+        existing = handle_supabase_response(resp)
         registro_atualizado = {
             'aluno_id': dados['aluno_id'],
-            'sala_id': dados['sala_id'],
+            'sala_id': dados.get('sala_id'),
             'data': dados['data'],
-            'hora_saida': dados['hora_saida'],
-            'motivo_saida': dados['motivo_saida'],
-            'responsavel_nome': dados['responsavel_nome'],
-            'responsavel_telefone': dados['responsavel_telefone'],
+            'hora_saida': dados.get('hora_saida'),
+            'motivo_saida': dados.get('motivo_saida'),
+            'responsavel_nome': dados.get('responsavel_nome'),
+            'responsavel_telefone': dados.get('responsavel_telefone'),
             'updated_at': datetime.now().isoformat()
         }
-        if existing.data:
-            status_atual = existing.data[0]['status']
+        if existing:
+            status_atual = existing[0].get('status')
             if status_atual == 'PA':
                 novo_status = 'PSA'
             else:
                 novo_status = 'PS'
             registro_atualizado['status'] = novo_status
-            supabase.table('f_frequencia').update(registro_atualizado).eq('id', existing.data[0]['id']).execute()
+            supabase.table('f_frequencia').update(registro_atualizado).eq('id', existing[0]['id']).execute()
         else:
             registro_atualizado['status'] = 'PS'
             registro_atualizado['created_at'] = datetime.now().isoformat()
@@ -410,7 +445,6 @@ def salvar_saida_unificado(dados):
 
 # =============================================================
 # APIS DE FREQUÊNCIA (rotas principais do app original)
-# Serão mantidas e compatíveis com f_frequencia
 # =============================================================
 
 @app.route('/api/salvar_frequencia', methods=['POST'])
@@ -467,8 +501,9 @@ def api_frequencia_detalhes(aluno_id, data):
     try:
         if supabase:
             response = supabase.table('f_frequencia').select('*').eq('aluno_id', aluno_id).eq('data', data).execute()
-            if response.data:
-                return jsonify(response.data[0])
+            data_resp = handle_supabase_response(response)
+            if data_resp:
+                return jsonify(data_resp[0])
             else:
                 return jsonify({'error': 'Registro não encontrado'}), 404
         return jsonify({'error': 'Supabase não configurado'}), 500
@@ -478,24 +513,45 @@ def api_frequencia_detalhes(aluno_id, data):
 
 @app.route('/api/frequencia')
 def api_frequencia():
+    """
+    Retorna frequência por sala e mês.
+    Parâmetros:
+    - sala (id)
+    - mes (1-12 ou '01'..'12')
+    """
     try:
         sala_id = request.args.get('sala')
         mes = request.args.get('mes')
         if not sala_id or not mes:
             return jsonify({'error': 'Sala e mês são obrigatórios'}), 400
         if supabase:
-            alunos_response = supabase.table('alunos').select('*').eq('sala_id', sala_id).execute()
+            alunos_response = supabase.table('d_alunos').select('*').eq('sala_id', sala_id).execute()
             alunos = handle_supabase_response(alunos_response)
             ano = datetime.now().year
-            data_inicio = f"{ano}-{mes:0>2}-01"
-            data_fim = f"{ano}-{mes:0>2}-31"
+            # normaliza mês
+            mes_str = str(mes).zfill(2)
+            try:
+                last_day = monthrange(ano, int(mes_str))[1]
+            except Exception:
+                last_day = 31
+            data_inicio = f"{ano}-{mes_str}-01"
+            data_fim = f"{ano}-{mes_str}-{last_day:02d}"
             frequencia_response = supabase.table('f_frequencia').select('*').eq('sala_id', sala_id).gte('data', data_inicio).lte('data', data_fim).execute()
+            freq_list = handle_supabase_response(frequencia_response)
             dados = []
-            for aluno in handle_supabase_response(alunos_response):
-                aluno_data = {'id': aluno['id'], 'nome': aluno['nome'], 'frequencia': {}}
-                freq_aluno = [f for f in handle_supabase_response(frequencia_response) if f['aluno_id'] == aluno['id']]
+            for aluno in (alunos or []):
+                aluno_data = {'id': aluno.get('id'), 'nome': aluno.get('nome'), 'frequencia': {}}
+                freq_aluno = [f for f in (freq_list or []) if f.get('aluno_id') == aluno.get('id')]
                 for freq in freq_aluno:
-                    aluno_data['frequencia'][freq['data']] = {'status': freq['status'], 'hora_entrada': freq.get('hora_entrada'), 'hora_saida': freq.get('hora_saida'), 'motivo_atraso': freq.get('motivo_atraso'), 'motivo_saida': freq.get('motivo_saida'), 'responsavel_nome': freq.get('responsavel_nome'), 'responsavel_telefone': freq.get('responsavel_telefone')}
+                    aluno_data['frequencia'][freq.get('data')] = {
+                        'status': freq.get('status'),
+                        'hora_entrada': freq.get('hora_entrada'),
+                        'hora_saida': freq.get('hora_saida'),
+                        'motivo_atraso': freq.get('motivo_atraso'),
+                        'motivo_saida': freq.get('motivo_saida'),
+                        'responsavel_nome': freq.get('responsavel_nome'),
+                        'responsavel_telefone': freq.get('responsavel_telefone')
+                    }
                 dados.append(aluno_data)
             return jsonify(dados)
         return jsonify([])
@@ -510,7 +566,8 @@ def api_frequencia_status_route():
         data = request.args.get('data')
         if supabase:
             response = supabase.table('f_frequencia').select('*').eq('sala_id', sala_id).eq('data', data).execute()
-            frequencia_registrada = len(response.data) > 0
+            resp_data = handle_supabase_response(response)
+            frequencia_registrada = len(resp_data) > 0
         else:
             frequencia_registrada = False
         return jsonify({'registrada': frequencia_registrada, 'sala_id': sala_id, 'data': data})
@@ -703,18 +760,6 @@ def gestao_tecnologia_ocorrencia():
 
 # Registrar blueprint principal
 app.register_blueprint(main_bp, url_prefix='/')
-
-# =============================================================
-# Observação sobre routes_frequencia.py
-# =============================================================
-# O conteúdo de routes_frequencia.py foi analisado e suas
-# rotas foram integradas nas seções de frequência acima.
-# Para evitar rotas duplicadas com o código existente, a
-# versão completa original de routes_frequencia.py foi
-# preservada localmente (comentada) mas não registrada.
-# Se preferir substituir as implementações atuais pelas
-# versões de routes_frequencia.py, diga que eu faço a troca
-# e eu removo as duplicatas.
 
 # =============================================================
 # Execução
