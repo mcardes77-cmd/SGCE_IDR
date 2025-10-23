@@ -1,259 +1,336 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Ocorrência</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'dark-primary': '#0F172A',
-            'dark-secondary': '#1E293B',
-            'accent': '#10B981',
-            'text-light': '#F8FAFC',
-            'tutor-color': '#007ACC',
-            'coord-color': '#F59E0B',
-            'gestao-color': '#EF4444'
-          },
-        },
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editar Ocorrência</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'dark-primary': '#0F172A',
+        'dark-secondary': '#1E293B',
+        'accent': '#10B981',
+        'text-light': '#F8FAFC',
+        'tutor-color': '#007ACC',
+        'coord-color': '#F59E0B',
+        'gestao-color': '#EF4444'
       },
-    };
-    </script>
-    <style>
-        .form-input, .form-textarea {
-            background-color: #374151; color: #F8FAFC; border: 1px solid #4B5563;
-            padding: 0.5rem; border-radius: 0.375rem; width: 100%;
-            transition: all 0.3s ease;
-        }
-        .readonly { 
-            background-color: #1F2937; 
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-        .editable {
-            background-color: #374151;
-            border-color: #10B981;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-        }
-        .badge-nivel {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            margin-left: 0.5rem;
-        }
-    </style>
+    },
+  },
+};
+</script>
+<style>
+.form-input, .form-textarea {
+    background-color: #374151; color: #F8FAFC; border: 1px solid #4B5563;
+    padding: 0.5rem; border-radius: 0.375rem; width: 100%;
+    transition: all 0.3s ease;
+}
+.readonly { 
+    background-color: #1F2937; 
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.editable {
+    background-color: #374151;
+    border-color: #10B981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+.badge-nivel {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 0.5rem;
+}
+</style>
 </head>
 <body class="bg-dark-primary text-text-light min-h-screen p-4">
-    <div class="max-w-4xl mx-auto">
-        <header class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-accent">EDITAR OCORRÊNCIA 
-                <span id="badge-nivel" class="badge-nivel hidden"></span>
-            </h1>
-            <button onclick="window.location.href='/gestao_ocorrencia'" class="mt-4 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white">
-                ← Voltar para Ocorrências
-            </button>
-        </header>
+<div class="max-w-4xl mx-auto">
+<header class="text-center mb-8">
+    <h1 class="text-2xl font-bold text-accent">EDITAR OCORRÊNCIA 
+        <span id="badge-nivel" class="badge-nivel hidden"></span>
+    </h1>
+    <button onclick="window.location.href='/gestao_ocorrencia'" class="mt-4 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white">
+        ← Voltar para Ocorrências
+    </button>
+</header>
 
-        <div class="bg-dark-secondary p-6 rounded-lg">
-            <div id="mensagem-status" class="hidden mb-4 p-3 rounded text-sm"></div>
+<div class="bg-dark-secondary p-6 rounded-lg">
+    <div id="mensagem-status" class="hidden mb-4 p-3 rounded text-sm"></div>
 
-            <div class="mb-4">
-                <strong>Número:</strong> <span id="numero" class="text-accent ml-2">Carregando...</span>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Aluno</label>
-                    <div id="aluno" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Sala</label>
-                    <div id="sala" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Professor Responsável</label>
-                    <div id="professor" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Tutor</label>
-                    <div id="tutor" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-sm text-gray-300 mb-1">Status</label>
-                <div id="status" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
-            </div>
-
-            <div class="mb-6">
-                <label class="block text-sm text-gray-300 mb-1">Descrição da Ocorrência</label>
-                <textarea id="descricao" class="form-textarea readonly" rows="4" readonly>Carregando...</textarea>
-            </div>
-
-            <form id="form-atendimento">
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-300 mb-1">Atendimento Professor</label>
-                    <textarea id="atendimento_professor" class="form-textarea readonly" rows="3" readonly>Carregando...</textarea>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-300 mb-1">Atendimento Tutor</label>
-                    <textarea id="atendimento_tutor" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento do tutor..." readonly>Carregando...</textarea>
-                    <p class="text-xs text-gray-400 mt-1" id="help-tutor">Este campo será editável apenas se você acessou através do link "T"</p>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-300 mb-1">Atendimento Coordenação</label>
-                    <textarea id="atendimento_coordenacao" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento da coordenação..." readonly>Carregando...</textarea>
-                    <p class="text-xs text-gray-400 mt-1" id="help-coordenacao">Este campo será editável apenas se você acessou através do link "C"</p>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-300 mb-1">Atendimento Gestão</label>
-                    <textarea id="atendimento_gestao" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento da gestão..." readonly>Carregando...</textarea>
-                    <p class="text-xs text-gray-400 mt-1" id="help-gestao">Este campo será editável apenas se você acessou através do link "G"</p>
-                </div>
-
-                <button type="button" onclick="salvarAtendimento()" id="btn-salvar" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white hidden">
-                    SALVAR ATENDIMENTO
-                </button>
-            </form>
-        </div>
-
-        <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
-            <p class="mb-1 text-base font-medium">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
-            <p class="text-xs font-light tracking-wide">LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO</p>
-        </footer>
+    <div class="mb-4">
+        <strong>Número:</strong> <span id="numero" class="text-accent ml-2">Carregando...</span>
     </div>
 
-    <script>
-        let ocorrenciaAtual = null;
-        let nivelAtual = null;
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-gray-300 mb-1">Aluno</label>
+            <div id="aluno" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-300 mb-1">Sala</label>
+            <div id="sala" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
+        </div>
+    </div>
 
-        const mapaNiveis = {
-            'T': { campo: 'atendimento_tutor', nome: 'TUTOR', cor: 'bg-tutor-color', texto: 'text-white', nivel_api: 'tutor' },
-            'C': { campo: 'atendimento_coordenacao', nome: 'COORDENAÇÃO', cor: 'bg-coord-color', texto: 'text-white', nivel_api: 'coordenacao' },
-            'G': { campo: 'atendimento_gestao', nome: 'GESTÃO', cor: 'bg-gestao-color', texto: 'text-white', nivel_api: 'gestao' }
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm text-gray-300 mb-1">Professor Responsável</label>
+            <div id="professor" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-300 mb-1">Tutor</label>
+            <div id="tutor" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-sm text-gray-300 mb-1">Status</label>
+        <div id="status" class="p-2 rounded bg-gray-800 text-sm">Carregando...</div>
+    </div>
+
+    <div class="mb-6">
+        <label class="block text-sm text-gray-300 mb-1">Descrição da Ocorrência</label>
+        <textarea id="descricao" class="form-textarea readonly" rows="4" readonly>Carregando...</textarea>
+    </div>
+
+    <form id="form-atendimento">
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Atendimento Professor</label>
+            <textarea id="atendimento_professor" class="form-textarea readonly" rows="3" readonly>Carregando...</textarea>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Atendimento Tutor</label>
+            <textarea id="atendimento_tutor" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento do tutor..." readonly>Carregando...</textarea>
+            <p class="text-xs text-gray-400 mt-1" id="help-tutor">Este campo será editável apenas se você acessou através do link "T"</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Atendimento Coordenação</label>
+            <textarea id="atendimento_coordenacao" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento da coordenação..." readonly>Carregando...</textarea>
+            <p class="text-xs text-gray-400 mt-1" id="help-coordenacao">Este campo será editável apenas se você acessou através do link "C"</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Atendimento Gestão</label>
+            <textarea id="atendimento_gestao" class="form-textarea readonly" rows="3" placeholder="Digite o atendimento da gestão..." readonly>Carregando...</textarea>
+            <p class="text-xs text-gray-400 mt-1" id="help-gestao">Este campo será editável apenas se você acessou através do link "G"</p>
+        </div>
+
+        <button type="button" onclick="salvarAtendimento()" id="btn-salvar" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white hidden">
+            SALVAR ATENDIMENTO
+        </button>
+    </form>
+
+    <button type="button" onclick="gerarPDFAluno()" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white mt-4">
+        GERAR PDF
+    </button>
+</div>
+
+<footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
+    <p class="mb-1 text-base font-medium">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
+    <p class="text-xs font-light tracking-wide">LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO</p>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+let ocorrenciaAtual = null;
+let nivelAtual = null;
+
+const mapaNiveis = {
+    'T': { campo: 'atendimento_tutor', nome: 'TUTOR', cor: 'bg-tutor-color', texto: 'text-white', nivel_api: 'tutor' },
+    'C': { campo: 'atendimento_coordenacao', nome: 'COORDENAÇÃO', cor: 'bg-coord-color', texto: 'text-white', nivel_api: 'coordenacao' },
+    'G': { campo: 'atendimento_gestao', nome: 'GESTÃO', cor: 'bg-gestao-color', texto: 'text-white', nivel_api: 'gestao' }
+};
+
+function iniciarPagina() {
+    const urlParams = new URLSearchParams(window.location.search);
+    ocorrenciaAtual = urlParams.get('numero'); 
+    nivelAtual = urlParams.get('nivel');
+
+    if (ocorrenciaAtual) {
+        carregarOcorrencia(ocorrenciaAtual);
+    } else {
+        mostrarMensagem('Erro: Nenhuma ocorrência especificada', 'error');
+        document.getElementById('numero').textContent = 'ERRO';
+    }
+}
+
+async function carregarOcorrencia(numero) {
+    try {
+        const response = await fetch(`/api/ocorrencia_detalhes?numero=${ocorrenciaAtual}`);
+        if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
+        const ocorrencia = await response.json();
+        if (ocorrencia.error) throw new Error(ocorrencia.error);
+
+        preencherDadosOcorrencia(ocorrencia);
+        aplicarRegrasEdicao(nivelAtual);
+    } catch (error) {
+        mostrarMensagem('Erro ao carregar dados: ' + error.message, 'error');
+    }
+}
+
+function preencherDadosOcorrencia(ocorrencia) {
+    document.getElementById('numero').textContent = ocorrencia.numero || 'N/A';
+    document.getElementById('aluno').textContent = ocorrencia.aluno_nome || 'N/A';
+    document.getElementById('sala').textContent = ocorrencia.sala_nome || 'N/A';
+    document.getElementById('professor').textContent = ocorrencia.professor_nome || 'N/A';
+    document.getElementById('tutor').textContent = ocorrencia.tutor_nome || 'N/A';
+    document.getElementById('status').textContent = ocorrencia.status || 'N/A';
+    document.getElementById('descricao').value = ocorrencia.descricao || '';
+    document.getElementById('atendimento_professor').value = ocorrencia.atendimento_professor || '';
+    document.getElementById('atendimento_tutor').value = ocorrencia.atendimento_tutor || '';
+    document.getElementById('atendimento_coordenacao').value = ocorrencia.atendimento_coordenacao || '';
+    document.getElementById('atendimento_gestao').value = ocorrencia.atendimento_gestao || '';
+}
+
+function aplicarRegrasEdicao(nivel) {
+    const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao'];
+    camposAtendimento.forEach(campo => {
+        const element = document.getElementById(campo);
+        element.readOnly = true;
+        element.classList.add('readonly');
+        element.classList.remove('editable');
+    });
+    document.getElementById('btn-salvar').classList.add('hidden');
+
+    if (nivel && mapaNiveis[nivel]) {
+        const config = mapaNiveis[nivel];
+        const element = document.getElementById(config.campo);
+        element.readOnly = false;
+        element.classList.remove('readonly');
+        element.classList.add('editable');
+
+        const badge = document.getElementById('badge-nivel');
+        badge.textContent = `EDITANDO: ${config.nome}`;
+        badge.className = `badge-nivel ${config.cor} ${config.texto}`;
+        badge.classList.remove('hidden');
+
+        document.getElementById('btn-salvar').classList.remove('hidden');
+        setTimeout(() => { element.focus(); }, 100);
+    }
+}
+
+async function salvarAtendimento() {
+    if (!ocorrenciaAtual || !nivelAtual) return;
+    const config = mapaNiveis[nivelAtual];
+    const texto = document.getElementById(config.campo).value;
+    if (!texto.trim()) return;
+
+    try {
+        const dadosEnviar = {
+            numero: ocorrenciaAtual,
+            nivel: config.nivel_api,
+            texto: texto
         };
-
-        function iniciarPagina() {
-            const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('numero'); 
-            nivelAtual = urlParams.get('nivel');
-
-            if (ocorrenciaAtual) {
-                carregarOcorrencia(ocorrenciaAtual);
-            } else {
-                mostrarMensagem('Erro: Nenhuma ocorrência especificada', 'error');
-                document.getElementById('numero').textContent = 'ERRO';
-            }
+        const response = await fetch('/api/salvar_atendimento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dadosEnviar)
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            mostrarMensagem('Atendimento salvo com sucesso! Redirecionando...', 'success');
+            setTimeout(() => { window.location.href = '/gestao_ocorrencia'; }, 2000);
+        } else {
+            mostrarMensagem('Erro ao salvar: ' + (result.error || 'Desconhecido'), 'error');
         }
+    } catch (error) {
+        mostrarMensagem('Erro de conexão: ' + error.message, 'error');
+    }
+}
 
-        async function carregarOcorrencia(numero) {
-            try {
-               const response = await fetch(`/api/ocorrencia_detalhes?numero=${ocorrenciaAtual}`);
-                if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
-                const ocorrencia = await response.json();
-                if (ocorrencia.error) throw new Error(ocorrencia.error);
+function mostrarMensagem(mensagem, tipo) {
+    const elemento = document.getElementById('mensagem-status');
+    elemento.textContent = mensagem;
+    elemento.className = 'mb-4 p-3 rounded text-sm ';
+    if (tipo === 'success') elemento.classList.add('bg-green-600', 'text-white');
+    else if (tipo === 'error') elemento.classList.add('bg-red-600', 'text-white');
+    else elemento.classList.add('bg-blue-600', 'text-white');
+    elemento.classList.remove('hidden');
+    if (tipo !== 'info') setTimeout(() => { elemento.classList.add('hidden'); }, 5000);
+}
 
-                preencherDadosOcorrencia(ocorrencia);
-                aplicarRegrasEdicao(nivelAtual);
+document.addEventListener('DOMContentLoaded', iniciarPagina);
 
-            } catch (error) {
-                mostrarMensagem('Erro ao carregar dados: ' + error.message, 'error');
-            }
-        }
+async function gerarPDFAluno() {
+    const { jsPDF } = window.jspdf;
+    const alunoId = ocorrenciaAtual;
+    if(!alunoId){ alert("Aluno não especificado."); return; }
 
-        function preencherDadosOcorrencia(ocorrencia) {
-            document.getElementById('numero').textContent = ocorrencia.numero || 'N/A';
-            document.getElementById('aluno').textContent = ocorrencia.aluno_nome || 'N/A';
-            document.getElementById('sala').textContent = ocorrencia.sala_nome || 'N/A';
-            document.getElementById('professor').textContent = ocorrencia.professor_nome || 'N/A';
-            document.getElementById('tutor').textContent = ocorrencia.tutor_nome || 'N/A';
-            document.getElementById('status').textContent = ocorrencia.status || 'N/A';
-            document.getElementById('descricao').value = ocorrencia.descricao || '';
-            document.getElementById('atendimento_professor').value = ocorrencia.atendimento_professor || '';
-            document.getElementById('atendimento_tutor').value = ocorrencia.atendimento_tutor || '';
-            document.getElementById('atendimento_coordenacao').value = ocorrencia.atendimento_coordenacao || '';
-            document.getElementById('atendimento_gestao').value = ocorrencia.atendimento_gestao || '';
-        }
+    try {
+        const response = await fetch(`/api/ocorrencias_aluno?aluno_id=${alunoId}`);
+        if(!response.ok) throw new Error(`Erro ao buscar ocorrências: ${response.status}`);
+        const ocorrencias = await response.json();
+        if(!ocorrencias.length){ alert("Nenhuma ocorrência encontrada."); return; }
 
-        function aplicarRegrasEdicao(nivel) {
-            const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao'];
-            camposAtendimento.forEach(campo => {
-                const element = document.getElementById(campo);
-                element.readOnly = true;
-                element.classList.add('readonly');
-                element.classList.remove('editable');
-            });
-            document.getElementById('btn-salvar').classList.add('hidden');
+        const doc = new jsPDF();
+        let y = 20;
+        const salaNome = ocorrencias[0].sala_nome.replace(/\s+/g, '');
+        const dataImpressao = new Date().toISOString().slice(0,10);
+        const nomeArquivo = `${salaNome}_${dataImpressao}.pdf`;
 
-            if (nivel && mapaNiveis[nivel]) {
-                const config = mapaNiveis[nivel];
-                const element = document.getElementById(config.campo);
-                element.readOnly = false;
-                element.classList.remove('readonly');
-                element.classList.add('editable');
+        ocorrencias.forEach((o) => {
+            doc.setFontSize(14);
+            doc.text(`Ocorrência: ${o.numero}`, 10, y); y += 8;
+            doc.setFontSize(12);
+            doc.text(`Data/Hora: ${o.data_hora || 'N/A'}`, 10, y); y += 8;
+            doc.text(`Aluno: ${o.aluno_nome || 'N/A'}`, 10, y); y += 8;
+            doc.text(`Sala: ${o.sala_nome || 'N/A'}`, 10, y); y += 8;
+            doc.text(`Professor: ${o.professor_nome || 'N/A'}`, 10, y); y += 8;
+            doc.text(`Tutor: ${o.tutor_nome || 'N/A'}`, 10, y); y += 8;
+            doc.text(`Status: ${o.status || 'N/A'}`, 10, y); y += 10;
 
-                const badge = document.getElementById('badge-nivel');
-                badge.textContent = `EDITANDO: ${config.nome}`;
-                badge.className = `badge-nivel ${config.cor} ${config.texto}`;
-                badge.classList.remove('hidden');
+            doc.setFontSize(12);
+            doc.text(`Descrição:`, 10, y); y += 8;
+            doc.setFontSize(11);
+            doc.text(o.descricao || '', 10, y, { maxWidth: 190 }); y += 12;
 
-                document.getElementById('btn-salvar').classList.remove('hidden');
-                setTimeout(() => { element.focus(); }, 100);
-            }
-        }
+            const camposAtendimento = [
+                { label: "Professor", valor: o.atendimento_professor },
+                { label: "Tutor", valor: o.atendimento_tutor },
+                { label: "Coordenação", valor: o.atendimento_coordenacao },
+                { label: "Gestão", valor: o.atendimento_gestao }
+            ];
 
-        async function salvarAtendimento() {
-            if (!ocorrenciaAtual || !nivelAtual) return;
-            const config = mapaNiveis[nivelAtual];
-            const texto = document.getElementById(config.campo).value;
-            if (!texto.trim()) return;
-
-            try {
-                const dadosEnviar = {
-                    numero: ocorrenciaAtual,
-                    nivel: config.nivel_api,
-                    texto: texto
-                };
-                const response = await fetch('/api/salvar_atendimento', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dadosEnviar)
-                });
-                const result = await response.json();
-                if (response.ok && result.success) {
-                    mostrarMensagem('Atendimento salvo com sucesso! Redirecionando...', 'success');
-                    setTimeout(() => { window.location.href = '/gestao_ocorrencia'; }, 2000);
-                } else {
-                    mostrarMensagem('Erro ao salvar: ' + (result.error || 'Desconhecido'), 'error');
+            camposAtendimento.forEach(c => {
+                if(c.valor && !o.impressao_pdf){
+                    doc.setFontSize(12);
+                    doc.text(`${c.label}:`, 10, y); y += 8;
+                    doc.setFontSize(11);
+                    doc.text(c.valor, 10, y, { maxWidth: 190 }); y += 12;
                 }
-            } catch (error) {
-                mostrarMensagem('Erro de conexão: ' + error.message, 'error');
-            }
-        }
+            });
 
-        function mostrarMensagem(mensagem, tipo) {
-            const elemento = document.getElementById('mensagem-status');
-            elemento.textContent = mensagem;
-            elemento.className = 'mb-4 p-3 rounded text-sm ';
-            if (tipo === 'success') elemento.classList.add('bg-green-600', 'text-white');
-            else if (tipo === 'error') elemento.classList.add('bg-red-600', 'text-white');
-            else elemento.classList.add('bg-blue-600', 'text-white');
-            elemento.classList.remove('hidden');
-            if (tipo !== 'info') setTimeout(() => { elemento.classList.add('hidden'); }, 5000);
-        }
+            y += 8; 
+        });
 
-        document.addEventListener('DOMContentLoaded', iniciarPagina);
-    </script>
+        // Assinatura e data
+        doc.setFontSize(12);
+        doc.text("__________________________", 10, y + 10);
+        doc.text("Assinatura do Responsável do Aluno", 10, y + 16);
+        doc.text("Data: _____/______/_________", 10, y + 24);
+
+        doc.save(nomeArquivo);
+
+        await fetch(`/api/marcar_impressa`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ aluno_id: alunoId })
+        });
+
+        alert("PDF gerado com sucesso!");
+
+    } catch (error) {
+        alert("Erro ao gerar PDF: " + error.message);
+    }
+}
+</script>
 </body>
 </html>
