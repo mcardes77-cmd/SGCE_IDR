@@ -889,6 +889,24 @@ def gestao_tecnologia_historico():
 def gestao_tecnologia_ocorrencia():
     return render_template('gestao_tecnologia_ocorrencia.html')
 
+@app.route('/api/ocorrencia/<int:numero>', methods=['GET'])
+def api_buscar_ocorrencia_por_numero(numero):
+    """Busca os dados de uma ocorrência pelo número"""
+    try:
+        response = supabase.table('ocorrencias').select('*').eq('numero', numero).execute()
+        ocorrencias = handle_supabase_response(response)
+        
+        if not ocorrencias:
+            return jsonify({'error': f'Ocorrência #{numero} não encontrada'}), 404
+        
+        # Retornamos a primeira ocorrência encontrada (deve haver apenas uma por número)
+        return jsonify(ocorrencias[0])
+    
+    except Exception as e:
+        logger.exception("Erro ao buscar ocorrência")
+        return jsonify({'error': str(e)}), 500
+
+
 # Registrar blueprint principal
 app.register_blueprint(main_bp, url_prefix='/')
 
@@ -898,6 +916,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
