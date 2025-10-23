@@ -322,5 +322,131 @@
             }
         }
     </script>
+
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // ---------- Carregar Responsáveis ----------
+    fetch('/api/professores')  // ajustar se o endpoint correto for diferente
+        .then(res => res.json())
+        .then(funcionarios => {
+            const responsavelSelect = document.getElementById('responsavelSelect');
+            if (!responsavelSelect) return;
+            responsavelSelect.innerHTML = '<option value="">Selecione o responsável</option>';
+            funcionarios.forEach(func => {
+                const option = document.createElement('option');
+                option.value = func.id;
+                option.textContent = func.nome;
+                responsavelSelect.appendChild(option);
+            });
+        });
+
+    // ---------- Carregar Salas ----------
+    fetch('/api/salas')
+        .then(res => res.json())
+        .then(salas => {
+            const salaSelect = document.getElementById('salaSelect');
+            if (!salaSelect) return;
+            salaSelect.innerHTML = '<option value="">Selecione a sala</option>';
+            salas.forEach(sala => {
+                const option = document.createElement('option');
+                option.value = sala.id;
+                option.textContent = sala.nome;
+                salaSelect.appendChild(option);
+            });
+        });
+
+    // ---------- Ao selecionar sala, carregar alunos ----------
+    const salaSelect = document.getElementById('salaSelect');
+    if (salaSelect) {
+        salaSelect.addEventListener('change', function() {
+            const salaId = this.value;
+            const alunoSelect = document.getElementById('alunoSelect');
+            const tutorInput = document.getElementById('tutorNomeInput');
+
+            if (!alunoSelect || !tutorInput) return;
+
+            alunoSelect.innerHTML = '<option value="">Selecione o aluno</option>';
+            tutorInput.value = '';
+
+            if (!salaId) return;
+
+            fetch(`/api/alunos_por_sala/${salaId}`)
+                .then(res => res.json())
+                .then(alunos => {
+                    alunos.forEach(aluno => {
+                        const option = document.createElement('option');
+                        option.value = aluno.id;
+                        option.textContent = aluno.nome;
+                        option.dataset.tutorId = aluno.tutor_id;
+                        option.dataset.tutorNome = aluno.tutor_nome;
+                        alunoSelect.appendChild(option);
+                    });
+                });
+        });
+    }
+
+    // ---------- Preencher tutor automaticamente ----------
+    const alunoSelect = document.getElementById('alunoSelect');
+    if (alunoSelect) {
+        alunoSelect.addEventListener('change', function() {
+            const alunoSelecionado = this.selectedOptions[0];
+            const tutorInput = document.getElementById('tutorNomeInput');
+            if (alunoSelecionado && tutorInput) {
+                tutorInput.value = alunoSelecionado.dataset.tutorNome || '';
+                tutorInput.dataset.tutorId = alunoSelecionado.dataset.tutorId || '';
+            }
+        });
+    }
+
+    // ---------- Salvar ocorrência ----------
+    const btnSalvar = document.getElementById('btnSalvarOcorrencia');
+    if (btnSalvar) {
+        btnSalvar.addEventListener('click', function() {
+            const responsavelId = document.getElementById('responsavelSelect')?.value;
+            const salaId = document.getElementById('salaSelect')?.value;
+            const alunoId = document.getElementById('alunoSelect')?.value;
+            const tutorId = document.getElementById('tutorNomeInput')?.dataset.tutorId;
+            const descricao = document.getElementById('descricaoOcorrencia')?.value;
+
+            if (!responsavelId || !salaId || !alunoId || !tutorId || !descricao) {
+                alert('Todos os campos são obrigatórios!');
+                return;
+            }
+
+            const dados = {
+                responsavel_id: responsavelId,
+                sala_id: salaId,
+                aluno_id: alunoId,
+                tutor_id: tutorId,
+                descricao: descricao
+            };
+
+            fetch('/api/ocorrencia_nova', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            })
+            .then(res => res.json())
+            .then(resp => {
+                if (resp.success) {
+                    alert(resp.message);
+                    // Limpar formulário mantendo estrutura original
+                    document.getElementById('responsavelSelect').value = '';
+                    document.getElementById('salaSelect').value = '';
+                    document.getElementById('alunoSelect').innerHTML = '<option value="">Selecione o aluno</option>';
+                    document.getElementById('tutorNomeInput').value = '';
+                    document.getElementById('descricaoOcorrencia').value = '';
+                } else {
+                    alert('Erro: ' + (resp.error || 'Não foi possível salvar'));
+                }
+            });
+        });
+    }
+
+});
+</script>
+
 </body>
+
 </html>
