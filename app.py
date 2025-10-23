@@ -983,12 +983,104 @@ def salvar_atendimento():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+# --------------------------
+# Filtros autofiltrantes
+# --------------------------
+
+# Lista de tutores que possuem ocorrências
+@app.route("/api/filtro_tutores")
+def filtro_tutores():
+    response = supabase.table("ocorrencias")\
+        .select("tutor_nome", count="id", distinct=True)\
+        .execute()
+    if response.error:
+        return jsonify({"success": False, "error": response.error.message}), 500
+    # Retornar apenas lista de nomes
+    tutores = [r["tutor_nome"] for r in response.data]
+    return jsonify(tutores)
+
+# Salas de um tutor específico
+@app.route("/api/filtro_salas")
+def filtro_salas():
+    tutor_nome = request.args.get("tutor_nome")
+    if not tutor_nome:
+        return jsonify([])
+    response = supabase.table("ocorrencias")\
+        .select("sala_id, sala_nome", distinct=True)\
+        .eq("tutor_nome", tutor_nome)\
+        .execute()
+    if response.error:
+        return jsonify({"success": False, "error": response.error.message}), 500
+    return jsonify(response.data)
+
+# Alunos de uma sala e tutor específico
+@app.route("/api/filtro_alunos")
+def filtro_alunos():
+    tutor_nome = request.args.get("tutor_nome")
+    sala_id = request.args.get("sala_id")
+    query = supabase.table("ocorrencias").select("aluno_id, aluno_nome", distinct=True)
+    if tutor_nome:
+        query = query.eq("tutor_nome", tutor_nome)
+    if sala_id:
+        query = query.eq("sala_id", int(sala_id))
+    response = query.execute()
+    if response.error:
+        return jsonify({"success": False, "error": response.error.message}), 500
+    return jsonify(response.data)
+
+# Status disponíveis
+@app.route("/api/filtro_status")
+def filtro_status():
+    tutor_nome = request.args.get("tutor_nome")
+    sala_id = request.args.get("sala_id")
+    aluno_id = request.args.get("aluno_id")
+    query = supabase.table("ocorrencias").select("status", distinct=True)
+    if tutor_nome:
+        query = query.eq("tutor_nome", tutor_nome)
+    if sala_id:
+        query = query.eq("sala_id", int(sala_id))
+    if aluno_id:
+        query = query.eq("aluno_id", int(aluno_id))
+    response = query.execute()
+    if response.error:
+        return jsonify({"success": False, "error": response.error.message}), 500
+    return jsonify([r["status"] for r in response.data])
+
+# --------------------------
+# Buscar ocorrências filtradas
+# --------------------------
+@app.route("/api/filtros_ocorrencias")
+def filtros_ocorrencias():
+    tutor_nome = request.args.get("tutor_nome")
+    sala_id = request.args.get("sala_id")
+    aluno_id = request.args.get("aluno_id")
+    status = request.args.get("status")
+
+    query = supabase.table("ocorrencias").select("*")
+
+    if tutor_nome:
+        query = query.eq("tutor_nome", tutor_nome)
+    if sala_id:
+        query = query.eq("sala_id", int(sala_id))
+    if aluno_id:
+        query = query.eq("aluno_id", int(aluno_id))
+    if status:
+        query = query.eq("status", status)
+
+    response = query.execute()
+    if response.error:
+        return jsonify({"success": False, "error": response.error.message}), 500
+
+    return jsonify(response.data)
+
+
 # =============================================================
 # Execução
 # =============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
