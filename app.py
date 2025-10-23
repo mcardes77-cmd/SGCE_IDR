@@ -945,12 +945,63 @@ def api_buscar_ocorrencia_por_numero(numero):
 # Registrar blueprint principal
 app.register_blueprint(main_bp, url_prefix='/')
 
+def get_conn():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT", 5432)
+    )
+
+# Mapa de campos para cada nível
+MAPA_ATENDIMENTO = {
+    "tutor": ("atendimento_tutor", "dt_atendimento_tutor"),
+    "coordenacao": ("atendimento_coordenacao", "dt_atendimento_coordenacao"),
+    "gestao": ("atendimento_gestao", "dt_atendimento_gestao")
+}
+
+@app.route("/api/salvar_atendimento", methods=["POST"])
+def salvar_atendimento():
+    data = request.json
+    numero = data.get("numero")
+    nivel = data.get("nivel")
+    texto = data.get("texto")
+
+    if not (numero and nivel and texto):
+        return jsonify({"success": False, "error": "Parâmetros incompletos"}), 400
+
+    if nivel not in MAPA_ATENDIMENTO:
+        return jsonify({"success": False, "error": "Nível inválido"}), 400
+
+    campo_texto, campo_data = MAPA_ATENDIMENTO[nivel]
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        sql = f"""
+            UPDATE ocorrencias
+            SET {campo_texto} = %s,
+                {campo_data} = %s
+            WHERE numero = %s
+        """
+        cur.execute(sql, (texto, date.today(), numero))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # =============================================================
 # Execução
 # =============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
