@@ -320,10 +320,10 @@ def api_registrar_ocorrencia():
     try:
         dados = request.get_json()
         
-        # Validar campos obrigatórios
+        # Validar campos obrigatórios - CORREÇÃO AQUI
         campos_obrigatorios = ['aluno_id', 'professor_id', 'professor_nome', 'descricao', 'atendimento_professor']
         for campo in campos_obrigatorios:
-            if not dados.get(campo):
+            if campo not in dados or dados[campo] is None or str(dados[campo]).strip() == '':
                 return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
         
         aluno_id = dados['aluno_id']
@@ -350,10 +350,10 @@ def api_registrar_ocorrencia():
             tutor_data = handle_supabase_response(response_tutor)
             tutor_nome = tutor_data[0]['nome'] if tutor_data else ''
         
-        # Gerar próximo número de ocorrência
+        # Gerar próximo número de ocorrência - CORREÇÃO AQUI (tratar caso não existam ocorrências)
         response_ultima = supabase.table('ocorrencias').select('numero').order('numero', desc=True).limit(1).execute()
         ultima_ocorrencia = handle_supabase_response(response_ultima)
-        proximo_numero = ultima_ocorrencia[0]['numero'] + 1 if ultima_ocorrencia else 1
+        proximo_numero = ultima_ocorrencia[0]['numero'] + 1 if ultima_ocorrencia and len(ultima_ocorrencia) > 0 else 1
         
         # Preparar dados para inserção
         nova_ocorrencia = {
@@ -393,26 +393,38 @@ def api_registrar_ocorrencia():
     except Exception as e:
         logger.exception("Erro ao registrar ocorrência")
         return jsonify({'error': str(e)}), 500
-
 # =============================================================
 # APIs de ocorrências (mantidas)
 # =============================================================
 
 @app.route('/api/tutores_com_ocorrencias')
 def api_tutores_com_ocorrencias():
+    """Retorna tutores que têm ocorrências - CORRIGIDO"""
     try:
         if supabase:
-            response = supabase.table('ocorrencias').select('tutor').execute()
+            # Buscar ocorrências com tutor_id e depois buscar nomes na d_tutores
+            response = supabase.table('ocorrencias').select('tutor_id').execute()
             dados = handle_supabase_response(response)
             if dados:
-                tutores = list(set([occ['tutor'] for occ in dados if occ.get('tutor')]))
-                tutores_formatados = [{'id': i, 'nome': tutor} for i, tutor in enumerate(tutores)]
-                return jsonify(tutores_formatados)
+                # Pegar tutor_ids únicos
+                tutor_ids = list(set([occ['tutor_id'] for occ in dados if occ.get('tutor_id')]))
+                
+                # Buscar nomes dos tutores
+                tutores_com_nomes = []
+                for tutor_id in tutor_ids:
+                    response_tutor = supabase.table('d_tutores').select('nome').eq('tutor_id', tutor_id).execute()
+                    tutor_data = handle_supabase_response(response_tutor)
+                    if tutor_data:
+                        tutores_com_nomes.append({
+                            'id': tutor_id,
+                            'nome': tutor_data[0].get('nome', f'Tutor {tutor_id}')
+                        })
+                
+                return jsonify(tutores_com_nomes)
         return jsonify([])
     except Exception as e:
         logger.exception("Erro ao buscar tutores")
         return jsonify({'error': str(e)}), 500
-
 @app.route('/api/salas_com_ocorrencias')
 def api_salas_com_ocorrencias():
     try:
@@ -893,4 +905,5 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
