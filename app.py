@@ -761,8 +761,6 @@ def gestao_tecnologia_ocorrencia():
 # Registrar blueprint principal
 app.register_blueprint(main_bp, url_prefix='/')
 
-APP
-
 @app.route('/api/responsaveis_ocorrencia')
 def api_responsaveis_ocorrencia():
     """
@@ -870,5 +868,6 @@ def api_ocorrencia_nova():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
