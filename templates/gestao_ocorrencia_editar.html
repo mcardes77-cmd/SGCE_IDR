@@ -159,7 +159,7 @@
 
         async function carregarOcorrencia(numero) {
             try {
-                const response = await fetch(`/api/ocorrencia_detalhes?numero=${numero}`);
+               const response = await fetch(`/api/ocorrencia_detalhes?numero=${ocorrenciaAtual}`);
                 if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
                 const ocorrencia = await response.json();
                 if (ocorrencia.error) throw new Error(ocorrencia.error);
@@ -220,7 +220,11 @@
             if (!texto.trim()) return;
 
             try {
-                const dadosEnviar = { numero: ocorrenciaAtual, nivel: config.nivel_api, texto: texto };
+                const dadosEnviar = {
+    numero: ocorrenciaAtual,
+    nivel: config.nivel_api,
+    texto: texto
+};
                 const response = await fetch('/api/salvar_atendimento', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -253,3 +257,4 @@
     </script>
 </body>
 </html>
+
