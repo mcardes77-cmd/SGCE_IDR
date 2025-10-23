@@ -316,76 +316,66 @@ def api_tutor_por_aluno(aluno_id):
         logger.exception("Erro ao buscar tutor do aluno")
         return jsonify({'tutor': ''})
 
-@app.route('/api/registrar_ocorrencia', methods=['POST'])
+from datetime import date
+
+@app.route("/api/registrar_ocorrencia", methods=["POST"])
 def api_registrar_ocorrencia():
+    data = request.json
+
+    aluno_id = data.get("aluno_id")
+    descricao = data.get("descricao", "")
+    status = data.get("status", "AGUARDANDO ATENDIMENTO")
+    atendimento_professor = data.get("atendimento_professor", "")
+    atendimento_tutor = data.get("atendimento_tutor", "")
+    atendimento_coordenacao = data.get("atendimento_coordenacao", "")
+    atendimento_gestao = data.get("atendimento_gestao", "")
+
+    if not aluno_id:
+        return jsonify({"success": False, "error": "Aluno não informado"}), 400
+
     try:
-        dados = request.get_json()
-        campos_obrigatorios = ['aluno_id', 'professor_nome', 'descricao', 'atendimento_professor']
-        for campo in campos_obrigatorios:
-            if campo not in dados or dados[campo] is None or str(dados[campo]).strip() == '':
-                return jsonify({'error': f'Campo {campo} é obrigatório'}), 400
+        # Buscar dados do aluno usando tutor_nome
+        response_aluno = supabase.table('d_alunos')\
+            .select('nome, sala_id, tutor_nome')\
+            .eq('id', aluno_id).execute()
 
-        aluno_id = dados['aluno_id']
+        if not response_aluno.data:
+            return jsonify({"success": False, "error": "Aluno não encontrado"}), 404
 
-        # Buscar dados do aluno
-        response_aluno = supabase.table('d_alunos').select('nome, sala_id, tutor').eq('id', aluno_id).execute()
-        aluno_data = handle_supabase_response(response_aluno)
-        if not aluno_data:
-            return jsonify({'error': 'Aluno não encontrado'}), 400
-        aluno = aluno_data[0]
+        aluno = response_aluno.data[0]
 
-        # Buscar nome da sala
-        response_sala = supabase.table('d_salas').select('nome').eq('id', aluno['sala_id']).execute()
-        sala_data = handle_supabase_response(response_sala)
-        sala_nome = sala_data[0]['nome'] if sala_data else ''
+        # Preparar datas de atendimento
+        dt_professor = date.today() if atendimento_professor.strip() else None
+        dt_tutor = date.today() if atendimento_tutor.strip() else None
+        dt_coordenacao = date.today() if atendimento_coordenacao.strip() else None
+        dt_gestao = date.today() if atendimento_gestao.strip() else None
 
-        # Gerar próximo número de ocorrência
-        response_ultima = supabase.table('ocorrencias').select('numero').order('numero', desc=True).limit(1).execute()
-        ultima_ocorrencia = handle_supabase_response(response_ultima)
-        proximo_numero = ultima_ocorrencia[0]['numero'] + 1 if ultima_ocorrencia else 1
+        # Inserir nova ocorrência
+        response = supabase.table('ocorrencias').insert({
+            "aluno_id": aluno_id,
+            "aluno_nome": aluno['nome'],
+            "sala_id": aluno['sala_id'],
+            "tutor_nome": aluno.get('tutor_nome', ''),
+            "descricao": descricao,
+            "status": status,
+            "atendimento_professor": atendimento_professor,
+            "dt_atendimento_professor": dt_professor,
+            "atendimento_tutor": atendimento_tutor,
+            "dt_atendimento_tutor": dt_tutor,
+            "atendimento_coordenacao": atendimento_coordenacao,
+            "dt_atendimento_coordenacao": dt_coordenacao,
+            "atendimento_gestao": atendimento_gestao,
+            "dt_atendimento_gestao": dt_gestao
+        }).execute()
 
-        # Preparar dados para inserção
-        nova_ocorrencia = {
-            'numero': proximo_numero,
-            'descricao': dados['descricao'],
-            'aluno_id': aluno_id,
-            'aluno_nome': aluno['nome'],
-            'professor_nome': dados['professor_nome'],
-            'sala_id': aluno['sala_id'],
-            'sala_nome': sala_nome,
-            'tutor_nome': aluno.get('tutor', ''),
-            'atendimento_professor': dados['atendimento_professor'],
-            'solicitado_tutor': dados.get('solicitar_tutor', False),
-            'solicitado_coordenacao': dados.get('solicitar_coordenacao', False),
-            'solicitado_gestao': dados.get('solicitar_gestao', False),
-            'status': 'ATENDIMENTO',
-            'data_hora': datetime.now().isoformat(),
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat()
-        }
+        if response.error:
+            return jsonify({"success": False, "error": response.error.message}), 500
 
-        response_insert = supabase.table('ocorrencias').insert(nova_ocorrencia).execute()
-        ocorrencia_salva = handle_supabase_response(response_insert)
-
-        if ocorrencia_salva:
-            return jsonify({'success': True, 'numero': proximo_numero, 'message': 'Ocorrência registrada com sucesso'})
-        return jsonify({'error': 'Erro ao salvar ocorrência'}), 500
+        return jsonify({"success": True, "ocorrencia": response.data[0]})
 
     except Exception as e:
-        logger.exception("Erro ao registrar ocorrência")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
-# --- Detalhes da ocorrência pelo número ---
-def get_conn():
-    # Ajuste sua conexão com PostgreSQL / Supabase
-    conn = psycopg2.connect(
-        host="SEU_HOST",
-        dbname="SEU_DB",
-        user="SEU_USER",
-        password="SUA_SENHA",
-        cursor_factory=RealDictCursor
-    )
-    return conn
 
 @app.route("/api/ocorrencia_detalhes")
 def ocorrencia_detalhes():
@@ -1080,6 +1070,7 @@ def filtros_ocorrencias():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
