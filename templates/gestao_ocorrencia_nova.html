@@ -128,6 +128,8 @@
         let professorSelecionado = null;
         let salaSelecionada = null;
         let alunoSelecionado = null;
+        let alunosDaSala = [];
+        let tutorNomeSelecionado = "";
 
         document.addEventListener('DOMContentLoaded', function() {
             carregarProfessores();
@@ -138,19 +140,12 @@
             elemento.textContent = mensagem;
             elemento.className = 'mb-4 p-3 rounded text-sm ';
             
-            if (tipo === 'success') {
-                elemento.classList.add('bg-green-600', 'text-white');
-            } else if (tipo === 'error') {
-                elemento.classList.add('bg-red-600', 'text-white');
-            } else {
-                elemento.classList.add('bg-blue-600', 'text-white');
-            }
+            if (tipo === 'success') elemento.classList.add('bg-green-600', 'text-white');
+            else if (tipo === 'error') elemento.classList.add('bg-red-600', 'text-white');
+            else elemento.classList.add('bg-blue-600', 'text-white');
             
             elemento.classList.remove('hidden');
-            
-            setTimeout(() => {
-                elemento.classList.add('hidden');
-            }, 5000);
+            setTimeout(() => elemento.classList.add('hidden'), 5000);
         }
 
         async function carregarProfessores() {
@@ -207,7 +202,6 @@
                     salaSelect.appendChild(option);
                 });
                 
-                // Resetar campos dependentes
                 alunoSelect.disabled = true;
                 alunoSelect.innerHTML = '<option value="">Selecione a sala primeiro</option>';
                 tutorInfo.textContent = 'Será preenchido automaticamente ao selecionar o aluno';
@@ -237,6 +231,8 @@
                 if (!response.ok) throw new Error('Erro ao carregar alunos');
                 
                 const alunos = await response.json();
+                alunosDaSala = alunos;
+
                 alunoSelect.disabled = false;
                 alunoSelect.innerHTML = '<option value="">Selecione o aluno</option>';
                 
@@ -247,7 +243,6 @@
                     alunoSelect.appendChild(option);
                 });
                 
-                // Resetar tutor
                 tutorInfo.textContent = 'Será preenchido automaticamente ao selecionar o aluno';
                 
             } catch (error) {
@@ -256,7 +251,7 @@
             }
         }
 
-        async function carregarTutor() {
+        function carregarTutor() {
             const alunoSelect = document.getElementById('aluno');
             const tutorInfo = document.getElementById('tutor-info');
             
@@ -268,24 +263,15 @@
                 return;
             }
 
-            try {
-                const response = await fetch(`/api/tutor_por_aluno/${alunoSelecionado}`);
-                if (!response.ok) throw new Error('Erro ao carregar tutor');
-                
-                const dados = await response.json();
-                
-                if (dados.tutor) {
-                    tutorInfo.textContent = dados.tutor;
-                    tutorInfo.className = 'p-3 bg-green-900 rounded text-green-300 font-medium';
-                } else {
-                    tutorInfo.textContent = 'Tutor não encontrado';
-                    tutorInfo.className = 'p-3 bg-yellow-900 rounded text-yellow-300';
-                }
-                
-            } catch (error) {
-                console.error('Erro ao carregar tutor:', error);
-                tutorInfo.textContent = 'Erro ao carregar tutor';
-                tutorInfo.className = 'p-3 bg-red-900 rounded text-red-300';
+            const aluno = alunosDaSala.find(a => a.id == alunoSelecionado);
+            if (aluno && aluno.tutor_nome) {
+                tutorNomeSelecionado = aluno.tutor_nome; // <== guarda o tutor
+                tutorInfo.textContent = aluno.tutor_nome;
+                tutorInfo.className = 'p-3 bg-green-900 rounded text-green-300 font-medium';
+            } else {
+                tutorNomeSelecionado = "";
+                tutorInfo.textContent = 'Tutor não encontrado';
+                tutorInfo.className = 'p-3 bg-yellow-900 rounded text-yellow-300';
             }
         }
 
@@ -306,16 +292,17 @@
                 mostrarMensagem('Registrando ocorrência...', 'info');
 
                 const professorSelect = document.getElementById('professor');
+                const professorId = professorSelect.value;
                 const professorNome = professorSelect.options[professorSelect.selectedIndex].text;
 
                 const response = await fetch('/api/registrar_ocorrencia', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         aluno_id: alunoSelecionado,
+                        professor_id: professorId,
                         professor_nome: professorNome,
+                        tutor_nome: tutorNomeSelecionado, // <== novo campo incluído
                         descricao: document.getElementById('descricao').value,
                         atendimento_professor: document.getElementById('atendimento_professor').value,
                         solicitar_tutor: document.getElementById('solicitar_tutor').checked,
