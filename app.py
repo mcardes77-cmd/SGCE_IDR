@@ -761,9 +761,78 @@ def gestao_tecnologia_ocorrencia():
 # Registrar blueprint principal
 app.register_blueprint(main_bp, url_prefix='/')
 
+APP
+
+@app.route('/api/responsaveis_ocorrencia')
+def api_responsaveis_ocorrencia():
+    """
+    Retorna todos os funcionários/tutores cadastrados para preencher o select
+    do responsável pela ocorrência.
+    """
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            return jsonify([])
+
+        response = supabase.table('d_funcionarios').select('id, nome').execute()
+        funcionarios = handle_supabase_response(response)
+        return jsonify(funcionarios)
+
+    except Exception as e:
+        logger.exception("Erro ao buscar responsáveis pela ocorrência")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salas')
+def api_salas():
+    """
+    Retorna todas as salas cadastradas para preencher o select de sala.
+    """
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            return jsonify([])
+        response = supabase.table('d_salas').select('id, nome').execute()
+        salas = handle_supabase_response(response)
+        return jsonify(salas)
+    except Exception as e:
+        logger.exception("Erro ao buscar salas")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos_por_sala/<int:sala_id>')
+def api_alunos_por_sala(sala_id):
+    """
+    Retorna todos os alunos de uma sala e adiciona o nome do tutor automaticamente.
+    """
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            return jsonify([])
+
+        # Buscar alunos e seus tutores
+        response = supabase.table('d_alunos').select(
+            'id, nome, tutor_id, d_funcionarios!d_alunos_tutor_id_fkey(nome)'
+        ).eq('sala_id', sala_id).execute()
+
+        alunos = []
+        for aluno in handle_supabase_response(response):
+            alunos.append({
+                'id': aluno['id'],
+                'nome': aluno['nome'],
+                'tutor_id': aluno.get('tutor_id'),
+                'tutor_nome': aluno.get('d_funcionarios', [{}])[0].get('nome', 'Tutor Não Definido')
+            })
+
+        return jsonify(alunos)
+    except Exception as e:
+        logger.exception(f"Erro ao buscar alunos da sala {sala_id}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 # =============================================================
 # Execução
 # =============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
