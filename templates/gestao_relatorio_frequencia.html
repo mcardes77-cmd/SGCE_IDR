@@ -26,6 +26,8 @@
       },
     };
 
+    let dadosFrequencia = [];
+
     document.addEventListener("DOMContentLoaded", () => {
       carregarSalas();
       carregarMeses();
@@ -71,8 +73,8 @@
       try {
         const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
         if (!resp.ok) throw new Error("Erro ao carregar frequência");
-        const dados = await resp.json();
-        montarTabela(dados, parseInt(mes));
+        dadosFrequencia = await resp.json();
+        montarTabela(dadosFrequencia, parseInt(mes));
       } catch (e) {
         console.error(e);
         alert("Erro ao carregar relatório.");
@@ -106,18 +108,28 @@
       html += `</tr></thead><tbody>`;
 
       if (alunos.length === 0) {
-        html += `<tr><td colspan="${dias.length + 1}" class="text-gray-400 py-4">Nenhum registro encontrado, mas a estrutura está pronta para o mês selecionado.</td></tr>`;
+        html += `<tr><td colspan="${dias.length + 1}" class="text-gray-400 py-4">Nenhum registro encontrado.</td></tr>`;
       } else {
         alunos.forEach(aluno => {
           html += `<tr><td class="border border-gray-700 text-left px-2">${aluno.nome}</td>`;
           dias.forEach(d => {
             const dataKey = d.format("YYYY-MM-DD");
-            const freq = aluno.frequencia?.[dataKey] || "";
-            let cor = "text-gray-500";
-            if (freq === "P") cor = "text-green-500 font-bold";
-            if (freq === "F") cor = "text-red-500 font-bold";
-            if (["PA","PS","PSA"].includes(freq)) cor = "text-yellow-400 font-bold";
-            html += `<td class="border border-gray-700 ${cor}">${freq}</td>`;
+            const freq = aluno.frequencia?.[dataKey] || {};
+            const status = freq.status || "";
+            
+            let cor = "text-gray-500 cursor-default";
+            let clickHandler = "";
+            
+            if (status === "P") {
+              cor = "text-green-500 font-bold cursor-default";
+            } else if (status === "F") {
+              cor = "text-red-500 font-bold cursor-default";
+            } else if (["PA", "PS", "PSA"].includes(status)) {
+              cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
+              clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
+            }
+            
+            html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
           });
           html += `</tr>`;
         });
@@ -127,14 +139,110 @@
         <div class="mt-4 text-gray-400 text-sm text-left">
           <p><span class="text-green-500 font-bold">P</span> = Presença |
              <span class="text-red-500 font-bold">F</span> = Ausente |
-             <span class="text-yellow-400 font-bold">PA</span> = Entrada Atrasada |
-             <span class="text-yellow-400 font-bold">PS</span> = Saída Antecipada |
-             <span class="text-yellow-400 font-bold">PSA</span> = Entrada Atrasada e Saída Antecipada
+             <span class="text-yellow-400 font-bold cursor-pointer" onclick="mostrarLegenda()">PA, PS, PSA</span> = Clique para ver detalhes
           </p>
         </div>
       </div>`;
 
       container.innerHTML = html;
+    }
+
+    async function mostrarDetalhesFrequencia(alunoId, data) {
+      try {
+        const resp = await fetch(`/api/frequencia_detalhes/${alunoId}/${data}`);
+        if (!resp.ok) throw new Error("Erro ao carregar detalhes");
+        const detalhes = await resp.json();
+        
+        // Encontrar nome do aluno
+        const aluno = dadosFrequencia.find(a => a.id === alunoId);
+        const alunoNome = aluno ? aluno.nome : 'Aluno';
+        
+        let modalContent = `
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-accent">Detalhes da Frequência</h3>
+            <p class="text-sm text-gray-300">${alunoNome} - ${dayjs(data).format('DD/MM/YYYY')}</p>
+          </div>
+        `;
+        
+        if (detalhes.hora_entrada || detalhes.motivo_atraso) {
+          modalContent += `
+            <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
+              <h4 class="font-bold text-yellow-400">Entrada com Atraso</h4>
+              <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
+              <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
+            </div>
+          `;
+        }
+        
+        if (detalhes.hora_saida || detalhes.motivo_saida) {
+          modalContent += `
+            <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
+              <h4 class="font-bold text-yellow-400">Saída Antecipada</h4>
+              <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_saida || 'N/A'}</p>
+              <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
+            </div>
+          `;
+        }
+        
+        if (detalhes.responsavel_nome) {
+          modalContent += `
+            <div class="mb-4 p-3 bg-gray-800 rounded-lg">
+              <h4 class="font-bold text-gray-300">Responsável</h4>
+              <p class="text-sm"><strong>Nome:</strong> ${detalhes.responsavel_nome}</p>
+              <p class="text-sm"><strong>Telefone:</strong> ${detalhes.responsavel_telefone || 'N/A'}</p>
+            </div>
+          `;
+        }
+        
+        if (!detalhes.hora_entrada && !detalhes.hora_saida) {
+          modalContent += `<p class="text-gray-400 text-center">Nenhum detalhe adicional disponível.</p>`;
+        }
+        
+        // Criar modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+          <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
+            ${modalContent}
+            <div class="text-center mt-4">
+              <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
+                Fechar
+              </button>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+      } catch (e) {
+        console.error(e);
+        alert("Erro ao carregar detalhes da frequência.");
+      }
+    }
+
+    function mostrarLegenda() {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
+          <h3 class="text-lg font-bold text-accent mb-4">Legenda de Status</h3>
+          <div class="space-y-2 text-sm">
+            <p><span class="text-green-500 font-bold">P</span> = Presença</p>
+            <p><span class="text-red-500 font-bold">F</span> = Falta</p>
+            <p><span class="text-yellow-400 font-bold">PA</span> = Presença com Atraso</p>
+            <p><span class="text-yellow-400 font-bold">PS</span> = Presença com Saída Antecipada</p>
+            <p><span class="text-yellow-400 font-bold">PSA</span> = Presença com Atraso e Saída Antecipada</p>
+          </div>
+          <div class="text-center mt-4">
+            <button onclick="this.closest('.fixed').remove()" 
+              class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
+              Fechar
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
     }
 
     async function gerarPDF() {
@@ -187,7 +295,7 @@
       </h2>
 
       <div class="flex justify-center gap-4 mt-4">
-        <button onclick="window.location.href='{{ url_for('gestao_frequencia') }}'"
+        <button onclick="window.location.href='{{ url_for('main.gestao_frequencia') }}'"
           class="px-4 py-2 text-sm rounded-lg border border-gray-600 hover:bg-gray-700 flex items-center">
           <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
