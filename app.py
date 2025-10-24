@@ -167,6 +167,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key')
 # Garanta que a instância global supabase esteja pronta
 supabase = get_supabase()
 
+# ---------- Util: gerar timestamp ISO ----------
+def now_iso():
+    return datetime.utcnow().isoformat()
+
 # =============================================================
 # Funções auxiliares do app original (mantidas)
 # Ajustadas para utilizar d_alunos em vez de alunos
@@ -538,6 +542,145 @@ def api_gerar_pdf_ocorrencias():
     except Exception as e:
         logger.exception("Erro ao gerar PDF de ocorrências")
         return jsonify({'error': str(e)}), 500
+
+# ---------- Listar ocorrências com filtros ----------
+@app.route("/api/ocorrencias", methods=["GET"])
+def api_list_ocorrencias():
+    supabase: Client = get_supabase()
+    try:
+        q = supabase.table("ocorrencias")
+        # filtros opcionais via query string
+        tutor = request.args.get("tutor")
+        sala = request.args.get("sala")
+        aluno = request.args.get("aluno")
+        status = request.args.get("status")
+        # se vier vazio ou "todos", ignora
+        if tutor:
+            q = q.eq("tutor_nome", tutor)
+        if sala:
+            q = q.eq("sala_nome", sala)
+        if aluno:
+            q = q.eq("aluno_nome", aluno)
+        if status:
+            q = q.eq("status", status)
+        # ordernar por data_hora desc
+        resp = q.order("data_hora", desc=True).execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ---------- Listas para selects ----------
+@app.route("/api/d_funcionarios", methods=["GET"])
+def api_d_funcionarios():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table("d_funcionarios").select("id, nome").order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/d_salas", methods=["GET"])
+def api_d_salas():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table("d_salas").select("id, nome").order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/d_alunos", methods=["GET"])
+def api_d_alunos():
+    supabase = get_supabase()
+    try:
+        sala_id = request.args.get("sala_id")
+        q = supabase.table("d_alunos").select("id, nome, tutor_nome, sala_id")
+        if sala_id:
+            q = q.eq("sala_id", int(sala_id))
+        resp = q.order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ---------- Criar nova ocorrência ----------
+@app.route("/api/ocorrencias", methods=["POST"])
+def api_create_ocorrencia():
+    supabase = get_supabase()
+    try:
+        payload = request.json or {}
+        # Campos esperados do frontend:
+        # professor_nome, sala_nome, aluno_id (ou aluno_nome), aluno_nome, tutor_nome,
+        # atendimento_professor (texto opcional), solicitado_tutor (bool), solicitado_coordenacao, solicitado_gestao
+        professor_nome = payload.get("professor_nome")
+        sala_nome = payload.get("sala_nome")
+        aluno_nome = payload.get("aluno_nome")
+        tutor_nome = payload.get("tutor_nome")
+        atendimento_professor = payload.get("atendimento_professor", "")
+        solicitado_tutor = bool(payload.get("solicitado_tutor", False))
+        solicitado_coordenacao = bool(payload.get("solicitado_coordenacao", False))
+        solicitado_gestao = bool(payload.get("solicitado_gestao", False))
+        status = payload.get("status", "aberta")  # default se desejar
+
+        # data_hora agora
+        data_hora = now_iso()
+
+        # monta objeto para inserir
+        record = {
+            "professor_nome": professor_nome,
+            "sala_nome": sala_nome,
+            "aluno_nome": aluno_nome,
+            "tutor_nome": tutor_nome,
+            "data_hora": data_hora,
+            "atendimento_professor": atendimento_professor,
+            "solicitado_tutor": solicitado_tutor,
+            "solicitado_coordenacao": solicitado_coordenacao,
+            "solicitado_gestao": solicitado_gestao,
+            "status": status
+        }
+
+        # Se sua coluna numero é serial/identity no DB, o banco vai preencher automaticamente.
+        # Caso NÃO seja, você pode gerar numero aqui (ver observação abaixo).
+        resp = supabase.table("ocorrencias").insert(record).execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data}), 201
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# ---------- Atualizar atendimentos (edits) ----------
+@app.route("/api/ocorrencias/<int:oc_id>/atendimento", methods=["PUT"])
+def api_update_atendimento(oc_id):
+    """
+    Espera JSON:
+    {
+      "tipo": "tutor" | "coordenacao" | "gestao",
+      "texto": "texto do atendimento"
+    }
+    Ao salvar, também grava dt_atendimento_<tipo> com timestamp atual.
+    """
+    supabase = get_supabase()
+    try:
+        payload = request.json or {}
+        tipo = payload.get("tipo")
+        texto = payload.get("texto", "")
+        if tipo not in ("tutor", "coordenacao", "gestao"):
+            return jsonify({"ok": False, "error": "tipo inválido"}), 400
+
+        field_text = f"atendimento_{tipo}"
+        field_dt = f"dt_atendimento_{tipo}"
+
+        updates = {
+            field_text: texto,
+            field_dt: now_iso()
+        }
+
+        resp = supabase.table("ocorrencias").update(updates).eq("id", oc_id).execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # =============================================================
 # FUNÇÕES DE FREQUÊNCIA UNIFICADA (mantidas)
