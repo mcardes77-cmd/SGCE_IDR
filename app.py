@@ -619,28 +619,7 @@ def gerar_pdf_ocorrencias():
     response.headers['Content-Disposition'] = 'inline; filename=ocorrencias.pdf'
     return response
 
-# ✅ Rota Flask correta (sem erro de argumento)
-@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
-def api_gerar_pdf_ocorrencias():
-    try:
-        dados = request.get_json()
-        ocorrencias = dados.get('ocorrencias', [])
-
-        if not ocorrencias:
-            return jsonify({'erro': 'Nenhuma ocorrência enviada.'}), 400
-
-        buffer = gerar_pdf_ocorrencias(ocorrencias)
-
-        response = make_response(buffer.getvalue())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = 'inline; filename=relatorio_ocorrencias.pdf'
-        return response
-
-    except Exception as e:
-        print(f"Erro ao gerar PDF: {e}")
-        return jsonify({'erro': str(e)}), 500
-
-    
+ 
 # ---------- Listar ocorrências com filtros ----------
 @app.route("/api/ocorrencias", methods=["GET"])
 def api_list_ocorrencias():
@@ -1187,6 +1166,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
