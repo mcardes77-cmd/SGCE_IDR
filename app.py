@@ -524,6 +524,7 @@ def api_ocorrencias_filtrar():
         logger.exception("Erro ao filtrar ocorrências")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
 def gerar_pdf_ocorrencias(ocorrencias):
     """
     Gerar PDF com as ocorrências selecionadas no formato específico
@@ -1201,6 +1202,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
