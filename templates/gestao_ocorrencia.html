@@ -356,32 +356,70 @@
             document.getElementById('contador-selecao').textContent = `${selecionadas}/${total} selecionadas`;
         }
 
-        async function gerarPDF() {
-            const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')].map(c => c.value);
+       async function gerarPDF() {
+    const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')].map(c => c.value);
+    
+    if (!selecionadas.length) {
+        return mostrarMsg('Selecione pelo menos uma ocorrência para gerar o PDF', 'danger');
+    }
+    
+    mostrarMsg('Gerando PDF...', 'secondary-accent');
+    
+    try {
+        const response = await fetch('/api/gerar_pdf_ocorrencias', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ numeros: selecionadas })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha ao gerar PDF');
+        }
+        
+        // Verificar se a resposta é um PDF
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+            // Criar blob e fazer download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
             
-            if (!selecionadas.length) {
-                return mostrarMsg('Selecione pelo menos uma ocorrência para gerar o PDF', 'danger');
+            // Extrair nome do arquivo do header ou usar padrão
+            const contentDisposition = response.headers.get('content-disposition');
+            let filename = 'ocorrencias.pdf';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
             }
             
-            mostrarMsg('Gerando PDF...', 'secondary-accent');
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
             
-            try {
-                const response = await fetch('/api/gerar_pdf_ocorrencias', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ numeros: selecionadas })
-                });
-                
-                if (!response.ok) throw new Error('Falha ao gerar PDF');
-                
-                const result = await response.json();
+            mostrarMsg(`PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
+            setTimeout(carregarOcorrencias, 1000);
+        } else {
+            // Se não for PDF, tratar como erro JSON
+            const result = await response.json();
+            if (result.success) {
                 mostrarMsg(result.message || `PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
                 setTimeout(carregarOcorrencias, 1000);
-            } catch (e) {
-                console.error('Erro ao gerar PDF:', e);
-                mostrarMsg('Erro ao gerar PDF: ' + e.message, 'danger');
+            } else {
+                throw new Error(result.error || 'Erro ao gerar PDF');
             }
         }
+    } catch (e) {
+        console.error('Erro ao gerar PDF:', e);
+        mostrarMsg('Erro ao gerar PDF: ' + e.message, 'danger');
+    }
+}
     </script>
 </head>
 <body class="bg-dark-primary text-text-light min-h-screen">
@@ -472,3 +510,4 @@
     </div>
 </body>
 </html>
+
