@@ -73,13 +73,7 @@
 
         async function carregarFiltros() {
             try {
-                salas = await safeFetch('/api/salas_com_ocorrencias');
-                const selectSala = document.getElementById('filtro-sala');
-                selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
-                salas.forEach(s => {
-                    selectSala.innerHTML += `<option value="${s.id}">${s.nome || s.sala}</option>`;
-                });
-
+                // Carregar tutores primeiro (agora é o primeiro filtro)
                 tutores = await safeFetch('/api/tutores_com_ocorrencias');
                 const selectTutor = document.getElementById('filtro-tutor');
                 selectTutor.innerHTML = '<option value="all">Todos os Tutores</option>';
@@ -87,6 +81,7 @@
                     selectTutor.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
                 });
 
+                // Status (segundo filtro)
                 const selectStatus = document.getElementById('filtro-status');
                 selectStatus.innerHTML = `
                     <option value="all">Todos os Status</option>
@@ -95,6 +90,15 @@
                     <option value="ASSINADA">Assinada</option>
                 `;
 
+                // Salas (terceiro filtro)
+                salas = await safeFetch('/api/salas_com_ocorrencias');
+                const selectSala = document.getElementById('filtro-sala');
+                selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
+                salas.forEach(s => {
+                    selectSala.innerHTML += `<option value="${s.id}">${s.nome || s.sala}</option>`;
+                });
+
+                // Alunos (quarto filtro)
                 const selectAluno = document.getElementById('filtro-aluno');
                 selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
             } catch (e) {
@@ -135,17 +139,17 @@
         }
 
         async function aplicarFiltros() {
-            const salaId = document.getElementById('filtro-sala').value;
             const tutorId = document.getElementById('filtro-tutor').value;
             const status = document.getElementById('filtro-status').value;
+            const salaId = document.getElementById('filtro-sala').value;
             const alunoId = document.getElementById('filtro-aluno').value;
             
             let url = '/api/ocorrencias_filtrar?';
             const params = [];
             
-            if (salaId !== 'all') params.push(`sala_id=${salaId}`);
             if (tutorId !== 'all') params.push(`tutor_id=${tutorId}`);
             if (status !== 'all') params.push(`status=${status}`);
+            if (salaId !== 'all') params.push(`sala_id=${salaId}`);
             if (alunoId !== 'all') params.push(`aluno_id=${alunoId}`);
             
             url += params.join('&');
@@ -289,28 +293,35 @@
         <div class="bg-dark-secondary p-6 rounded-lg shadow-lg mb-6">
             <h3 class="text-lg font-semibold mb-4 text-accent">Filtros</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Sala</label>
-                    <select id="filtro-sala" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Carregando...</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Aluno</label>
-                    <select id="filtro-aluno" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Selecione uma sala</option>
-                    </select>
-                </div>
+                <!-- TUTOR (primeiro) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Tutor</label>
                     <select id="filtro-tutor" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Carregando...</option>
+                        <option value="all">Todos os Tutores</option>
                     </select>
                 </div>
+                <!-- STATUS (segundo) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Status</label>
                     <select id="filtro-status" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Carregando...</option>
+                        <option value="all">Todos os Status</option>
+                        <option value="ATENDIMENTO">Atendimento</option>
+                        <option value="FINALIZADA">Finalizada</option>
+                        <option value="ASSINADA">Assinada</option>
+                    </select>
+                </div>
+                <!-- SALA (terceiro) -->
+                <div>
+                    <label class="block text-sm text-gray-300 mb-1">Sala</label>
+                    <select id="filtro-sala" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
+                        <option value="all">Todas as Salas</option>
+                    </select>
+                </div>
+                <!-- ALUNO (quarto) -->
+                <div>
+                    <label class="block text-sm text-gray-300 mb-1">Aluno</label>
+                    <select id="filtro-aluno" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
+                        <option value="all">Todos os Alunos</option>
                     </select>
                 </div>
             </div>
@@ -353,4 +364,3 @@
     </div>
 </body>
 </html>
-
