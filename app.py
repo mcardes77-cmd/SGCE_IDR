@@ -320,8 +320,16 @@ def api_registrar_ocorrencia():
         if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
             return jsonify({"success": False, "error": "Dados obrigatórios faltando"}), 400
 
+        # Buscar o próximo número da ocorrência
+        resp_numero = supabase.table("ocorrencias").select("numero").order("numero", desc=True).limit(1).execute()
+        ultimo_numero = 0
+        if resp_numero.data and len(resp_numero.data) > 0:
+            ultimo_numero = resp_numero.data[0].get("numero", 0)
+        proximo_numero = ultimo_numero + 1
+
         # Preparar dados para inserção
         ocorrencia_data = {
+            "numero": proximo_numero,
             "aluno_id": aluno_id,
             "professor_id": professor_id,
             "professor_nome": professor_nome,
@@ -350,6 +358,7 @@ def api_registrar_ocorrencia():
             
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+        
 @app.route("/api/ocorrencia_detalhes")
 def ocorrencia_detalhes():
     """
@@ -1063,4 +1072,5 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
