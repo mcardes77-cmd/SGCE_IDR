@@ -114,7 +114,7 @@
             const tutoresSet = new Set();
             
             ocorrencias.forEach(oc => {
-                const tutorNome = oc.tutor_nome || oc.tutor;
+                const tutorNome = oc.tutor_nome;
                 if (tutorNome && tutorNome.trim() !== '' && tutorNome !== 'N/A') {
                     tutoresSet.add(tutorNome.trim());
                 }
@@ -128,7 +128,7 @@
             const salasSet = new Set();
             
             ocorrencias.forEach(oc => {
-                const salaNome = oc.sala_nome || oc.sala;
+                const salaNome = oc.sala_nome;
                 if (salaNome && salaNome.trim() !== '' && salaNome !== 'N/A') {
                     salasSet.add(salaNome.trim());
                 }
@@ -142,12 +142,26 @@
             const alunosSet = new Set();
             
             ocorrencias.forEach(oc => {
-                const alunoNome = oc.aluno_nome || oc.aluno;
-                const ocSalaNome = oc.sala_nome || oc.sala;
+                const alunoNome = oc.aluno_nome;
+                const ocSalaNome = oc.sala_nome;
                 
                 if (alunoNome && alunoNome.trim() !== '' && 
                     alunoNome !== 'N/A' && 
                     ocSalaNome === salaNome) {
+                    alunosSet.add(alunoNome.trim());
+                }
+            });
+            
+            // Converter para array e ordenar alfabeticamente
+            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
+        }
+
+        function extrairAlunosUnicos(ocorrencias) {
+            const alunosSet = new Set();
+            
+            ocorrencias.forEach(oc => {
+                const alunoNome = oc.aluno_nome;
+                if (alunoNome && alunoNome.trim() !== '' && alunoNome !== 'N/A') {
                     alunosSet.add(alunoNome.trim());
                 }
             });
@@ -183,28 +197,46 @@
             }
         }
 
-        function extrairAlunosUnicos(ocorrencias) {
-            const alunosSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const alunoNome = oc.aluno_nome || oc.aluno;
-                if (alunoNome && alunoNome.trim() !== '' && alunoNome !== 'N/A') {
-                    alunosSet.add(alunoNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
-        }
-
         async function carregarOcorrencias() {
             try {
-                // Já carregamos as ocorrências em carregarFiltros, então apenas renderizamos
+                ocorrencias = await safeFetch('/api/ocorrencias_todas');
+                // Atualizar status das ocorrências
+                ocorrencias = ocorrencias.map(oc => {
+                    return {
+                        ...oc,
+                        status: calcularStatus(oc)
+                    };
+                });
                 renderizarOcorrencias();
             } catch (e) {
                 console.error('Erro ao carregar ocorrências:', e);
                 mostrarMsg('Erro ao carregar ocorrências', 'danger');
             }
+        }
+
+        function calcularStatus(ocorrencia) {
+            // Se já está assinada, mantém ASSINADA
+            if (ocorrencia.status === 'ASSINADA') {
+                return 'ASSINADA';
+            }
+
+            // Verifica se há atendimentos pendentes
+            const temAtendimentoPendente = 
+                (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) ||
+                (ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '')) ||
+                (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === ''));
+
+            // Se não há solicitações ou todas foram atendidas, vai para FINALIZADA
+            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao) {
+                return 'FINALIZADA';
+            }
+
+            if (!temAtendimentoPendente) {
+                return 'FINALIZADA';
+            }
+
+            // Caso contrário, mantém em ATENDIMENTO
+            return 'ATENDIMENTO';
         }
 
         async function aplicarFiltros() {
@@ -225,6 +257,13 @@
             
             try {
                 ocorrencias = await safeFetch(url);
+                // Recalcular status para as ocorrências filtradas
+                ocorrencias = ocorrencias.map(oc => {
+                    return {
+                        ...oc,
+                        status: calcularStatus(oc)
+                    };
+                });
                 renderizarOcorrencias();
             } catch (e) {
                 console.error('Erro ao filtrar ocorrências:', e);
@@ -253,10 +292,10 @@
                     </td>
                     <td class="p-3 text-sm font-medium text-accent">${oc.numero}</td>
                     <td class="p-3 text-sm">${formatarData(oc.data_hora || oc.data)}</td>
-                    <td class="p-3 text-sm">${oc.aluno_nome || oc.aluno || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.sala_nome || oc.sala || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.professor_nome || oc.professor || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.tutor_nome || oc.tutor || 'N/A'}</td>
+                    <td class="p-3 text-sm">${oc.aluno_nome || 'N/A'}</td>
+                    <td class="p-3 text-sm">${oc.sala_nome || 'N/A'}</td>
+                    <td class="p-3 text-sm">${oc.professor_nome || 'N/A'}</td>
+                    <td class="p-3 text-sm">${oc.tutor_nome || 'N/A'}</td>
                     <td class="p-3 text-sm">
                         <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(oc.status)}">
                             ${oc.status || 'N/A'}
