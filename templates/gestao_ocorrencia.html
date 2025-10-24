@@ -1,505 +1,275 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Ocorrências</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'dark-primary': '#0F172A',
-                        'dark-secondary': '#1E293B',
-                        'accent': '#10B981',
-                        'text-light': '#F8FAFC',
-                        'danger': '#DC2626',
-                        'secondary-accent': '#3B82F6',
-                        'tutor-color': '#007ACC',
-                        'coord-color': '#F59E0B',
-                        'gestao-color': '#EF4444'
-                    },
-                },
-            },
-        };
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impressão de Ocorrências</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        'dark-primary': '#0F172A',
+        'dark-secondary': '#1E293B',
+        'accent': '#10B981',
+        'text-light': '#F8FAFC',
+        'danger': '#DC2626',
+        'secondary-accent': '#3B82F6'
+      },
+    },
+  },
+};
 
-        let ocorrencias = [];
-        let salas = [];
-        let alunos = [];
-        let tutores = [];
+let salas = [];
+let alunos = [];
+let ocorrencias = [];
+let nomeAlunoAtual = "";
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            await carregarFiltros();
-            await carregarOcorrencias();
-            
-            document.getElementById('filtro-sala').addEventListener('change', async (e) => {
-                await carregarAlunosPorSala(e.target.value);
-                await aplicarFiltros();
-            });
-            
-            document.getElementById('filtro-aluno').addEventListener('change', aplicarFiltros);
-            document.getElementById('filtro-tutor').addEventListener('change', aplicarFiltros);
-            document.getElementById('filtro-status').addEventListener('change', aplicarFiltros);
-        });
+document.addEventListener('DOMContentLoaded', async () => {
+  await carregarSalas();
+  document.getElementById('filter-sala').addEventListener('change', carregarAlunos);
+});
 
-        function mostrarMsg(msg, tipo = 'info') {
-            const el = document.getElementById('global-message');
-            if (!el) return;
-            
-            el.textContent = msg;
-            el.className = 'p-3 rounded mt-4 text-white font-bold fixed top-4 right-4 z-50 max-w-sm';
-            el.style.display = 'block';
-            el.classList.remove('bg-danger', 'bg-accent', 'bg-secondary-accent');
-            
-            if (tipo === 'danger') el.classList.add('bg-danger');
-            else if (tipo === 'accent') el.classList.add('bg-accent');
-            else el.classList.add('bg-secondary-accent');
-            
-            setTimeout(() => el.style.display = 'none', 5000);
-        }
+function mostrarMsg(msg, tipo = 'info') {
+    const el = document.getElementById('global-message');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `p-3 rounded mt-4 text-white font-bold`;
+    el.style.display = 'block';
 
-        async function safeFetch(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                return Array.isArray(data) ? data : [];
-            } catch (error) {
-                console.error(`Erro na requisição ${url}:`, error);
-                return [];
-            }
-        }
-
-        async function carregarFiltros() {
-            try {
-                // Carregar ocorrências primeiro para extrair os dados
-                ocorrencias = await safeFetch('/api/ocorrencias_todas');
-                
-                // Extrair tutores únicos da coluna tutor_nome
-                tutores = extrairTutoresUnicos(ocorrencias);
-                const selectTutor = document.getElementById('filtro-tutor');
-                selectTutor.innerHTML = '<option value="all">Todos os Tutores</option>';
-                tutores.forEach(t => {
-                    selectTutor.innerHTML += `<option value="${t}">${t}</option>`;
-                });
-
-                // Status (segundo filtro)
-                const selectStatus = document.getElementById('filtro-status');
-                selectStatus.innerHTML = `
-                    <option value="all">Todos os Status</option>
-                    <option value="ATENDIMENTO">Atendimento</option>
-                    <option value="FINALIZADA">Finalizada</option>
-                    <option value="ASSINADA">Assinada</option>
-                `;
-
-                // Extrair salas únicas da coluna sala_nome
-                salas = extrairSalasUnicas(ocorrencias);
-                const selectSala = document.getElementById('filtro-sala');
-                selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
-                salas.forEach(s => {
-                    selectSala.innerHTML += `<option value="${s}">${s}</option>`;
-                });
-
-                // Alunos (quarto filtro) - inicialmente vazio
-                const selectAluno = document.getElementById('filtro-aluno');
-                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-            } catch (e) {
-                console.error('Erro ao carregar filtros:', e);
-                mostrarMsg('Erro ao carregar filtros', 'danger');
-            }
-        }
-
-        function extrairTutoresUnicos(ocorrencias) {
-            const tutoresSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const tutorNome = oc.tutor_nome;
-                if (tutorNome && tutorNome.trim() !== '' && tutorNome !== 'N/A') {
-                    tutoresSet.add(tutorNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(tutoresSet).sort((a, b) => a.localeCompare(b));
-        }
-
-        function extrairSalasUnicas(ocorrencias) {
-            const salasSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const salaNome = oc.sala_nome;
-                if (salaNome && salaNome.trim() !== '' && salaNome !== 'N/A') {
-                    salasSet.add(salaNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(salasSet).sort((a, b) => a.localeCompare(b));
-        }
-
-        function extrairAlunosPorSala(ocorrencias, salaNome) {
-            const alunosSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const alunoNome = oc.aluno_nome;
-                const ocSalaNome = oc.sala_nome;
-                
-                if (alunoNome && alunoNome.trim() !== '' && 
-                    alunoNome !== 'N/A' && 
-                    ocSalaNome === salaNome) {
-                    alunosSet.add(alunoNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
-        }
-
-        function extrairAlunosUnicos(ocorrencias) {
-            const alunosSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const alunoNome = oc.aluno_nome;
-                if (alunoNome && alunoNome.trim() !== '' && alunoNome !== 'N/A') {
-                    alunosSet.add(alunoNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
-        }
-
-        async function carregarAlunosPorSala(salaNome) {
-            const selectAluno = document.getElementById('filtro-aluno');
-            selectAluno.innerHTML = '<option value="all">Carregando...</option>';
-            
-            if (salaNome === 'all') {
-                // Se não há sala selecionada, mostrar todos os alunos
-                const todosAlunos = extrairAlunosUnicos(ocorrencias);
-                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-                todosAlunos.forEach(a => {
-                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
-                });
-                return;
-            }
-            
-            try {
-                // Extrair alunos da sala selecionada
-                const alunosSala = extrairAlunosPorSala(ocorrencias, salaNome);
-                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-                alunosSala.forEach(a => {
-                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
-                });
-            } catch (e) {
-                console.error('Erro ao carregar alunos:', e);
-                selectAluno.innerHTML = '<option value="all">Erro ao carregar</option>';
-            }
-        }
-
-        async function carregarOcorrencias() {
-            try {
-                ocorrencias = await safeFetch('/api/ocorrencias_todas');
-                // Atualizar status das ocorrências
-                ocorrencias = ocorrencias.map(oc => {
-                    return {
-                        ...oc,
-                        status: calcularStatus(oc)
-                    };
-                });
-                renderizarOcorrencias();
-            } catch (e) {
-                console.error('Erro ao carregar ocorrências:', e);
-                mostrarMsg('Erro ao carregar ocorrências', 'danger');
-            }
-        }
-
-        function calcularStatus(ocorrencia) {
-            // Se já está assinada, mantém ASSINADA
-            if (ocorrencia.status === 'ASSINADA') {
-                return 'ASSINADA';
-            }
-
-            // Verifica se há atendimentos pendentes
-            const temAtendimentoPendente = 
-                (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) ||
-                (ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '')) ||
-                (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === ''));
-
-            // Se não há solicitações ou todas foram atendidas, vai para FINALIZADA
-            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao) {
-                return 'FINALIZADA';
-            }
-
-            if (!temAtendimentoPendente) {
-                return 'FINALIZADA';
-            }
-
-            // Caso contrário, mantém em ATENDIMENTO
-            return 'ATENDIMENTO';
-        }
-
-        async function aplicarFiltros() {
-            const tutorNome = document.getElementById('filtro-tutor').value;
-            const status = document.getElementById('filtro-status').value;
-            const salaNome = document.getElementById('filtro-sala').value;
-            const alunoNome = document.getElementById('filtro-aluno').value;
-            
-            let url = '/api/ocorrencias_filtrar?';
-            const params = [];
-            
-            if (tutorNome !== 'all') params.push(`tutor_nome=${encodeURIComponent(tutorNome)}`);
-            if (status !== 'all') params.push(`status=${status}`);
-            if (salaNome !== 'all') params.push(`sala_nome=${encodeURIComponent(salaNome)}`);
-            if (alunoNome !== 'all') params.push(`aluno_nome=${encodeURIComponent(alunoNome)}`);
-            
-            url += params.join('&');
-            
-            try {
-                ocorrencias = await safeFetch(url);
-                // Recalcular status para as ocorrências filtradas
-                ocorrencias = ocorrencias.map(oc => {
-                    return {
-                        ...oc,
-                        status: calcularStatus(oc)
-                    };
-                });
-                renderizarOcorrencias();
-            } catch (e) {
-                console.error('Erro ao filtrar ocorrências:', e);
-                mostrarMsg('Erro ao aplicar filtros', 'danger');
-            }
-        }
-
-        function renderizarOcorrencias() {
-            const tbody = document.getElementById('ocorrencias-body');
-            
-            if (!ocorrencias.length) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" class="text-center py-6 text-gray-400">
-                            Nenhuma ocorrência encontrada
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = ocorrencias.map(oc => `
-                <tr class="border-b border-gray-700 hover:bg-gray-800/50">
-                    <td class="p-3 text-sm">
-                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'disabled checked' : ''} onchange="atualizarSelecao()">
-                    </td>
-                    <td class="p-3 text-sm font-medium text-accent">${oc.numero}</td>
-                    <td class="p-3 text-sm">${formatarData(oc.data_hora || oc.data)}</td>
-                    <td class="p-3 text-sm">${oc.aluno_nome || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.sala_nome || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.professor_nome || 'N/A'}</td>
-                    <td class="p-3 text-sm">${oc.tutor_nome || 'N/A'}</td>
-                    <td class="p-3 text-sm">
-                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(oc.status)}">
-                            ${oc.status || 'N/A'}
-                        </span>
-                    </td>
-                    <td class="p-3 text-sm">
-                        <div class="flex space-x-2 items-center">
-                            <a href="/gestao_ocorrencia_editar?id=${oc.numero}" class="text-blue-400 hover:text-blue-300 transition" title="Visualizar">👁️</a>
-                            ${renderizarAcoes(oc)}
-                            ${oc.impressao_pdf ? `<span class="text-green-400" title="PDF já gerado">✅</span>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-            
-            atualizarSelecao();
-        }
-
-        function renderizarAcoes(ocorrencia) {
-            let html = '';
-            
-            if (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) {
-                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=T" class="bg-tutor-color/20 text-tutor-color text-xs font-bold px-2 py-1 rounded-full border border-tutor-color hover:bg-tutor-color hover:text-white transition" title="Atendimento Tutor Pendente">T</a>`;
-            }
-            
-            if (ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '')) {
-                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=C" class="bg-coord-color/20 text-coord-color text-xs font-bold px-2 py-1 rounded-full border border-coord-color hover:bg-coord-color hover:text-white transition" title="Atendimento Coordenação Pendente">C</a>`;
-            }
-            
-            if (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '')) {
-                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=G" class="bg-gestao-color/20 text-gestao-color text-xs font-bold px-2 py-1 rounded-full border border-gestao-color hover:bg-gestao-color hover:text-white transition" title="Atendimento Gestão Pendente">G</a>`;
-            }
-            
-            return html;
-        }
-
-        function formatarData(dataString) {
-            if (!dataString) return 'N/A';
-            try {
-                return new Date(dataString).toLocaleDateString('pt-BR');
-            } catch {
-                return dataString;
-            }
-        }
-
-        function getStatusClass(status) {
-            const classes = {
-                'ATENDIMENTO': 'bg-yellow-500/20 text-yellow-400',
-                'FINALIZADA': 'bg-green-500/20 text-green-400',
-                'ASSINADA': 'bg-purple-500/20 text-purple-400'
-            };
-            return classes[status] || 'bg-gray-500/20 text-gray-400';
-        }
-
-        function atualizarSelecao() {
-            const selecionadas = document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)').length;
-            const total = ocorrencias.filter(oc => !oc.impressao_pdf).length;
-            document.getElementById('contador-selecao').textContent = `${selecionadas}/${total} selecionadas`;
-        }
-
-     async function gerarPDF() {
-    const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')].map(c => c.value);
-    
-    if (!selecionadas.length) {
-        return mostrarMsg('Selecione pelo menos uma ocorrência para gerar o PDF', 'danger');
+    if (tipo === 'danger') {
+        el.classList.add('bg-danger');
+    } else if (tipo === 'accent') {
+        el.classList.add('bg-accent');
+    } else {
+        el.classList.add('bg-secondary-accent');
     }
-    
-    mostrarMsg('Gerando PDF...', 'secondary-accent');
-    
-    try {
-        // Filtrar os objetos completos das ocorrências selecionadas
-        const ocorrenciasParaPDF = ocorrencias.filter(oc => selecionadas.includes(oc.numero.toString()));
 
+    setTimeout(() => el.style.display = 'none', 5000);
+}
+
+async function carregarSalas() {
+  const sel = document.getElementById('filter-sala');
+  sel.innerHTML = '<option>Carregando...</option>';
+  try {
+    const resp = await fetch('/api/salas_com_ocorrencias');
+    salas = await resp.json();
+    sel.innerHTML = '<option value="">Selecione a Sala</option>';
+    salas.forEach(s => {
+      const nomeSala = s.sala || s.nome || 'Sem nome';
+      const idSala = s.id || s.id_sala || s.numero || '';
+      sel.innerHTML += `<option value="${idSala}">${nomeSala}</option>`;
+    });
+    mostrarMsg('Salas carregadas.', 'accent');
+  } catch (e) {
+    console.error('Erro ao carregar salas:', e);
+    sel.innerHTML = '<option value="">Erro ao carregar salas</option>';
+    mostrarMsg('Erro ao carregar salas. Verifique a API.', 'danger');
+  }
+}
+
+async function carregarAlunos() {
+  const sala = document.getElementById('filter-sala').value;
+  const sel = document.getElementById('filter-aluno');
+  sel.innerHTML = '<option>Carregando...</option>';
+  if (!sala) {
+    sel.innerHTML = '<option value="">Selecione uma sala primeiro</option>';
+    ocorrencias = [];
+    renderizarOcorrencias();
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/alunos_com_ocorrencias_por_sala/${sala}`);
+    alunos = await resp.json();
+    sel.innerHTML = '<option value="">Selecione o Aluno</option>';
+    alunos.forEach(a => {
+      const nomeAluno = a.nome || a.aluno_nome || 'Sem nome';
+      const idAluno = a.id || a.id_aluno || a.matricula || '';
+      sel.innerHTML += `<option value="${idAluno}">${nomeAluno}</option>`;
+    });
+    ocorrencias = [];
+    renderizarOcorrencias();
+  } catch (e) {
+    console.error('Erro ao carregar alunos:', e);
+    sel.innerHTML = '<option value="">Erro ao carregar alunos</option>';
+    mostrarMsg('Erro ao carregar alunos. Verifique a API.', 'danger');
+  }
+}
+
+async function buscarOcorrencias() {
+  const aluno = document.getElementById('filter-aluno').value;
+  if (!aluno) {
+    mostrarMsg('Selecione o aluno para buscar as ocorrências.', 'danger');
+    return;
+  }
+  
+  mostrarMsg('Buscando ocorrências...', 'secondary-accent');
+  
+  try {
+      const resp = await fetch(`/api/ocorrencias_por_aluno/${aluno}`);
+      ocorrencias = await resp.json();
+      
+      if (!resp.ok) {
+          throw new Error(ocorrencias.error || 'Falha ao buscar ocorrências.');
+      }
+
+      nomeAlunoAtual = ocorrencias[0]?.aluno_nome || alunos.find(a => a.id == aluno)?.nome || "Aluno Desconhecido";
+      
+      renderizarOcorrencias();
+      mostrarMsg(`${ocorrencias.length} ocorrência(s) encontrada(s) para ${nomeAlunoAtual}.`, 'accent');
+      
+  } catch (e) {
+      console.error('Erro ao buscar ocorrências:', e);
+      ocorrencias = [];
+      renderizarOcorrencias();
+      mostrarMsg(`Erro na busca: ${e.message}`, 'danger');
+  }
+}
+
+function renderizarOcorrencias() {
+  const div = document.getElementById('ocorrencias-lista');
+  if (!ocorrencias.length) {
+    div.innerHTML = '<p class="text-gray-400 text-center">Nenhuma ocorrência encontrada.</p>';
+    return;
+  }
+  
+  div.innerHTML = ocorrencias.map(o => `
+    <div class="flex items-start gap-3 border-b border-gray-700 py-3 ${o.impressao_pdf ? 'bg-gray-800' : ''}">
+      <input type="checkbox" 
+             value="${o.numero}" 
+             class="mt-1 h-4 w-4 accent-accent"
+             ${o.impressao_pdf ? 'disabled' : ''}
+             ${o.impressao_pdf ? 'checked' : ''}>
+      <div class="flex-1">
+        <p class="font-bold text-lg text-accent-light">
+          Nº ${o.numero} - ${o.status}
+          ${o.impressao_pdf ? '<span class="text-xs bg-green-600 text-white px-2 py-1 rounded ml-2">IMPRESSO</span>' : ''}
+        </p>
+        <p class="text-sm text-gray-400"><strong>Data:</strong> ${new Date(o.data_hora).toLocaleString('pt-BR')}</p>
+        <p class="text-sm text-gray-400"><strong>Tipo:</strong> ${o.tipo}</p>
+        <p class="mt-1"><strong>Descrição:</strong> ${o.descricao}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+// --- Função gerarPDF corrigida ---
+async function gerarPDF() {
+    const selecionadas = [...document.querySelectorAll('#ocorrencias-lista input:checked:not(:disabled)')]
+        .map(c => parseInt(c.value))
+        .filter(n => !isNaN(n));
+
+    if (!selecionadas.length) {
+        mostrarMsg('Selecione pelo menos uma ocorrência para gerar o PDF.', 'danger');
+        return;
+    }
+
+    mostrarMsg('Gerando PDF...', 'secondary-accent');
+
+    try {
         const response = await fetch('/api/gerar_pdf_ocorrencias', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ ocorrencias: ocorrenciasParaPDF }) // ✅ chave correta
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ numeros: selecionadas })
         });
-        
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/pdf')) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            
-            const contentDisposition = response.headers.get('content-disposition');
-            let filename = 'ocorrencias.pdf';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                if (filenameMatch) filename = filenameMatch[1];
-            }
-            
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            
-            mostrarMsg(`PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
-            setTimeout(carregarOcorrencias, 1000);
-        } else {
-            const responseText = await response.text();
-            console.error('Resposta inesperada:', responseText.substring(0, 500));
-            throw new Error('Erro no servidor ao gerar PDF. Tente novamente.');
+
+        if (!response.ok) {
+            let errorData = {};
+            try { errorData = await response.json(); } catch {}
+            throw new Error(errorData.error || `Falha ao gerar PDF (HTTP ${response.status})`);
         }
+
+        // Criar blob do PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Criar link para download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `ocorrencias_${nomeAlunoAtual.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Limpar
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        mostrarMsg(`PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
+
+        // Recarregar ocorrências para atualizar status das impressas
+        setTimeout(() => buscarOcorrencias(), 1000);
+
     } catch (e) {
         console.error('Erro ao gerar PDF:', e);
         mostrarMsg('Erro ao gerar PDF: ' + e.message, 'danger');
     }
 }
-
-    </script>
+</script>
 </head>
-<body class="bg-dark-primary text-text-light min-h-screen">
+
+<body class="bg-dark-primary text-text-light min-h-screen p-6">
     <div id="global-message" style="display: none;"></div>
     
-    <div class="container mx-auto p-4">
-        <header class="text-center mb-8">
-            <h1 class="text-2xl sm:text-3xl font-bold text-secondary-accent mb-2">SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
-            <h2 class="text-xl sm:text-2xl text-text-light font-light border-b border-gray-700 pb-2 inline-block">GESTÃO DE OCORRÊNCIAS</h2>
-            <div class="mt-4 flex flex-wrap justify-center gap-4">
-                <button onclick="window.location.href='/gestao_ocorrencia_nova'" class="bg-accent hover:bg-emerald-700 px-4 py-2 rounded-lg text-white font-semibold transition">Nova Ocorrência</button>
-                <button onclick="window.location.href='/'" class="border border-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg text-gray-300 transition">Voltar ao Menu</button>
-            </div>
-        </header>
+  <header class="w-full text-center mb-8 mt-4">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-secondary-accent leading-tight tracking-wider">
+      SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
+    </h1>
+    <h2 class="text-xl sm:text-2xl text-text-light mt-2 font-light border-b border-gray-700 pb-2 inline-block">
+      GESTÃO DE RELATÓRIOS - IMPRESSÃO DE OCORRÊNCIAS
+    </h2>
 
-        <!-- Filtros -->
-        <div class="bg-dark-secondary p-6 rounded-lg shadow-lg mb-6">
-            <h3 class="text-lg font-semibold mb-4 text-accent">Filtros</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- TUTOR (primeiro) -->
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Tutor</label>
-                    <select id="filtro-tutor" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Todos os Tutores</option>
-                    </select>
-                </div>
-                <!-- STATUS (segundo) -->
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Status</label>
-                    <select id="filtro-status" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Todos os Status</option>
-                        <option value="ATENDIMENTO">Atendimento</option>
-                        <option value="FINALIZADA">Finalizada</option>
-                        <option value="ASSINADA">Assinada</option>
-                    </select>
-                </div>
-                <!-- SALA (terceiro) -->
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Sala</label>
-                    <select id="filtro-sala" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Todas as Salas</option>
-                    </select>
-                </div>
-                <!-- ALUNO (quarto) -->
-                <div>
-                    <label class="block text-sm text-gray-300 mb-1">Aluno</label>
-                    <select id="filtro-aluno" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
-                        <option value="all">Todos os Alunos</option>
-                    </select>
-                </div>
-            </div>
+    <button onclick="window.location.href='/gestao_ocorrencia'" 
+      class="mt-4 px-4 py-2 text-sm font-medium rounded-lg text-gray-300 border border-gray-600 hover:bg-gray-700 transition duration-150 flex items-center mx-auto">
+      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+      </svg>
+      Voltar ao Menu de Ocorrências
+    </button>
+  </header>
+
+  <main class="max-w-4xl mx-auto space-y-6">
+    <section class="bg-dark-secondary p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-semibold border-b border-gray-600 pb-2 mb-4 text-accent">Filtros</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="filter-sala" class="block mb-1 text-sm text-gray-300">Sala:</label>
+          <select id="filter-sala" class="w-full p-2 rounded text-black"></select>
         </div>
-
-        <!-- Tabela de Ocorrências -->
-        <div class="bg-dark-secondary rounded-lg shadow-lg overflow-hidden">
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
-                <h3 class="text-lg font-semibold text-accent">Ocorrências <span id="contador-selecao" class="text-sm text-gray-400 ml-2">0/0 selecionadas</span></h3>
-                <button onclick="gerarPDF()" class="bg-secondary-accent hover:bg-blue-700 px-4 py-2 rounded text-white font-semibold transition">Gerar PDF Selecionadas</button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-800">
-                        <tr>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase w-12">Sel.</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Nº</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Data</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Aluno</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Sala</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Responsável</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Tutor</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                            <th class="p-3 text-left text-xs font-medium text-gray-400 uppercase">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ocorrencias-body">
-                        <tr>
-                            <td colspan="9" class="text-center py-6 text-gray-400">Carregando ocorrências...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div>
+          <label for="filter-aluno" class="block mb-1 text-sm text-gray-300">Aluno:</label>
+          <select id="filter-aluno" class="w-full p-2 rounded text-black"></select>
         </div>
+      </div>
+      <button onclick="buscarOcorrencias()" 
+        class="mt-4 bg-danger px-4 py-2 rounded text-white font-semibold hover:bg-red-700 w-full">
+        Buscar Ocorrências
+      </button>
+    </section>
 
-        <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
-            <p class="mb-1 text-base font-medium">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
-            <p class="text-xs font-light tracking-wide">LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO</p>
-        </footer>
-    </div>
+    <section class="bg-dark-secondary p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-semibold border-b border-gray-600 pb-2 mb-4 text-accent">Ocorrências Encontradas</h3>
+      <div id="ocorrencias-lista" class="space-y-2">
+        <p class="text-gray-400 text-center">Use os filtros acima para carregar as ocorrências.</p>
+      </div>
+      <button onclick="gerarPDF()" 
+        class="mt-6 bg-accent px-4 py-3 rounded-lg text-white font-bold w-full hover:bg-emerald-700">
+        Gerar PDF das Ocorrências Selecionadas
+      </button>
+      <p class="text-sm text-gray-400 mt-2">
+        <strong>Nota:</strong> As ocorrências já impressas aparecem em cinza e não podem ser selecionadas novamente.
+      </p>
+    </section>
+  </main>
+
+  <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
+    <p class="mb-1 text-base font-medium">
+      DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES
+    </p>
+    <p class="text-xs font-light tracking-wide">
+      LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO
+    </p>
+  </footer>
 </body>
 </html>
-
-
-
