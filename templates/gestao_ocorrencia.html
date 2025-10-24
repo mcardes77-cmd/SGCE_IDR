@@ -25,6 +25,7 @@
         };
 
         let ocorrencias = [];
+        let todasOcorrencias = []; // Guarda todas as ocorrências para filtros
         let salas = [];
         let alunos = [];
         let tutores = [];
@@ -33,14 +34,11 @@
             await carregarFiltros();
             await carregarOcorrencias();
             
-            document.getElementById('filtro-sala').addEventListener('change', async (e) => {
-                await carregarAlunosPorSala(e.target.value);
-                await aplicarFiltros();
-            });
-            
-            document.getElementById('filtro-aluno').addEventListener('change', aplicarFiltros);
+            // Tornar filtros autofiltrantes
             document.getElementById('filtro-tutor').addEventListener('change', aplicarFiltros);
             document.getElementById('filtro-status').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtro-sala').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtro-aluno').addEventListener('change', aplicarFiltros);
         });
 
         function mostrarMsg(msg, tipo = 'info') {
@@ -74,10 +72,13 @@
         async function carregarFiltros() {
             try {
                 // Carregar ocorrências primeiro para extrair os dados
-                ocorrencias = await safeFetch('/api/ocorrencias_todas');
+                todasOcorrencias = await safeFetch('/api/ocorrencias_todas');
+                
+                // Ordenar por número decrescente
+                todasOcorrencias.sort((a, b) => (b.numero || 0) - (a.numero || 0));
                 
                 // Extrair tutores únicos da coluna tutor_nome
-                tutores = extrairTutoresUnicos(ocorrencias);
+                tutores = extrairTutoresUnicos(todasOcorrencias);
                 const selectTutor = document.getElementById('filtro-tutor');
                 selectTutor.innerHTML = '<option value="all">Todos os Tutores</option>';
                 tutores.forEach(t => {
@@ -94,7 +95,7 @@
                 `;
 
                 // Extrair salas únicas da coluna sala_nome
-                salas = extrairSalasUnicas(ocorrencias);
+                salas = extrairSalasUnicas(todasOcorrencias);
                 const selectSala = document.getElementById('filtro-sala');
                 selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
                 salas.forEach(s => {
@@ -104,10 +105,24 @@
                 // Alunos (quarto filtro) - inicialmente vazio
                 const selectAluno = document.getElementById('filtro-aluno');
                 selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
+                
+                // Carregar alunos para filtro inicial
+                await carregarAlunosParaFiltro();
+                
             } catch (e) {
                 console.error('Erro ao carregar filtros:', e);
                 mostrarMsg('Erro ao carregar filtros', 'danger');
             }
+        }
+
+        async function carregarAlunosParaFiltro() {
+            const selectAluno = document.getElementById('filtro-aluno');
+            const alunosUnicos = extrairAlunosUnicos(todasOcorrencias);
+            
+            selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
+            alunosUnicos.forEach(a => {
+                selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
+            });
         }
 
         function extrairTutoresUnicos(ocorrencias) {
@@ -138,24 +153,6 @@
             return Array.from(salasSet).sort((a, b) => a.localeCompare(b));
         }
 
-        function extrairAlunosPorSala(ocorrencias, salaNome) {
-            const alunosSet = new Set();
-            
-            ocorrencias.forEach(oc => {
-                const alunoNome = oc.aluno_nome;
-                const ocSalaNome = oc.sala_nome;
-                
-                if (alunoNome && alunoNome.trim() !== '' && 
-                    alunoNome !== 'N/A' && 
-                    ocSalaNome === salaNome) {
-                    alunosSet.add(alunoNome.trim());
-                }
-            });
-            
-            // Converter para array e ordenar alfabeticamente
-            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
-        }
-
         function extrairAlunosUnicos(ocorrencias) {
             const alunosSet = new Set();
             
@@ -170,36 +167,11 @@
             return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
         }
 
-        async function carregarAlunosPorSala(salaNome) {
-            const selectAluno = document.getElementById('filtro-aluno');
-            selectAluno.innerHTML = '<option value="all">Carregando...</option>';
-            
-            if (salaNome === 'all') {
-                // Se não há sala selecionada, mostrar todos os alunos
-                const todosAlunos = extrairAlunosUnicos(ocorrencias);
-                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-                todosAlunos.forEach(a => {
-                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
-                });
-                return;
-            }
-            
-            try {
-                // Extrair alunos da sala selecionada
-                const alunosSala = extrairAlunosPorSala(ocorrencias, salaNome);
-                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-                alunosSala.forEach(a => {
-                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
-                });
-            } catch (e) {
-                console.error('Erro ao carregar alunos:', e);
-                selectAluno.innerHTML = '<option value="all">Erro ao carregar</option>';
-            }
-        }
-
         async function carregarOcorrencias() {
             try {
-                ocorrencias = await safeFetch('/api/ocorrencias_todas');
+                // Usar todas as ocorrências já carregadas, ordenadas por número decrescente
+                ocorrencias = [...todasOcorrencias];
+                
                 // Atualizar status das ocorrências
                 ocorrencias = ocorrencias.map(oc => {
                     return {
@@ -207,6 +179,7 @@
                         status: calcularStatus(oc)
                     };
                 });
+                
                 renderizarOcorrencias();
             } catch (e) {
                 console.error('Erro ao carregar ocorrências:', e);
@@ -239,36 +212,52 @@
             return 'ATENDIMENTO';
         }
 
-        async function aplicarFiltros() {
+        function aplicarFiltros() {
             const tutorNome = document.getElementById('filtro-tutor').value;
             const status = document.getElementById('filtro-status').value;
             const salaNome = document.getElementById('filtro-sala').value;
             const alunoNome = document.getElementById('filtro-aluno').value;
             
-            let url = '/api/ocorrencias_filtrar?';
-            const params = [];
+            // Filtrar localmente em vez de fazer requisição ao servidor
+            let ocorrenciasFiltradas = [...todasOcorrencias];
             
-            if (tutorNome !== 'all') params.push(`tutor_nome=${encodeURIComponent(tutorNome)}`);
-            if (status !== 'all') params.push(`status=${status}`);
-            if (salaNome !== 'all') params.push(`sala_nome=${encodeURIComponent(salaNome)}`);
-            if (alunoNome !== 'all') params.push(`aluno_nome=${encodeURIComponent(alunoNome)}`);
-            
-            url += params.join('&');
-            
-            try {
-                ocorrencias = await safeFetch(url);
-                // Recalcular status para as ocorrências filtradas
-                ocorrencias = ocorrencias.map(oc => {
-                    return {
-                        ...oc,
-                        status: calcularStatus(oc)
-                    };
-                });
-                renderizarOcorrencias();
-            } catch (e) {
-                console.error('Erro ao filtrar ocorrências:', e);
-                mostrarMsg('Erro ao aplicar filtros', 'danger');
+            // Aplicar filtros
+            if (tutorNome !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.tutor_nome === tutorNome
+                );
             }
+            
+            if (status !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    calcularStatus(oc) === status
+                );
+            }
+            
+            if (salaNome !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.sala_nome === salaNome
+                );
+            }
+            
+            if (alunoNome !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.aluno_nome === alunoNome
+                );
+            }
+            
+            // Manter ordenação decrescente
+            ocorrenciasFiltradas.sort((a, b) => (b.numero || 0) - (a.numero || 0));
+            
+            // Atualizar status e renderizar
+            ocorrencias = ocorrenciasFiltradas.map(oc => {
+                return {
+                    ...oc,
+                    status: calcularStatus(oc)
+                };
+            });
+            
+            renderizarOcorrencias();
         }
 
         function renderizarOcorrencias() {
