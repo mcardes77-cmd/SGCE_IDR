@@ -524,60 +524,25 @@ def api_ocorrencias_filtrar():
         logger.exception("Erro ao filtrar ocorrências")
         return jsonify({'error': str(e)}), 500
 
-@app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
-def api_gerar_pdf_ocorrencias():
-    """
-    Gerar PDF para as ocorrências selecionadas
-    """
-    supabase = get_supabase()
-    try:
-        payload = request.json or {}
-        numeros_ocorrencias = payload.get("numeros", [])
-        
-        if not numeros_ocorrencias:
-            return jsonify({"success": False, "error": "Nenhuma ocorrência selecionada"}), 400
-
-        # Buscar as ocorrências selecionadas
-        resp = supabase.table("ocorrencias").select("*").in_("numero", numeros_ocorrencias).execute()
-        ocorrencias = handle_supabase_response(resp)
-        
-        if not ocorrencias:
-            return jsonify({"success": False, "error": "Nenhuma ocorrência encontrada"}), 404
-
-        # Gerar o PDF
-        pdf_buffer = gerar_pdf_ocorrencias(ocorrencias)  # Chamando a função auxiliar
-        
-        # Marcar como impresso no banco
-        for numero in numeros_ocorrencias:
-            supabase.table("ocorrencias").update({"impressao_pdf": True}).eq("numero", numero).execute()
-
-        # Retornar o arquivo PDF para download
-        from io import BytesIO
-        pdf_buffer.seek(0)
-        
-        nome_arquivo = f"ocorrencias_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=nome_arquivo,
-            mimetype='application/pdf'
-        )
-            
-    except Exception as e:
-        print(f"Erro ao gerar PDF: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
 def gerar_pdf_ocorrencias(ocorrencias):
     """
     Gerar PDF com as ocorrências selecionadas no formato específico
     """
+    # ✅ Ordenar as ocorrências em ordem crescente pelo número
+    ocorrencias = sorted(
+        ocorrencias,
+        key=lambda x: x.get('numero', 0) if x.get('numero') is not None else 0
+    )
+
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, 
-                          topMargin=0.5*inch, 
-                          bottomMargin=0.5*inch,
-                          leftMargin=0.5*inch,
-                          rightMargin=0.5*inch)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch
+    )
     elements = []
     
     styles = getSampleStyleSheet()
@@ -597,7 +562,7 @@ def gerar_pdf_ocorrencias(ocorrencias):
     elements.append(data_relatorio)
     elements.append(Spacer(1, 0.3 * inch))
     
-    # Dados das ocorrências
+    # Dados das ocorrências (já em ordem crescente)
     for i, ocorrencia in enumerate(ocorrencias):
         # Número da ocorrência
         elements.append(Paragraph(f"<b>OCORRÊNCIA Nº: {ocorrencia.get('numero', 'N/A')}</b>", styles['Heading2']))
@@ -672,12 +637,12 @@ def gerar_pdf_ocorrencias(ocorrencias):
         elements.append(Paragraph(atendimento_gestao, styles['Normal']))
         elements.append(Spacer(1, 0.2 * inch))
         
-        # Sala e Tutor (informações adicionais)
+        # Sala e Tutor
         sala_tutor_text = f"<b>Sala:</b> {ocorrencia.get('sala_nome', 'N/A')}    <b>Tutor:</b> {ocorrencia.get('tutor_nome', 'N/A')}"
         elements.append(Paragraph(sala_tutor_text, styles['Normal']))
         elements.append(Spacer(1, 0.3 * inch))
         
-        # Assinatura apenas para a última ocorrência
+        # Assinatura apenas na última ocorrência
         if i == len(ocorrencias) - 1:
             elements.append(Paragraph("<b>Assinatura do Responsável: _____</b>", styles['Heading3']))
             elements.append(Spacer(1, 0.1 * inch))
@@ -688,6 +653,7 @@ def gerar_pdf_ocorrencias(ocorrencias):
     # Construir o PDF
     doc.build(elements)
     return buffer
+
     
 # ---------- Listar ocorrências com filtros ----------
 @app.route("/api/ocorrencias", methods=["GET"])
@@ -1235,6 +1201,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
