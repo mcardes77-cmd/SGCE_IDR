@@ -320,6 +320,16 @@ def api_registrar_ocorrencia():
         if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
             return jsonify({"success": False, "error": "Dados obrigatórios faltando"}), 400
 
+        # Buscar informações do aluno para obter nome e sala
+        resp_aluno = supabase.table("d_alunos").select("nome, sala_id, sala_nome, tutor_nome").eq("id", aluno_id).execute()
+        if not resp_aluno.data:
+            return jsonify({"success": False, "error": "Aluno não encontrado"}), 404
+        
+        aluno_data = resp_aluno.data[0]
+        aluno_nome = aluno_data.get("nome")
+        sala_nome = aluno_data.get("sala_nome")
+        tutor_nome = aluno_data.get("tutor_nome", payload.get("tutor_nome", ""))
+
         # Buscar o próximo número da ocorrência
         resp_numero = supabase.table("ocorrencias").select("numero").order("numero", desc=True).limit(1).execute()
         ultimo_numero = 0
@@ -331,9 +341,11 @@ def api_registrar_ocorrencia():
         ocorrencia_data = {
             "numero": proximo_numero,
             "aluno_id": aluno_id,
+            "aluno_nome": aluno_nome,
+            "sala_nome": sala_nome,
             "professor_id": professor_id,
             "professor_nome": professor_nome,
-            "tutor_nome": payload.get("tutor_nome", ""),
+            "tutor_nome": tutor_nome,
             "descricao": descricao,
             "atendimento_professor": atendimento_professor,
             "solicitado_tutor": payload.get("solicitar_tutor", False),
@@ -1093,6 +1105,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
