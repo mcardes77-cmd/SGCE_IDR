@@ -356,7 +356,7 @@
             document.getElementById('contador-selecao').textContent = `${selecionadas}/${total} selecionadas`;
         }
 
-       async function gerarPDF() {
+      async function gerarPDF() {
     const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')].map(c => c.value);
     
     if (!selecionadas.length) {
@@ -372,22 +372,18 @@
             body: JSON.stringify({ numeros: selecionadas })
         });
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha ao gerar PDF');
-        }
-        
         // Verificar se a resposta é um PDF
         const contentType = response.headers.get('content-type');
+        
         if (contentType && contentType.includes('application/pdf')) {
-            // Criar blob e fazer download
+            // É um PDF - fazer download
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
             
-            // Extrair nome do arquivo do header ou usar padrão
+            // Extrair nome do arquivo
             const contentDisposition = response.headers.get('content-disposition');
             let filename = 'ocorrencias.pdf';
             if (contentDisposition) {
@@ -405,14 +401,33 @@
             
             mostrarMsg(`PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
             setTimeout(carregarOcorrencias, 1000);
+            
         } else {
-            // Se não for PDF, tratar como erro JSON
-            const result = await response.json();
-            if (result.success) {
-                mostrarMsg(result.message || `PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
-                setTimeout(carregarOcorrencias, 1000);
-            } else {
-                throw new Error(result.error || 'Erro ao gerar PDF');
+            // Não é um PDF - tentar ler como JSON ou texto
+            const responseText = await response.text();
+            
+            // Verificar se é HTML (página de erro)
+            if (responseText.trim().toLowerCase().startsWith('<!doctype') || 
+                responseText.includes('<html') || 
+                responseText.includes('<!DOCTYPE')) {
+                
+                console.error('Resposta HTML recebida:', responseText.substring(0, 500));
+                throw new Error('Erro no servidor ao gerar PDF. Tente novamente.');
+            }
+            
+            // Tentar parsear como JSON
+            try {
+                const result = JSON.parse(responseText);
+                if (result.success) {
+                    mostrarMsg(result.message || `PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
+                    setTimeout(carregarOcorrencias, 1000);
+                } else {
+                    throw new Error(result.error || 'Erro ao gerar PDF');
+                }
+            } catch (jsonError) {
+                // Se não for JSON válido, mostrar erro genérico
+                console.error('Resposta inválida:', responseText.substring(0, 500));
+                throw new Error('Resposta inválida do servidor');
             }
         }
     } catch (e) {
@@ -510,4 +525,5 @@
     </div>
 </body>
 </html>
+
 
