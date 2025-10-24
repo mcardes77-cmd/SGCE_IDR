@@ -73,12 +73,15 @@
 
         async function carregarFiltros() {
             try {
-                // Carregar tutores primeiro (agora é o primeiro filtro)
-                tutores = await safeFetch('/api/tutores_com_ocorrencias');
+                // Carregar ocorrências primeiro para extrair os tutores
+                ocorrencias = await safeFetch('/api/ocorrencias_todas');
+                
+                // Extrair tutores únicos da coluna tutor_nome
+                tutores = extrairTutoresUnicos(ocorrencias);
                 const selectTutor = document.getElementById('filtro-tutor');
                 selectTutor.innerHTML = '<option value="all">Todos os Tutores</option>';
                 tutores.forEach(t => {
-                    selectTutor.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
+                    selectTutor.innerHTML += `<option value="${t}">${t}</option>`;
                 });
 
                 // Status (segundo filtro)
@@ -107,6 +110,20 @@
             }
         }
 
+        function extrairTutoresUnicos(ocorrencias) {
+            const tutoresSet = new Set();
+            
+            ocorrencias.forEach(oc => {
+                const tutorNome = oc.tutor_nome || oc.tutor;
+                if (tutorNome && tutorNome.trim() !== '' && tutorNome !== 'N/A') {
+                    tutoresSet.add(tutorNome.trim());
+                }
+            });
+            
+            // Converter para array e ordenar alfabeticamente
+            return Array.from(tutoresSet).sort((a, b) => a.localeCompare(b));
+        }
+
         async function carregarAlunosPorSala(salaId) {
             const selectAluno = document.getElementById('filtro-aluno');
             selectAluno.innerHTML = '<option value="all">Carregando...</option>';
@@ -130,7 +147,7 @@
 
         async function carregarOcorrencias() {
             try {
-                ocorrencias = await safeFetch('/api/ocorrencias_todas');
+                // Já carregamos as ocorrências em carregarFiltros, então apenas renderizamos
                 renderizarOcorrencias();
             } catch (e) {
                 console.error('Erro ao carregar ocorrências:', e);
@@ -139,7 +156,7 @@
         }
 
         async function aplicarFiltros() {
-            const tutorId = document.getElementById('filtro-tutor').value;
+            const tutorNome = document.getElementById('filtro-tutor').value;
             const status = document.getElementById('filtro-status').value;
             const salaId = document.getElementById('filtro-sala').value;
             const alunoId = document.getElementById('filtro-aluno').value;
@@ -147,7 +164,7 @@
             let url = '/api/ocorrencias_filtrar?';
             const params = [];
             
-            if (tutorId !== 'all') params.push(`tutor_id=${tutorId}`);
+            if (tutorNome !== 'all') params.push(`tutor_nome=${encodeURIComponent(tutorNome)}`);
             if (status !== 'all') params.push(`status=${status}`);
             if (salaId !== 'all') params.push(`sala_id=${salaId}`);
             if (alunoId !== 'all') params.push(`aluno_id=${alunoId}`);
