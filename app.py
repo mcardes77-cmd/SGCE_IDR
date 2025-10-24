@@ -505,27 +505,48 @@ def api_ocorrencias_filtrar():
         logger.exception("Erro ao filtrar ocorrências")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
+@app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
 def api_gerar_pdf_ocorrencias():
     """
-    Marca ocorrências como impressas e atualiza status para 'ASSINADA'.
-    Espera JSON: { "numeros": [123, 456] }
+    Gerar PDF para as ocorrências selecionadas
     """
+    supabase = get_supabase()
     try:
-        dados = request.get_json() or {}
-        numeros = dados.get('numeros', [])
-        if not isinstance(numeros, list):
-            return jsonify({'success': False, 'error': 'Formato inválido para numeros'}), 400
+        payload = request.json or {}
+        numeros_ocorrencias = payload.get("numeros", [])
+        
+        if not numeros_ocorrencias:
+            return jsonify({"success": False, "error": "Nenhuma ocorrência selecionada"}), 400
 
-        for numero in numeros:
-            dados_atualizacao = {'impressao_pdf': True, 'status': 'ASSINADA', 'updated_at': datetime.now().isoformat()}
-            if supabase:
-                supabase.table('ocorrencias').update(dados_atualizacao).eq('numero', numero).execute()
-        return jsonify({'success': True, 'message': f'{len(numeros)} ocorrências processadas para PDF'})
+        # Buscar as ocorrências selecionadas
+        resp = supabase.table("ocorrencias").select("*").in_("numero", numeros_ocorrencias).execute()
+        ocorrencias = handle_supabase_response(resp)
+        
+        if not ocorrencias:
+            return jsonify({"success": False, "error": "Nenhuma ocorrência encontrada"}), 404
+
+        # Gerar o PDF
+        pdf_buffer = gerar_pdf_ocorrencias(ocorrencias)
+        
+        # Marcar como impresso no banco
+        for numero in numeros_ocorrencias:
+            supabase.table("ocorrencias").update({"impressao_pdf": True}).eq("numero", numero).execute()
+
+        # Retornar o arquivo PDF para download
+        from io import BytesIO
+        pdf_buffer.seek(0)
+        
+        nome_arquivo = f"ocorrencias_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=nome_arquivo,
+            mimetype='application/pdf'
+        )
+            
     except Exception as e:
-        logger.exception("Erro ao gerar PDF de ocorrências")
-        return jsonify({'error': str(e)}), 500
-
+        return jsonify({"success": False, "error": str(e)}), 500
 # ---------- Listar ocorrências com filtros ----------
 @app.route("/api/ocorrencias", methods=["GET"])
 def api_list_ocorrencias():
@@ -1072,6 +1093,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
