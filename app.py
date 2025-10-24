@@ -524,12 +524,12 @@ def api_ocorrencias_filtrar():
         logger.exception("Erro ao filtrar ocorrências")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
+# ✅ Função utilitária para gerar o PDF (sem rota)
 def gerar_pdf_ocorrencias(ocorrencias):
     """
-    Gerar PDF com as ocorrências selecionadas no formato específico
+    Gera o PDF com as ocorrências em ordem crescente pelo número
     """
-    # ✅ Ordenar as ocorrências em ordem crescente pelo número
+    # Ordenar as ocorrências
     ocorrencias = sorted(
         ocorrencias,
         key=lambda x: x.get('numero', 0) if x.get('numero') is not None else 0
@@ -545,35 +545,29 @@ def gerar_pdf_ocorrencias(ocorrencias):
         rightMargin=0.5 * inch
     )
     elements = []
-    
     styles = getSampleStyleSheet()
-    
-    # Título principal
+
+    # Cabeçalho
     title = Paragraph("RELATÓRIO DE OCORRÊNCIAS - ASSINATURA", styles['Title'])
     elements.append(title)
     elements.append(Spacer(1, 0.2 * inch))
-    
-    # Cabeçalho da escola
     escola = Paragraph("<b>E.E. PEI PROFESSOR IRENE DIAS RIBEIRO</b>", styles['Heading2'])
     elements.append(escola)
     elements.append(Spacer(1, 0.1 * inch))
-    
-    # Data do relatório
-    data_relatorio = Paragraph(f"<b>Data do Relatório:</b> {datetime.now().strftime('%d/%m/%Y')}", styles['Normal'])
+    data_relatorio = Paragraph(
+        f"<b>Data do Relatório:</b> {datetime.now().strftime('%d/%m/%Y')}",
+        styles['Normal']
+    )
     elements.append(data_relatorio)
     elements.append(Spacer(1, 0.3 * inch))
-    
-    # Dados das ocorrências (já em ordem crescente)
+
+    # Ocorrências
     for i, ocorrencia in enumerate(ocorrencias):
-        # Número da ocorrência
         elements.append(Paragraph(f"<b>OCORRÊNCIA Nº: {ocorrencia.get('numero', 'N/A')}</b>", styles['Heading2']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Dados do aluno
         aluno_text = f"<b>Aluno:</b> {ocorrencia.get('aluno_nome', 'N/A')}"
         elements.append(Paragraph(aluno_text, styles['Normal']))
-        
-        # Data e hora
+
         data_hora = ocorrencia.get('data_hora', '')
         if data_hora:
             try:
@@ -585,75 +579,84 @@ def gerar_pdf_ocorrencias(ocorrencias):
                 data_hora_text = f"<b>Data/Hora:</b> {data_hora}"
         else:
             data_hora_text = "<b>Data/Hora:</b> N/A"
-        
+
         elements.append(Paragraph(data_hora_text, styles['Normal']))
-        
-        # Professor
-        professor_text = f"<b>Professor:</b> {ocorrencia.get('professor_nome', 'N/A')}"
-        elements.append(Paragraph(professor_text, styles['Normal']))
+        elements.append(Paragraph(f"<b>Professor:</b> {ocorrencia.get('professor_nome', 'N/A')}", styles['Normal']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Descrição da ocorrência
+
+        # Demais campos...
         elements.append(Paragraph("<b>Descrição da Ocorrência:</b>", styles['Heading3']))
-        descricao = ocorrencia.get('descricao', 'Nenhuma descrição fornecida')
-        elements.append(Paragraph(descricao, styles['Normal']))
+        elements.append(Paragraph(ocorrencia.get('descricao', 'Nenhuma descrição fornecida'), styles['Normal']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Atendimento Professor
+
         elements.append(Paragraph("<b>Atendimento Professor:</b>", styles['Heading3']))
-        atendimento_prof = ocorrencia.get('atendimento_professor', 'Nenhum atendimento registrado')
-        elements.append(Paragraph(atendimento_prof, styles['Normal']))
+        elements.append(Paragraph(ocorrencia.get('atendimento_professor', 'Nenhum atendimento registrado'), styles['Normal']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Atendimento Tutor
+
+        # Tutor
         elements.append(Paragraph("<b>Atendimento Tutor:</b>", styles['Heading3']))
         if ocorrencia.get('solicitado_tutor'):
-            atendimento_tutor = ocorrencia.get('atendimento_tutor', 'Pendente')
-            if not atendimento_tutor or atendimento_tutor.strip() == '':
-                atendimento_tutor = 'Pendente'
+            atendimento_tutor = ocorrencia.get('atendimento_tutor', 'Pendente').strip() or 'Pendente'
         else:
             atendimento_tutor = 'Atendimento Não Solicitado pelo Professor Responsável da Ocorrência'
         elements.append(Paragraph(atendimento_tutor, styles['Normal']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Atendimento Coordenação
+
+        # Coordenação
         elements.append(Paragraph("<b>Atendimento Coordenação:</b>", styles['Heading3']))
         if ocorrencia.get('solicitado_coordenacao'):
-            atendimento_coord = ocorrencia.get('atendimento_coordenacao', 'Pendente')
-            if not atendimento_coord or atendimento_coord.strip() == '':
-                atendimento_coord = 'Pendente'
+            atendimento_coord = ocorrencia.get('atendimento_coordenacao', 'Pendente').strip() or 'Pendente'
         else:
             atendimento_coord = 'Atendimento Não Solicitado pelo Professor Responsável da Ocorrência'
         elements.append(Paragraph(atendimento_coord, styles['Normal']))
         elements.append(Spacer(1, 0.1 * inch))
-        
-        # Atendimento Gestão
+
+        # Gestão
         elements.append(Paragraph("<b>Atendimento Gestão:</b>", styles['Heading3']))
         if ocorrencia.get('solicitado_gestao'):
-            atendimento_gestao = ocorrencia.get('atendimento_gestao', 'Pendente')
-            if not atendimento_gestao or atendimento_gestao.strip() == '':
-                atendimento_gestao = 'Pendente'
+            atendimento_gestao = ocorrencia.get('atendimento_gestao', 'Pendente').strip() or 'Pendente'
         else:
             atendimento_gestao = 'Atendimento Não Solicitado pelo Professor Responsável da Ocorrência'
         elements.append(Paragraph(atendimento_gestao, styles['Normal']))
         elements.append(Spacer(1, 0.2 * inch))
-        
+
         # Sala e Tutor
         sala_tutor_text = f"<b>Sala:</b> {ocorrencia.get('sala_nome', 'N/A')}    <b>Tutor:</b> {ocorrencia.get('tutor_nome', 'N/A')}"
         elements.append(Paragraph(sala_tutor_text, styles['Normal']))
         elements.append(Spacer(1, 0.3 * inch))
-        
-        # Assinatura apenas na última ocorrência
+
+        # Assinatura final
         if i == len(ocorrencias) - 1:
             elements.append(Paragraph("<b>Assinatura do Responsável: _____</b>", styles['Heading3']))
             elements.append(Spacer(1, 0.1 * inch))
             elements.append(Paragraph("<b>Data: _____ /_____/_____</b>", styles['Heading3']))
         else:
             elements.append(Spacer(1, 0.2 * inch))
-    
-    # Construir o PDF
+
     doc.build(elements)
     return buffer
+
+
+# ✅ Rota Flask correta (sem erro de argumento)
+@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
+def api_gerar_pdf_ocorrencias():
+    try:
+        dados = request.get_json()
+        ocorrencias = dados.get('ocorrencias', [])
+
+        if not ocorrencias:
+            return jsonify({'erro': 'Nenhuma ocorrência enviada.'}), 400
+
+        buffer = gerar_pdf_ocorrencias(ocorrencias)
+
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=relatorio_ocorrencias.pdf'
+        return response
+
+    except Exception as e:
+        print(f"Erro ao gerar PDF: {e}")
+        return jsonify({'erro': str(e)}), 500
 
     
 # ---------- Listar ocorrências com filtros ----------
@@ -1202,6 +1205,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
