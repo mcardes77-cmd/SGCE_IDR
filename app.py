@@ -304,78 +304,52 @@ def api_tutor_por_aluno(aluno_id):
 @app.route("/api/registrar_ocorrencia", methods=["POST"])
 def api_registrar_ocorrencia():
     """
-    Espera JSON com pelo menos:
-    { "aluno_id": <int>, "descricao": "...", "status": "...", ... }
-    Retorna a ocorrência criada (incluindo numero) — supabase gera o registro.
+    Registrar uma nova ocorrência
     """
-    data = request.json or {}
-    aluno_id = data.get("aluno_id")
-    descricao = data.get("descricao", "")
-    status = data.get("status", "AGUARDANDO ATENDIMENTO")
-    atendimento_professor = data.get("atendimento_professor", "")
-    atendimento_tutor = data.get("atendimento_tutor", "")
-    atendimento_coordenacao = data.get("atendimento_coordenacao", "")
-    atendimento_gestao = data.get("atendimento_gestao", "")
-
-    if not aluno_id:
-        return jsonify({"success": False, "error": "Aluno não informado"}), 400
-
+    supabase = get_supabase()
     try:
-        # Buscar dados do aluno
-        response_aluno = supabase.table('d_alunos')\
-            .select('id, nome, sala_id, tutor_nome')\
-            .eq('id', aluno_id).execute()
+        payload = request.json or {}
+        
+        # Dados obrigatórios
+        aluno_id = payload.get("aluno_id")
+        professor_id = payload.get("professor_id")
+        professor_nome = payload.get("professor_nome")
+        descricao = payload.get("descricao")
+        atendimento_professor = payload.get("atendimento_professor")
+        
+        if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
+            return jsonify({"success": False, "error": "Dados obrigatórios faltando"}), 400
 
-        aluno_data = handle_supabase_response(response_aluno)
-        if not aluno_data:
-            return jsonify({"success": False, "error": "Aluno não encontrado"}), 404
-
-        aluno = aluno_data[0]
-
-        # Preparar datas de atendimento (timestamps)
-        dt_professor = datetime.now().isoformat() if str(atendimento_professor or "").strip() else None
-        dt_tutor = datetime.now().isoformat() if str(atendimento_tutor or "").strip() else None
-        dt_coordenacao = datetime.now().isoformat() if str(atendimento_coordenacao or "").strip() else None
-        dt_gestao = datetime.now().isoformat() if str(atendimento_gestao or "").strip() else None
-
-        # Inserir nova ocorrência
-        payload = {
+        # Preparar dados para inserção
+        ocorrencia_data = {
             "aluno_id": aluno_id,
-            "aluno_nome": aluno.get('nome'),
-            "sala_id": aluno.get('sala_id'),
-            "sala_nome": None,
-            "tutor_nome": aluno.get('tutor_nome', ''),
+            "professor_id": professor_id,
+            "professor_nome": professor_nome,
+            "tutor_nome": payload.get("tutor_nome", ""),
             "descricao": descricao,
-            "status": status,
             "atendimento_professor": atendimento_professor,
-            "dt_atendimento_professor": dt_professor,
-            "atendimento_tutor": atendimento_tutor,
-            "dt_atendimento_tutor": dt_tutor,
-            "atendimento_coordenacao": atendimento_coordenacao,
-            "dt_atendimento_coordenacao": dt_coordenacao,
-            "atendimento_gestao": atendimento_gestao,
-            "dt_atendimento_gestao": dt_gestao,
-            "impressao_pdf": False,
-            "data_hora": datetime.now().isoformat()
+            "solicitado_tutor": payload.get("solicitar_tutor", False),
+            "solicitado_coordenacao": payload.get("solicitar_coordenacao", False),
+            "solicitado_gestao": payload.get("solicitar_gestao", False),
+            "status": "ATENDIMENTO",
+            "data_hora": now_iso()
         }
 
-        # tentar também preencher sala_nome se sala_id existir na tabela salas
-        if aluno.get('sala_id'):
-            sala_resp = supabase.table('salas').select('nome').eq('id', aluno['sala_id']).execute()
-            sala_data = handle_supabase_response(sala_resp)
-            if sala_data:
-                payload['sala_nome'] = sala_data[0].get('nome')
-
-        resp = supabase.table('ocorrencias').insert(payload).execute()
-        created = handle_supabase_response(resp)
-        # created pode ser lista com o registro inserido
-        if isinstance(created, list) and created:
-            return jsonify({"success": True, "ocorrencia": created[0]})
-        return jsonify({"success": True, "ocorrencia": created})
+        # Inserir no banco
+        resp = supabase.table("ocorrencias").insert(ocorrencia_data).execute()
+        data = handle_supabase_response(resp)
+        
+        if data and len(data) > 0:
+            return jsonify({
+                "success": True, 
+                "numero": data[0].get("numero"),
+                "data": data[0]
+            })
+        else:
+            return jsonify({"success": False, "error": "Nenhum dado retornado"}), 500
+            
     except Exception as e:
-        logger.exception("Erro ao registrar ocorrência")
         return jsonify({"success": False, "error": str(e)}), 500
-
 @app.route("/api/ocorrencia_detalhes")
 def ocorrencia_detalhes():
     """
@@ -1089,3 +1063,4 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
