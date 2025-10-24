@@ -13,6 +13,7 @@ from datetime import datetime, date
 from calendar import monthrange
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from io import BytesIO
 
 # -----------------------------
 # Carregar .env
@@ -1228,6 +1229,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
