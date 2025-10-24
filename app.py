@@ -357,7 +357,7 @@ def api_registrar_ocorrencia():
             return jsonify({"success": False, "error": "Nenhum dado retornado"}), 500
             
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500"error": str(e)}), 500
         
 @app.route("/api/ocorrencia_detalhes")
 def ocorrencia_detalhes():
@@ -1072,5 +1072,6 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
