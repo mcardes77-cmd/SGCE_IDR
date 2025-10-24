@@ -144,6 +144,7 @@
     <script>
         let ocorrenciaAtual = null;
         let nivelAtual = null;
+        let ocorrenciaId = null; // Vamos precisar do ID interno, não só do número
         
         const mapaNiveis = {
             'T': {
@@ -151,30 +152,27 @@
                 nome: 'TUTOR',
                 cor: 'bg-tutor-color',
                 texto: 'text-white',
-                nivel_api: 'tutor',
-                campo_solicitado: 'solicitado_tutor'
+                tipo: 'tutor'
             },
             'C': {
                 campo: 'atendimento_coordenacao',
                 nome: 'COORDENAÇÃO',
                 cor: 'bg-coord-color',
                 texto: 'text-white',
-                nivel_api: 'coordenacao',
-                campo_solicitado: 'solicitado_coordenacao'
+                tipo: 'coordenacao'
             },
             'G': {
                 campo: 'atendimento_gestao',
                 nome: 'GESTÃO',
                 cor: 'bg-gestao-color',
                 texto: 'text-white',
-                nivel_api: 'gestao',
-                campo_solicitado: 'solicitado_gestao'
+                tipo: 'gestao'
             }
         };
 
         function iniciarPagina() {
             const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('id');
+            ocorrenciaAtual = urlParams.get('id'); // Este é o número da ocorrência
             nivelAtual = urlParams.get('nivel');
             
             if (ocorrenciaAtual) {
@@ -192,6 +190,9 @@
                 
                 const ocorrencia = await response.json();
                 if (ocorrencia.error) throw new Error(ocorrencia.error);
+                
+                // Guardar o ID interno da ocorrência
+                ocorrenciaId = ocorrencia.id;
                 
                 preencherDadosOcorrencia(ocorrencia);
                 aplicarRegrasEdicao(nivelAtual);
@@ -247,7 +248,10 @@
         }
 
         async function salvarAtendimento() {
-            if (!ocorrenciaAtual || !nivelAtual) return;
+            if (!ocorrenciaId || !nivelAtual) {
+                mostrarMensagem('Erro: ID da ocorrência não encontrado', 'error');
+                return;
+            }
             
             const config = mapaNiveis[nivelAtual];
             const texto = document.getElementById(config.campo).value;
@@ -258,19 +262,20 @@
             }
             
             try {
-                // Preparar dados para envio - CORREÇÃO AQUI
+                // CORREÇÃO: Enviar no formato que o backend espera
                 const dadosEnviar = {
-                    numero: ocorrenciaAtual,
-                    nivel: config.nivel_api,
-                    texto: texto.trim(),
-                    // Enviar como booleano true para marcar como concluído
-                    concluido: true
+                    tipo: config.tipo, // "tutor", "coordenacao" ou "gestao"
+                    texto: texto.trim()
                 };
                 
-                console.log('Enviando dados:', dadosEnviar); // Para debug
+                console.log('Enviando dados para API:', {
+                    url: `/api/ocorrencias/${ocorrenciaId}/atendimento`,
+                    method: 'PUT',
+                    dados: dadosEnviar
+                });
                 
-                const response = await fetch('/api/salvar_atendimento', {
-                    method: 'POST',
+                const response = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento`, {
+                    method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
@@ -279,14 +284,13 @@
                 
                 const result = await response.json();
                 
-                if (response.ok && result.success) {
+                if (response.ok && result.ok) {
                     mostrarMensagem('Atendimento salvo com sucesso! Redirecionando...', 'success');
                     setTimeout(() => {
                         window.location.href = '/gestao_ocorrencia';
                     }, 2000);
                 } else {
-                    // Mostrar erro mais detalhado
-                    const erroDetalhado = result.error || result.message || 'Erro desconhecido';
+                    const erroDetalhado = result.error || 'Erro desconhecido';
                     mostrarMensagem('Erro ao salvar: ' + erroDetalhado, 'error');
                     console.error('Erro detalhado:', result);
                 }
