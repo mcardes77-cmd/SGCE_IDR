@@ -73,7 +73,7 @@
 
         async function carregarFiltros() {
             try {
-                // Carregar ocorrências primeiro para extrair os tutores
+                // Carregar ocorrências primeiro para extrair os dados
                 ocorrencias = await safeFetch('/api/ocorrencias_todas');
                 
                 // Extrair tutores únicos da coluna tutor_nome
@@ -93,15 +93,15 @@
                     <option value="ASSINADA">Assinada</option>
                 `;
 
-                // Salas (terceiro filtro)
-                salas = await safeFetch('/api/salas_com_ocorrencias');
+                // Extrair salas únicas da coluna sala_nome
+                salas = extrairSalasUnicas(ocorrencias);
                 const selectSala = document.getElementById('filtro-sala');
                 selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
                 salas.forEach(s => {
-                    selectSala.innerHTML += `<option value="${s.id}">${s.nome || s.sala}</option>`;
+                    selectSala.innerHTML += `<option value="${s}">${s}</option>`;
                 });
 
-                // Alunos (quarto filtro)
+                // Alunos (quarto filtro) - inicialmente vazio
                 const selectAluno = document.getElementById('filtro-aluno');
                 selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
             } catch (e) {
@@ -124,25 +124,77 @@
             return Array.from(tutoresSet).sort((a, b) => a.localeCompare(b));
         }
 
-        async function carregarAlunosPorSala(salaId) {
+        function extrairSalasUnicas(ocorrencias) {
+            const salasSet = new Set();
+            
+            ocorrencias.forEach(oc => {
+                const salaNome = oc.sala_nome || oc.sala;
+                if (salaNome && salaNome.trim() !== '' && salaNome !== 'N/A') {
+                    salasSet.add(salaNome.trim());
+                }
+            });
+            
+            // Converter para array e ordenar alfabeticamente
+            return Array.from(salasSet).sort((a, b) => a.localeCompare(b));
+        }
+
+        function extrairAlunosPorSala(ocorrencias, salaNome) {
+            const alunosSet = new Set();
+            
+            ocorrencias.forEach(oc => {
+                const alunoNome = oc.aluno_nome || oc.aluno;
+                const ocSalaNome = oc.sala_nome || oc.sala;
+                
+                if (alunoNome && alunoNome.trim() !== '' && 
+                    alunoNome !== 'N/A' && 
+                    ocSalaNome === salaNome) {
+                    alunosSet.add(alunoNome.trim());
+                }
+            });
+            
+            // Converter para array e ordenar alfabeticamente
+            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
+        }
+
+        async function carregarAlunosPorSala(salaNome) {
             const selectAluno = document.getElementById('filtro-aluno');
             selectAluno.innerHTML = '<option value="all">Carregando...</option>';
             
-            if (salaId === 'all') {
+            if (salaNome === 'all') {
+                // Se não há sala selecionada, mostrar todos os alunos
+                const todosAlunos = extrairAlunosUnicos(ocorrencias);
                 selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
+                todosAlunos.forEach(a => {
+                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
+                });
                 return;
             }
             
             try {
-                alunos = await safeFetch(`/api/alunos_por_sala/${salaId}`);
+                // Extrair alunos da sala selecionada
+                const alunosSala = extrairAlunosPorSala(ocorrencias, salaNome);
                 selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-                alunos.forEach(a => {
-                    selectAluno.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+                alunosSala.forEach(a => {
+                    selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
                 });
             } catch (e) {
                 console.error('Erro ao carregar alunos:', e);
                 selectAluno.innerHTML = '<option value="all">Erro ao carregar</option>';
             }
+        }
+
+        function extrairAlunosUnicos(ocorrencias) {
+            const alunosSet = new Set();
+            
+            ocorrencias.forEach(oc => {
+                const alunoNome = oc.aluno_nome || oc.aluno;
+                if (alunoNome && alunoNome.trim() !== '' && alunoNome !== 'N/A') {
+                    alunosSet.add(alunoNome.trim());
+                }
+            });
+            
+            // Converter para array e ordenar alfabeticamente
+            return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
         }
 
         async function carregarOcorrencias() {
@@ -158,16 +210,16 @@
         async function aplicarFiltros() {
             const tutorNome = document.getElementById('filtro-tutor').value;
             const status = document.getElementById('filtro-status').value;
-            const salaId = document.getElementById('filtro-sala').value;
-            const alunoId = document.getElementById('filtro-aluno').value;
+            const salaNome = document.getElementById('filtro-sala').value;
+            const alunoNome = document.getElementById('filtro-aluno').value;
             
             let url = '/api/ocorrencias_filtrar?';
             const params = [];
             
             if (tutorNome !== 'all') params.push(`tutor_nome=${encodeURIComponent(tutorNome)}`);
             if (status !== 'all') params.push(`status=${status}`);
-            if (salaId !== 'all') params.push(`sala_id=${salaId}`);
-            if (alunoId !== 'all') params.push(`aluno_id=${alunoId}`);
+            if (salaNome !== 'all') params.push(`sala_nome=${encodeURIComponent(salaNome)}`);
+            if (alunoNome !== 'all') params.push(`aluno_nome=${encodeURIComponent(alunoNome)}`);
             
             url += params.join('&');
             
