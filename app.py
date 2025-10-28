@@ -325,12 +325,36 @@ def api_registrar_ocorrencia():
         atendimento_professor = payload.get("atendimento_professor")
         
         if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
-            return jsonify({"success": False, "error": "Dados obrigatórios faltando"}), 400
+            return jsonify({
+                "success": False, 
+                "error": "Dados obrigatórios faltando",
+                "redirect": False
+            }), 400
+
+        # VERIFICAÇÃO DE DUPLICAÇÃO - Prevenir múltiplos cliques
+        cinco_minutos_atras = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
+        verificacao = supabase.table("ocorrencias")\
+            .select("numero")\
+            .eq("aluno_id", aluno_id)\
+            .eq("professor_id", professor_id)\
+            .gte("data_hora", cinco_minutos_atras)\
+            .execute()
+            
+        if verificacao.data:
+            return jsonify({
+                "success": False, 
+                "error": "Uma ocorrência similar foi registrada recentemente. Aguarde alguns minutos antes de tentar novamente.",
+                "redirect": False
+            }), 400
 
         # Buscar informações do aluno para obter nome e sala
         resp_aluno = supabase.table("d_alunos").select("nome, sala_id, sala_nome, tutor_nome").eq("id", aluno_id).execute()
         if not resp_aluno.data:
-            return jsonify({"success": False, "error": "Aluno não encontrado"}), 404
+            return jsonify({
+                "success": False, 
+                "error": "Aluno não encontrado",
+                "redirect": False
+            }), 404
         
         aluno_data = resp_aluno.data[0]
         aluno_nome = aluno_data.get("nome")
@@ -370,13 +394,24 @@ def api_registrar_ocorrencia():
             return jsonify({
                 "success": True, 
                 "numero": data[0].get("numero"),
-                "data": data[0]
+                "data": data[0],
+                "redirect": True,
+                "redirect_url": "/gestao_ocorrencia",
+                "message": f"Ocorrência #{proximo_numero} registrada com sucesso!"
             })
         else:
-            return jsonify({"success": False, "error": "Nenhum dado retornado"}), 500
+            return jsonify({
+                "success": False, 
+                "error": "Nenhum dado retornado",
+                "redirect": False
+            }), 500
             
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            "success": False, 
+            "error": str(e),
+            "redirect": False
+        }), 500
         
 @app.route("/api/ocorrencia_detalhes")
 def ocorrencia_detalhes():
@@ -1200,6 +1235,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
