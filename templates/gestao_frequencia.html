@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
         tailwind.config = {
@@ -29,6 +30,11 @@
                 },
             },
         };
+
+        // Configuração do Supabase
+        const supabaseUrl = 'SUA_URL_DO_SUPABASE';
+        const supabaseKey = 'SUA_CHAVE_DO_SUPABASE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
         let moduloAtual = 'menu';
         let dadosFrequencia = [];
@@ -89,31 +95,277 @@
             setTimeout(() => el.style.display = 'none', 5000);
         }
 
-        async function safeFetch(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                return Array.isArray(data) ? data : [];
-            } catch (error) {
-                console.error(`Erro na requisição ${url}:`, error);
-                return [];
-            }
-        }
+        // ========== FUNÇÕES SUPABASE ==========
 
         async function carregarSalas() {
             try {
-                salasData = await safeFetch('/api/salas');
+                const { data, error } = await supabase
+                    .from('d_alunos')
+                    .select('sala_id, sala_nome')
+                    .not('sala_id', 'is', null)
+                    .order('sala_nome');
+
+                if (error) throw error;
+
+                // Remover duplicatas
+                const salasUnicas = [];
+                const idsVistos = new Set();
+                
+                data.forEach(item => {
+                    if (item.sala_id && !idsVistos.has(item.sala_id)) {
+                        idsVistos.add(item.sala_id);
+                        salasUnicas.push({
+                            id: item.sala_id,
+                            nome: item.sala_nome
+                        });
+                    }
+                });
+
+                salasData = salasUnicas;
+                
                 // Atualizar todos os selects de sala
                 document.querySelectorAll('.select-sala').forEach(select => {
                     select.innerHTML = '<option value="">Selecione a Sala</option>';
                     salasData.forEach(sala => {
-                        select.innerHTML += `<option value="${sala.id}">${sala.sala || sala.nome}</option>`;
+                        select.innerHTML += `<option value="${sala.id}">${sala.nome}</option>`;
                     });
                 });
-            } catch (e) {
-                console.error('Erro ao carregar salas:', e);
+            } catch (error) {
+                console.error('Erro ao carregar salas:', error);
                 mostrarMsg('Erro ao carregar salas', 'danger');
+            }
+        }
+
+        async function carregarAlunosPorSala(salaId) {
+            try {
+                const { data, error } = await supabase
+                    .from('d_alunos')
+                    .select('id, aluno_nome, sala_nome')
+                    .eq('sala_id', salaId)
+                    .order('aluno_nome');
+
+                if (error) throw error;
+
+                return data || [];
+            } catch (error) {
+                console.error('Erro ao carregar alunos:', error);
+                mostrarMsg('Erro ao carregar alunos', 'danger');
+                return [];
+            }
+        }
+
+        async function verificarFrequenciaRegistrada(salaId, data) {
+            try {
+                // Primeiro busca alunos da sala
+                const alunos = await carregarAlunosPorSala(salaId);
+                if (alunos.length === 0) return false;
+
+                const { data: frequencia, error } = await supabase
+                    .from('f_frequencia')
+                    .select('id')
+                    .in('aluno_nome', alunos.map(a => a.aluno_nome))
+                    .eq('data', data)
+                    .limit(1);
+
+                if (error) throw error;
+
+                return frequencia && frequencia.length > 0;
+            } catch (error) {
+                console.error('Erro ao verificar frequência:', error);
+                return false;
+            }
+        }
+
+        async function salvarFrequenciaSupabase(registros) {
+            try {
+                const { data, error } = await supabase
+                    .from('f_frequencia')
+                    .upsert(registros, { 
+                        onConflict: 'aluno_nome,data',
+                        ignoreDuplicates: false 
+                    });
+
+                if (error) throw error;
+
+                return { success: true, message: 'Frequência salva com sucesso!' };
+            } catch (error) {
+                console.error('Erro ao salvar frequência:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function salvarAtrasoSupabase(dados) {
+            try {
+                // Busca dados do aluno
+                const { data: aluno, error: alunoError } = await supabase
+                    .from('d_alunos')
+                    .select('aluno_nome, sala_nome')
+                    .eq('id', dados.aluno_id)
+                    .single();
+
+                if (alunoError) throw alunoError;
+
+                // Salva/atualiza na f_frequencia
+                const { error: freqError } = await supabase
+                    .from('f_frequencia')
+                    .upsert({
+                        aluno_nome: aluno.aluno_nome,
+                        sala_nome: aluno.sala_nome,
+                        data: dados.data,
+                        status: 'PA',
+                        hora_entrada: dados.hora_entrada,
+                        motivo_atraso: dados.motivo_atraso,
+                        responsavel_nome: dados.responsavel_nome,
+                        responsavel_telefone: dados.responsavel_telefone,
+                        updated_at: new Date()
+                    }, {
+                        onConflict: 'aluno_nome,data'
+                    });
+
+                if (freqError) throw freqError;
+
+                return { success: true, message: 'Atraso registrado com sucesso!' };
+            } catch (error) {
+                console.error('Erro ao salvar atraso:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function salvarSaidaSupabase(dados) {
+            try {
+                // Busca dados do aluno
+                const { data: aluno, error: alunoError } = await supabase
+                    .from('d_alunos')
+                    .select('aluno_nome, sala_nome')
+                    .eq('id', dados.aluno_id)
+                    .single();
+
+                if (alunoError) throw alunoError;
+
+                // Busca registro existente para determinar status
+                const { data: registroExistente, error: buscaError } = await supabase
+                    .from('f_frequencia')
+                    .select('status')
+                    .eq('aluno_nome', aluno.aluno_nome)
+                    .eq('data', dados.data)
+                    .single();
+
+                let status = 'PS'; // Presença com Saída Antecipada
+                
+                // Se já tiver atraso, atualiza para PSA
+                if (registroExistente && registroExistente.status === 'PA') {
+                    status = 'PSA';
+                }
+
+                // Salva/atualiza na f_frequencia
+                const { error: freqError } = await supabase
+                    .from('f_frequencia')
+                    .upsert({
+                        aluno_nome: aluno.aluno_nome,
+                        sala_nome: aluno.sala_nome,
+                        data: dados.data,
+                        status: status,
+                        hora_saida: dados.hora_saida,
+                        motivo_saida: dados.motivo_saida,
+                        responsavel_nome: dados.responsavel_nome,
+                        responsavel_telefone: dados.responsavel_telefone,
+                        updated_at: new Date()
+                    }, {
+                        onConflict: 'aluno_nome,data'
+                    });
+
+                if (freqError) throw freqError;
+
+                return { success: true, message: 'Saída antecipada registrada com sucesso!' };
+            } catch (error) {
+                console.error('Erro ao salvar saída antecipada:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function carregarRelatorioMensal(salaId, mes) {
+            try {
+                const ano = new Date().getFullYear();
+                const dataInicio = `${ano}-${mes.toString().padStart(2, '0')}-01`;
+                const dataFim = `${ano}-${mes.toString().padStart(2, '0')}-${new Date(ano, mes, 0).getDate()}`;
+
+                // Carrega alunos da sala
+                const { data: alunos, error: alunosError } = await supabase
+                    .from('d_alunos')
+                    .select('id, aluno_nome')
+                    .eq('sala_id', salaId)
+                    .order('aluno_nome');
+
+                if (alunosError) throw alunosError;
+
+                if (!alunos || alunos.length === 0) return [];
+
+                // Carrega frequência do período
+                const { data: frequencia, error: freqError } = await supabase
+                    .from('f_frequencia')
+                    .select('*')
+                    .in('aluno_nome', alunos.map(a => a.aluno_nome))
+                    .gte('data', dataInicio)
+                    .lte('data', dataFim);
+
+                if (freqError) throw freqError;
+
+                // Processa os dados para o formato do relatório
+                const relatorio = alunos.map(aluno => {
+                    const frequenciaAluno = {};
+                    
+                    // Processa frequência
+                    frequencia.filter(f => f.aluno_nome === aluno.aluno_nome).forEach(f => {
+                        frequenciaAluno[f.data] = {
+                            status: f.status,
+                            hora_entrada: f.hora_entrada,
+                            hora_saida: f.hora_saida,
+                            motivo_atraso: f.motivo_atraso,
+                            motivo_saida: f.motivo_saida,
+                            responsavel_nome: f.responsavel_nome,
+                            responsavel_telefone: f.responsavel_telefone
+                        };
+                    });
+
+                    return {
+                        id: aluno.id,
+                        nome: aluno.aluno_nome,
+                        frequencia: frequenciaAluno
+                    };
+                });
+
+                return relatorio;
+            } catch (error) {
+                console.error('Erro ao carregar relatório:', error);
+                throw error;
+            }
+        }
+
+        async function carregarDetalhesFrequencia(alunoId, data) {
+            try {
+                // Busca nome do aluno
+                const { data: aluno, error: alunoError } = await supabase
+                    .from('d_alunos')
+                    .select('aluno_nome')
+                    .eq('id', alunoId)
+                    .single();
+
+                if (alunoError) throw alunoError;
+
+                // Busca detalhes da frequência
+                const { data: frequencia, error: freqError } = await supabase
+                    .from('f_frequencia')
+                    .select('*')
+                    .eq('aluno_nome', aluno.aluno_nome)
+                    .eq('data', data)
+                    .single();
+
+                if (freqError && freqError.code !== 'PGRST116') throw freqError;
+
+                return frequencia || {};
+            } catch (error) {
+                console.error('Erro ao carregar detalhes:', error);
+                return {};
             }
         }
 
@@ -135,8 +387,7 @@
 
         async function loadAlunosRegistro(sala_id) {
             try {
-                const response = await fetch(`/api/alunos_por_sala/${sala_id}`);
-                alunosData = await response.json();
+                alunosData = await carregarAlunosPorSala(sala_id);
                 renderAlunosList();
             } catch {
                 mostrarMsg('Erro ao carregar alunos.', 'danger');
@@ -160,10 +411,9 @@
             if (!salaId || !data) return;
 
             try {
-                const statusResponse = await fetch(`/api/frequencia/status?sala_id=${salaId}&data=${data}`);
-                const statusData = await statusResponse.json();
+                const registrada = await verificarFrequenciaRegistrada(salaId, data);
 
-                if (statusData.registrada) {
+                if (registrada) {
                     statusDiv.innerHTML = `<span class="text-accent font-bold">Frequência já registrada.</span>`;
                     isLocked = true;
                     mensagemTravada.classList.remove('hidden');
@@ -190,7 +440,7 @@
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-gray-700 hover:bg-dark-primary transition';
                 tr.innerHTML = `
-                    <td class="p-3 text-left">${aluno.nome}</td>
+                    <td class="p-3 text-left">${aluno.aluno_nome}</td>
                     <td class="p-3 text-center">
                         <div id="btn-${aluno.id}" class="status-btn ${colorClass}">
                             ${currentStatus}
@@ -222,29 +472,38 @@
             const data = document.getElementById('input-data-registro').value;
             if (!salaId || !data) return mostrarMsg('Selecione Sala e Data.', 'danger');
 
-            const registros = Object.entries(frequenciaData).map(([id, status]) => ({
-                aluno_id: id,
-                sala_id: salaId,
-                data,
-                status
-            }));
+            // Busca informações da sala e alunos
+            const sala = salasData.find(s => s.id == salaId);
+            if (!sala) return mostrarMsg('Sala não encontrada.', 'danger');
+
+            const registros = await Promise.all(
+                Object.entries(frequenciaData).map(async ([aluno_id, status]) => {
+                    const aluno = alunosData.find(a => a.id == aluno_id);
+                    return {
+                        aluno_nome: aluno.aluno_nome,
+                        sala_nome: sala.nome,
+                        data: data,
+                        status: status,
+                        created_at: new Date(),
+                        updated_at: new Date()
+                    };
+                })
+            );
 
             if (!registros.length) return mostrarMsg('Nenhum registro encontrado.', 'danger');
 
             mostrarMsg('Salvando...', 'secondary-accent');
 
             try {
-                const response = await fetch('/api/salvar_frequencia', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(registros)
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error);
-                mostrarMsg(result.message, 'accent');
-                checkFrequencyStatus();
-            } catch {
-                mostrarMsg('Erro ao salvar.', 'danger');
+                const result = await salvarFrequenciaSupabase(registros);
+                if (result.success) {
+                    mostrarMsg(result.message, 'accent');
+                    checkFrequencyStatus();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                mostrarMsg('Erro ao salvar: ' + error.message, 'danger');
             }
         }
 
@@ -270,10 +529,8 @@
             if (!salaId) return;
             
             try {
-                const r = await fetch(`/api/alunos_por_sala/${salaId}`);
-                if (!r.ok) throw new Error('Erro ao buscar alunos');
-                const alunos = await r.json();
-                alunos.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.nome}</option>`);
+                const alunos = await carregarAlunosPorSala(salaId);
+                alunos.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.aluno_nome}</option>`);
             } catch (e) {
                 console.error(e);
                 mostrarMsg('Erro ao carregar alunos', 'danger');
@@ -297,7 +554,7 @@
             const payload = {
                 aluno_id: Number(aluno_id),
                 sala_id: Number(sala_id),
-                data,
+                data: data,
                 hora_entrada: hora_atraso,
                 motivo_atraso: motivo_atraso,
                 responsavel_nome: responsavel_atraso,
@@ -307,24 +564,15 @@
             mostrarMsg('Enviando...', 'secondary-accent');
 
             try {
-                const resp = await fetch('/api/salvar_atraso', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const json = await resp.json();
-
-                if (resp.ok) {
-                    mostrarMsg(json.message || 'Atraso salvo com sucesso', 'accent');
+                const result = await salvarAtrasoSupabase(payload);
+                if (result.success) {
+                    mostrarMsg(result.message, 'accent');
                     document.getElementById('form-atraso').reset();
                 } else {
-                    console.error(json);
-                    mostrarMsg(json.error || 'Erro ao salvar atraso', 'danger');
+                    throw new Error(result.error);
                 }
-            } catch (e) {
-                console.error(e);
-                mostrarMsg('Erro de rede ao salvar', 'danger');
+            } catch (error) {
+                mostrarMsg('Erro ao salvar atraso: ' + error.message, 'danger');
             }
         }
 
@@ -350,10 +598,8 @@
             if (!salaId) return;
             
             try {
-                const r = await fetch(`/api/alunos_por_sala/${salaId}`);
-                if (!r.ok) throw new Error('Erro ao buscar alunos');
-                const alunos = await r.json();
-                alunos.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.nome}</option>`);
+                const alunos = await carregarAlunosPorSala(salaId);
+                alunos.forEach(a => sel.innerHTML += `<option value="${a.id}">${a.aluno_nome}</option>`);
             } catch (e) {
                 console.error(e);
                 mostrarMsg('Erro ao carregar alunos', 'danger');
@@ -377,7 +623,7 @@
             const payload = {
                 aluno_id: Number(aluno_id),
                 sala_id: Number(sala_id),
-                data,
+                data: data,
                 hora_saida: hora_saida,
                 motivo_saida: motivo_saida,
                 responsavel_nome: responsavel_saida,
@@ -387,24 +633,15 @@
             mostrarMsg('Enviando...', 'secondary-accent');
 
             try {
-                const resp = await fetch('/api/salvar_saida_antecipada', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const json = await resp.json();
-
-                if (resp.ok) {
-                    mostrarMsg(json.message || 'Saída antecipada salva com sucesso', 'accent');
+                const result = await salvarSaidaSupabase(payload);
+                if (result.success) {
+                    mostrarMsg(result.message, 'accent');
                     document.getElementById('form-saida').reset();
                 } else {
-                    console.error(json);
-                    mostrarMsg(json.error || 'Erro ao salvar saída antecipada', 'danger');
+                    throw new Error(result.error);
                 }
-            } catch (e) {
-                console.error(e);
-                mostrarMsg('Erro de rede ao salvar', 'danger');
+            } catch (error) {
+                mostrarMsg('Erro ao salvar saída antecipada: ' + error.message, 'danger');
             }
         }
 
@@ -442,9 +679,7 @@
                 return;
             }
             try {
-                const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
-                if (!resp.ok) throw new Error("Erro ao carregar frequência");
-                dadosFrequencia = await resp.json();
+                dadosFrequencia = await carregarRelatorioMensal(sala, mes);
                 montarTabelaRelatorio(dadosFrequencia, parseInt(mes));
             } catch (e) {
                 console.error(e);
@@ -474,7 +709,11 @@
                     <tr>
                         <th class="px-2 py-2 border border-gray-700 text-gray-300">Aluno</th>`;
             dias.forEach(d => {
-                html += `<th class="px-2 py-2 border border-gray-700 text-gray-400">${d.format("DD")}</th>`;
+                // Verificar se é feriado (15/10 ou 27/10)
+                const isFeriado = (d.month() === 9 && d.date() === 15) || (d.month() === 9 && d.date() === 27);
+                const feriadoClass = isFeriado ? 'bg-red-500 text-white' : '';
+                
+                html += `<th class="px-2 py-2 border border-gray-700 text-gray-400 ${feriadoClass}">${d.format("DD")}</th>`;
             });
             html += `</tr></thead><tbody>`;
 
@@ -488,19 +727,28 @@
                         const freq = aluno.frequencia?.[dataKey] || {};
                         const status = freq.status || "";
                         
+                        // Verificar se é feriado (15/10 ou 27/10)
+                        const isFeriado = (d.month() === 9 && d.date() === 15) || (d.month() === 9 && d.date() === 27);
+                        
                         let cor = "text-gray-500 cursor-default";
                         let clickHandler = "";
+                        let feriadoStyle = "";
                         
-                        if (status === "P") {
-                            cor = "text-green-500 font-bold cursor-default";
-                        } else if (status === "F") {
-                            cor = "text-red-500 font-bold cursor-default";
-                        } else if (["PA", "PS", "PSA"].includes(status)) {
-                            cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
-                            clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
+                        if (isFeriado) {
+                            cor = "bg-red-500 text-white cursor-default";
+                            html += `<td class="border border-gray-700 ${cor}" title="Feriado"></td>`;
+                        } else {
+                            if (status === "P") {
+                                cor = "text-green-500 font-bold cursor-default";
+                            } else if (status === "F") {
+                                cor = "text-red-500 font-bold cursor-default";
+                            } else if (["PA", "PS", "PSA"].includes(status)) {
+                                cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
+                                clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
+                            }
+                            
+                            html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
                         }
-                        
-                        html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
                     });
                     html += `</tr>`;
                 });
@@ -510,7 +758,8 @@
                 <div class="mt-4 text-gray-400 text-sm text-left">
                 <p><span class="text-green-500 font-bold">P</span> = Presença |
                     <span class="text-red-500 font-bold">F</span> = Ausente |
-                    <span class="text-yellow-400 font-bold cursor-pointer" onclick="mostrarLegenda()">PA, PS, PSA</span> = Clique para ver detalhes
+                    <span class="text-yellow-400 font-bold cursor-pointer" onclick="mostrarLegenda()">PA, PS, PSA</span> = Clique para ver detalhes |
+                    <span class="bg-red-500 text-white px-2 py-1 rounded">15/10, 27/10</span> = Feriado
                 </p>
                 </div>
             </div>`;
@@ -520,9 +769,7 @@
 
         async function mostrarDetalhesFrequencia(alunoId, data) {
             try {
-                const resp = await fetch(`/api/frequencia_detalhes/${alunoId}/${data}`);
-                if (!resp.ok) throw new Error("Erro ao carregar detalhes");
-                const detalhes = await resp.json();
+                const detalhes = await carregarDetalhesFrequencia(alunoId, data);
                 
                 const aluno = dadosFrequencia.find(a => a.id === alunoId);
                 const alunoNome = aluno ? aluno.nome : 'Aluno';
@@ -602,6 +849,7 @@
                     <p><span class="text-yellow-400 font-bold">PA</span> = Presença com Atraso</p>
                     <p><span class="text-yellow-400 font-bold">PS</span> = Presença com Saída Antecipada</p>
                     <p><span class="text-yellow-400 font-bold">PSA</span> = Presença com Atraso e Saída Antecipada</p>
+                    <p><span class="bg-red-500 text-white px-2 py-1 rounded">15/10, 27/10</span> = Feriado</p>
                 </div>
                 <div class="text-center mt-4">
                     <button onclick="this.closest('.fixed').remove()" 
@@ -625,7 +873,7 @@
             const salaSelect = document.getElementById('salaSelectRelatorio');
             const mesSelect = document.getElementById('mesSelectRelatorio');
             const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
-            const mesNome = mesSelect.options[esSelect.selectedIndex]?.text || "Mês não selecionado";
+            const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
             const ano = new Date().getFullYear();
 
             doc.setFont("helvetica", "bold");
