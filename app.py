@@ -244,6 +244,23 @@ def get_ocorrencia_por_numero(numero):
     except Exception as e:
         logger.error(f"Erro ao buscar ocorrência: {e}")
         return None
+        
+# ========== ROTAS PRINCIPAIS ==========
+
+@app.route('/')
+def index():
+    """Página inicial"""
+    return render_template('index.html')
+
+@app.route('/gestao_frequencia')
+def gestao_frequencia():
+    """Página de gestão de frequência"""
+    return render_template('gestao_frequencia.html')
+
+@app.route('/gestao_ocorrencia')
+def gestao_ocorrencia():
+    """Página de gestão de ocorrência"""
+    return render_template('gestao_ocorrencia.html')
 
 # =============================================================
 # APIs — nova ocorrência, buscas auxiliares e CRUD de ocorrências
@@ -1122,3 +1139,4 @@ def detalhes_frequencia():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
