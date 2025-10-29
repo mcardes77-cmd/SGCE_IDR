@@ -186,7 +186,8 @@ def now_iso():
 def get_salas():
     try:
         if supabase:
-            response = supabase.table('salas').select('*').execute()
+            # CORREÇÃO: Usando 'd_salas' para consistência
+            response = supabase.table('d_salas').select('*').execute()
             return handle_supabase_response(response)
         return []
     except Exception as e:
@@ -1200,6 +1201,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
