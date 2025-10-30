@@ -266,60 +266,75 @@
                 tutorInfo.className = 'p-3 bg-yellow-900 rounded text-yellow-300';
             }
         }
+async function registrarOcorrencia() {
+    const form = document.getElementById('form-ocorrencia');
+    const botao = document.querySelector('button[onclick="registrarOcorrencia()"]');
+    
+    if (!form.checkValidity()) {
+        mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+    
+    if (!alunoSelecionado) {
+        mostrarMensagem('Por favor, selecione um aluno', 'error');
+        return;
+    }
 
-        async function registrarOcorrencia() {
-            const form = document.getElementById('form-ocorrencia');
-            
-            if (!form.checkValidity()) {
-                mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
-                return;
-            }
-            
-            if (!alunoSelecionado) {
-                mostrarMensagem('Por favor, selecione um aluno', 'error');
-                return;
-            }
-            
-            try {
-                mostrarMensagem('Registrando ocorrência...', 'info');
-                
-                const professorSelect = document.getElementById('professor');
-                const professorId = professorSelect.value;
-                const professorNome = professorSelect.options[professorSelect.selectedIndex].text;
-                
-                const response = await fetch('/api/registrar_ocorrencia', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        aluno_id: alunoSelecionado,
-                        professor_id: professorId,
-                        professor_nome: professorNome,
-                        tutor_nome: tutorNomeSelecionado,
-                        descricao: document.getElementById('descricao').value,
-                        atendimento_professor: document.getElementById('atendimento_professor').value,
-                        solicitar_tutor: document.getElementById('solicitar_tutor').checked,
-                        solicitar_coordenacao: document.getElementById('solicitar_coordenacao').checked,
-                        solicitar_gestao: document.getElementById('solicitar_gestao').checked
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    mostrarMensagem(`Ocorrência #${result.numero} registrada com sucesso! Redirecionando...`, 'success');
-                    setTimeout(() => {
-                        window.location.href = '/gestao_ocorrencia';
-                    }, 2000);
-                } else {
-                    mostrarMensagem('Erro ao registrar: ' + (result.error || 'Erro desconhecido'), 'error');
-                }
-            } catch (error) {
-                console.error('Erro ao registrar ocorrência:', error);
-                mostrarMensagem('Erro de conexão ao registrar ocorrência', 'error');
-            }
+    // 🔒 Desativa o botão enquanto envia
+    botao.disabled = true;
+    botao.textContent = 'Registrando...';
+    botao.classList.add('opacity-70', 'cursor-not-allowed');
+
+    try {
+        mostrarMensagem('Registrando ocorrência...', 'info');
+
+        const professorSelect = document.getElementById('professor');
+        const professorId = professorSelect.value;
+        const professorNome = professorSelect.options[professorSelect.selectedIndex].text;
+
+        const response = await fetch('/api/registrar_ocorrencia', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                aluno_id: alunoSelecionado,
+                professor_id: professorId,
+                professor_nome: professorNome,
+                tutor_nome: tutorNomeSelecionado,
+                descricao: document.getElementById('descricao').value,
+                atendimento_professor: document.getElementById('atendimento_professor').value,
+                solicitar_tutor: document.getElementById('solicitar_tutor').checked,
+                solicitar_coordenacao: document.getElementById('solicitar_coordenacao').checked,
+                solicitar_gestao: document.getElementById('solicitar_gestao').checked
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            mostrarMensagem(`Ocorrência #${result.numero} registrada com sucesso! Redirecionando...`, 'success');
+            setTimeout(() => {
+                window.location.href = '/gestao_ocorrencia';
+            }, 2000);
+        } else {
+            mostrarMensagem('Erro ao registrar: ' + (result.error || 'Erro desconhecido'), 'error');
+            // 🔓 Reativa o botão em caso de erro
+            botao.disabled = false;
+            botao.textContent = 'REGISTRAR OCORRÊNCIA';
+            botao.classList.remove('opacity-70', 'cursor-not-allowed');
         }
+
+    } catch (error) {
+        console.error('Erro ao registrar ocorrência:', error);
+        mostrarMensagem('Erro de conexão ao registrar ocorrência', 'error');
+        // 🔓 Reativa o botão em caso de erro de rede
+        botao.disabled = false;
+        botao.textContent = 'REGISTRAR OCORRÊNCIA';
+        botao.classList.remove('opacity-70', 'cursor-not-allowed');
+    }
+}
     </script>
 </body>
 </html>
+
