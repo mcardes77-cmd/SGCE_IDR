@@ -266,55 +266,59 @@
                 tutorInfo.className = 'p-3 bg-yellow-900 rounded text-yellow-300';
             }
 
-            async function registrarOcorrencia() {
-    const professorId = document.getElementById('professor').value;
-    const salaId = document.getElementById('sala').value;
-    const alunoId = document.getElementById('aluno').value;
-    const descricao = document.getElementById('descricao').value.trim();
-    const atendimentoProfessor = document.getElementById('atendimento_professor').value.trim();
-    const solicitarTutor = document.getElementById('solicitar_tutor').checked;
-    const solicitarCoordenacao = document.getElementById('solicitar_coordenacao').checked;
-    const solicitarGestao = document.getElementById('solicitar_gestao').checked;
-
-    // Validação simples
-    if (!professorId || !salaId || !alunoId || !descricao || !atendimentoProfessor) {
-        mostrarMensagem('Por favor, preencha todos os campos obrigatórios.', 'error');
-        return;
-    }
-
-    const dados = {
-        professor_id: professorId,
-        sala_id: salaId,
-        aluno_id: alunoId,
-        descricao: descricao,
-        atendimento_professor: atendimentoProfessor,
-        solicitar_tutor: solicitarTutor,
-        solicitar_coordenacao: solicitarCoordenacao,
-        solicitar_gestao: solicitarGestao
-    };
-
-    try {
-        const response = await fetch('/api/ocorrencias', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
-        });
-
-        if (!response.ok) throw new Error('Erro ao registrar ocorrência');
-        const result = await response.json();
-
-        mostrarMensagem('Ocorrência registrada com sucesso!', 'success');
-        document.getElementById('form-ocorrencia').reset();
-        document.getElementById('tutor-info').textContent = 'Será preenchido automaticamente ao selecionar o aluno';
-    } catch (error) {
-        console.error('Erro ao registrar ocorrência:', error);
-        mostrarMensagem('Erro ao registrar ocorrência.', 'error');
-    }
-}
-
-    
+   async function registrarOcorrencia() {
+            const form = document.getElementById('form-ocorrencia');
+            
+            if (!form.checkValidity()) {
+                mostrarMensagem('Por favor, preencha todos os campos obrigatórios', 'error');
+                return;
+            }
+            
+            if (!alunoSelecionado) {
+                mostrarMensagem('Por favor, selecione um aluno', 'error');
+                return;
+            }
+            
+            try {
+                mostrarMensagem('Registrando ocorrência...', 'info');
+                
+                const professorSelect = document.getElementById('professor');
+                const professorId = professorSelect.value;
+                const professorNome = professorSelect.options[professorSelect.selectedIndex].text;
+                
+                const response = await fetch('/api/registrar_ocorrencia', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        aluno_id: alunoSelecionado,
+                        professor_id: professorId,
+                        professor_nome: professorNome,
+                        tutor_nome: tutorNomeSelecionado,
+                        descricao: document.getElementById('descricao').value,
+                        atendimento_professor: document.getElementById('atendimento_professor').value,
+                        solicitar_tutor: document.getElementById('solicitar_tutor').checked,
+                        solicitar_coordenacao: document.getElementById('solicitar_coordenacao').checked,
+                        solicitar_gestao: document.getElementById('solicitar_gestao').checked
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    mostrarMensagem(`Ocorrência #${result.numero} registrada com sucesso! Redirecionando...`, 'success');
+                    setTimeout(() => {
+                        window.location.href = '/gestao_ocorrencia';
+                    }, 2000);
+                } else {
+                    mostrarMensagem('Erro ao registrar: ' + (result.error || 'Erro desconhecido'), 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao registrar ocorrência:', error);
+                mostrarMensagem('Erro de conexão ao registrar ocorrência', 'error');
+            }
+        }
     </script>
 </body>
 </html>
-
-
