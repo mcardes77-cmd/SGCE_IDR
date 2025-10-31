@@ -1064,24 +1064,36 @@ def get_frequencia_relatorio():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/frequencia_detalhes/<string:aluno_nome>/<string:data>', methods=['GET'])
-def get_frequencia_detalhes(aluno_nome, data):
-    """Buscar detalhes da frequência de um aluno em uma data específica"""
+@app.route("/api/frequencia_detalhes/<int:aluno_id>/<data>", methods=["GET"])
+def frequencia_detalhes(aluno_id, data):
     try:
-        response = supabase.table('f_frequencia')\
-            .select('*')\
-            .eq('aluno_nome', aluno_nome)\
-            .eq('data', data)\
+        # Busca o registro de frequência do aluno para a data informada
+        result = supabase.table("f_frequencia") \
+            .select("aluno_id, aluno_nome, data, status, hora_entrada, motivo_atraso, hora_saida, motivo_saida") \
+            .eq("aluno_id", aluno_id) \
+            .eq("data", data) \
+            .limit(1) \
             .execute()
-        
-        if response.data:
-            return jsonify(response.data[0])
-        else:
-            return jsonify({})
-            
+
+        if not result.data:
+            return jsonify({"error": "Registro não encontrado"}), 404
+
+        registro = result.data[0]
+
+        return jsonify({
+            "aluno_id": registro.get("aluno_id"),
+            "aluno_nome": registro.get("aluno_nome"),
+            "data": registro.get("data"),
+            "status": registro.get("status"),
+            "hora_entrada": registro.get("hora_entrada"),
+            "motivo_atraso": registro.get("motivo_atraso"),
+            "hora_saida": registro.get("hora_saida"),
+            "motivo_saida": registro.get("motivo_saida"),
+        }), 200
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print("Erro ao buscar detalhes de frequência:", e)
+        return jsonify({"error": str(e)}), 500
 
 # ========== ROTAS ADICIONAIS PARA COMPATIBILIDADE ==========
 
@@ -1309,6 +1321,7 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
