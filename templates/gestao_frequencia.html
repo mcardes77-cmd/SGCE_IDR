@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -37,15 +38,23 @@
         let frequenciaData = {};
         let isLocked = false;
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            await carregarSalas();
-            mostrarModulo('menu');
-            
-            // Configurar event listeners para os módulos
-            configurarModuloRegistro();
-            configurarModuloAtraso();
-            configurarModuloSaida();
-            configurarModuloRelatorio();
+        document.addEventListener('DOMContentLoaded', function() {
+            // Carregar salas primeiro
+            carregarSalas().then(() => {
+                mostrarModulo('menu');
+                
+                // Configurar event listeners para os módulos
+                configurarModuloRegistro();
+                configurarModuloAtraso();
+                configurarModuloSaida();
+                configurarModuloRelatorio();
+                carregarMesesRelatorio();
+            }).catch(error => {
+                console.error('Erro na inicialização:', error);
+                mostrarMsg('Erro ao carregar dados iniciais', 'danger');
+                // Mostrar menu mesmo com erro
+                mostrarModulo('menu');
+            });
         });
 
         function mostrarModulo(modulo) {
@@ -57,7 +66,10 @@
             });
             
             // Mostrar módulo selecionado
-            document.getElementById(`modulo-${modulo}`).classList.remove('hidden');
+            const moduloElement = document.getElementById(`modulo-${modulo}`);
+            if (moduloElement) {
+                moduloElement.classList.remove('hidden');
+            }
             
             // Atualizar botões de navegação
             document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -89,31 +101,38 @@
             setTimeout(() => el.style.display = 'none', 5000);
         }
 
-        async function safeFetch(url) {
+        async function safeFetch(url, options = {}) {
             try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
                 const data = await response.json();
-                return Array.isArray(data) ? data : [];
+                return data.data || data;
             } catch (error) {
-                console.error(`Erro na requisição ${url}:`, error);
-                return [];
+                console.error('Erro no fetch:', error);
+                throw error;
             }
         }
 
         async function carregarSalas() {
             try {
-                salasData = await safeFetch('/api/salas');
-                // Atualizar todos os selects de sala
+                console.log('Carregando salas...');
+                salasData = await safeFetch('/api/d_salas');
+                console.log('Salas carregadas:', salasData);
+                
                 document.querySelectorAll('.select-sala').forEach(select => {
                     select.innerHTML = '<option value="">Selecione a Sala</option>';
                     salasData.forEach(sala => {
-                        select.innerHTML += `<option value="${sala.id}">${sala.sala || sala.nome}</option>`;
+                        const nomeSala = sala.nome || sala.sala || 'Sem nome';
+                        select.innerHTML += `<option value="${sala.id}">${nomeSala}</option>`;
                     });
                 });
             } catch (e) {
                 console.error('Erro ao carregar salas:', e);
                 mostrarMsg('Erro ao carregar salas', 'danger');
+                // Preencher com dados de fallback para teste
+                document.querySelectorAll('.select-sala').forEach(select => {
+                    select.innerHTML = '<option value="">Erro ao carregar salas</option>';
+                });
             }
         }
 
@@ -135,10 +154,16 @@
 
         async function loadAlunosRegistro(sala_id) {
             try {
+                console.log('Carregando alunos para sala:', sala_id);
+                // Use a API correta para buscar alunos por sala
                 const response = await fetch(`/api/alunos_por_sala/${sala_id}`);
+                if (!response.ok) throw new Error('Erro ao carregar alunos');
+                
                 alunosData = await response.json();
+                console.log('Alunos carregados:', alunosData);
                 renderAlunosList();
-            } catch {
+            } catch (error) {
+                console.error('Erro:', error);
                 mostrarMsg('Erro ao carregar alunos.', 'danger');
             }
         }
@@ -150,10 +175,15 @@
             const statusDiv = document.getElementById('registro-status');
             const mensagemTravada = document.getElementById('mensagem-travada');
 
+            if (!alunosContainer || !statusDiv || !mensagemTravada) return;
+
             alunosContainer.classList.add('hidden');
             mensagemTravada.classList.add('hidden');
             statusDiv.innerHTML = '';
-            document.getElementById('btn-salvar-frequencia').classList.add('hidden');
+            
+            const btnSalvar = document.getElementById('btn-salvar-frequencia');
+            if (btnSalvar) btnSalvar.classList.add('hidden');
+            
             frequenciaData = {};
             isLocked = false;
 
@@ -167,19 +197,25 @@
                     statusDiv.innerHTML = `<span class="text-accent font-bold">Frequência já registrada.</span>`;
                     isLocked = true;
                     mensagemTravada.classList.remove('hidden');
+                    // Limpar dados locais
+                    alunosData = [];
+                    frequenciaData = {};
                 } else {
                     statusDiv.innerHTML = `<span class="text-secondary-accent font-bold">Frequência pendente.</span>`;
                     alunosContainer.classList.remove('hidden');
-                    document.getElementById('btn-salvar-frequencia').classList.remove('hidden');
-                    loadAlunosRegistro(salaId);
+                    if (btnSalvar) btnSalvar.classList.remove('hidden');
+                    await loadAlunosRegistro(salaId);
                 }
-            } catch {
-                mostrarMsg('Erro ao verificar status.', 'danger');
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+                mostrarMsg('Erro ao verificar status da frequência.', 'danger');
             }
         }
 
         function renderAlunosList() {
             const tbody = document.getElementById('alunos-list-body');
+            if (!tbody) return;
+            
             tbody.innerHTML = '';
 
             alunosData.forEach(aluno => {
@@ -198,64 +234,106 @@
                     </td>
                 `;
 
-                tr.querySelector(`#btn-${aluno.id}`).addEventListener('click', (e) => {
-                    const btn = e.currentTarget;
-                    if (btn.classList.contains('status-P')) {
-                        btn.classList.remove('status-P');
-                        btn.classList.add('status-F');
-                        btn.textContent = 'F';
-                        frequenciaData[aluno.id] = 'F';
-                    } else {
-                        btn.classList.remove('status-F');
-                        btn.classList.add('status-P');
-                        btn.textContent = 'P';
-                        frequenciaData[aluno.id] = 'P';
-                    }
-                });
-
                 tbody.appendChild(tr);
+
+                // Adicionar event listener após o elemento ser inserido no DOM
+                setTimeout(() => {
+                    const btn = document.getElementById(`btn-${aluno.id}`);
+                    if (btn) {
+                        btn.addEventListener('click', (e) => {
+                            const btn = e.currentTarget;
+                            if (btn.classList.contains('status-P')) {
+                                btn.classList.remove('status-P');
+                                btn.classList.add('status-F');
+                                btn.textContent = 'F';
+                                frequenciaData[aluno.id] = 'F';
+                            } else {
+                                btn.classList.remove('status-F');
+                                btn.classList.add('status-P');
+                                btn.textContent = 'P';
+                                frequenciaData[aluno.id] = 'P';
+                            }
+                        });
+                    }
+                }, 0);
             });
         }
 
         async function saveFrequency() {
+            const btnSalvar = document.getElementById('btn-salvar-frequencia');
             const salaId = document.getElementById('select-sala-registro').value;
             const data = document.getElementById('input-data-registro').value;
+            
             if (!salaId || !data) return mostrarMsg('Selecione Sala e Data.', 'danger');
 
-            const registros = Object.entries(frequenciaData).map(([id, status]) => ({
-                aluno_id: id,
-                sala_id: salaId,
-                data,
-                status
-            }));
+            // Desabilitar o botão e mostrar estado de carregamento
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = 'Salvando...';
+            btnSalvar.classList.remove('bg-accent', 'hover:bg-green-600');
+            btnSalvar.classList.add('bg-gray-500', 'cursor-not-allowed');
 
-            if (!registros.length) return mostrarMsg('Nenhum registro encontrado.', 'danger');
+            // Buscar nome da sala selecionada
+            const salaSelect = document.getElementById('select-sala-registro');
+            const salaNome = salaSelect.options[salaSelect.selectedIndex].text;
+
+            // Criar array de registros
+            const registros = Object.entries(frequenciaData).map(([aluno_id, status]) => {
+                const aluno = alunosData.find(a => a.id == aluno_id);
+                return {
+                    aluno_id: parseInt(aluno_id),
+                    aluno_nome: aluno ? aluno.nome : 'Aluno Desconhecido',
+                    sala_id: parseInt(salaId),
+                    sala_nome: salaNome,
+                    data: data,
+                    status: status
+                };
+            });
+
+            if (!registros.length) {
+                mostrarMsg('Nenhum registro encontrado.', 'danger');
+                // Reabilitar botão em caso de erro
+                resetButton(btnSalvar);
+                return;
+            }
 
             mostrarMsg('Salvando...', 'secondary-accent');
 
             try {
-                const response = await fetch('/api/salvar_frequencia', {
+                const response = await fetch('/api/salvar_frequencia_unificada', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(registros)
                 });
+                
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.error);
-                mostrarMsg(result.message, 'accent');
-                checkFrequencyStatus();
-            } catch {
-                mostrarMsg('Erro ao salvar.', 'danger');
+                if (!response.ok) throw new Error(result.error || 'Erro ao salvar');
+                
+                mostrarMsg('Frequência salva com sucesso!', 'accent');
+                checkFrequencyStatus(); // Recarregar status
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg(error.message || 'Erro ao salvar frequência', 'danger');
+            } finally {
+                // Sempre redefinir o botão, independente de sucesso ou erro
+                resetButton(btnSalvar);
             }
+        }
+
+        function resetButton(button) {
+            button.disabled = false;
+            button.innerHTML = 'Salvar Frequência';
+            button.classList.remove('bg-gray-500', 'cursor-not-allowed');
+            button.classList.add('bg-accent', 'hover:bg-green-600');
         }
 
         // ========== MÓDULO ATRASO ==========
         function configurarModuloAtraso() {
             const selectSala = document.getElementById('sala-atraso');
-            const selectAluno = document.getElementById('aluno-atraso');
             const btnSalvar = document.getElementById('btnSalvarAtraso');
             
             if (selectSala) {
-                selectSala.addEventListener('change', () => carregarAlunosAtraso());
+                selectSala.addEventListener('change', carregarAlunosAtraso);
             }
             
             if (btnSalvar) {
@@ -266,6 +344,8 @@
         async function carregarAlunosAtraso() {
             const salaId = document.getElementById('sala-atraso').value;
             const sel = document.getElementById('aluno-atraso');
+            if (!sel) return;
+            
             sel.innerHTML = '<option value="">Selecione o Aluno</option>';
             if (!salaId) return;
             
@@ -281,61 +361,81 @@
         }
 
         async function salvarAtraso() {
+            const btnSalvar = document.getElementById('btnSalvarAtraso');
             const aluno_id = document.getElementById('aluno-atraso').value;
             const sala_id = document.getElementById('sala-atraso').value;
             const data = document.getElementById('data-atraso').value;
-            const hora_atraso = document.getElementById('hora-atraso').value;
+            const hora_entrada = document.getElementById('hora-atraso').value;
             const motivo_atraso = document.getElementById('motivo-atraso').value;
             const responsavel_atraso = document.getElementById('responsavel-atraso').value;
             const telefone_atraso = document.getElementById('telefone-atraso').value;
 
-            if (!aluno_id || !sala_id || !data || !hora_atraso || !motivo_atraso || !responsavel_atraso || !telefone_atraso) {
+            if (!aluno_id || !sala_id || !data || !hora_entrada || !motivo_atraso || !responsavel_atraso || !telefone_atraso) {
                 mostrarMsg('Preencha todos os campos', 'danger');
                 return;
             }
 
+            // Desabilitar botão
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = 'Salvando...';
+            btnSalvar.classList.remove('bg-accent', 'hover:bg-green-600');
+            btnSalvar.classList.add('bg-gray-500', 'cursor-not-allowed');
+
+            // Buscar nomes do aluno e sala
+            const alunoSelect = document.getElementById('aluno-atraso');
+            const alunoNome = alunoSelect.options[alunoSelect.selectedIndex].text;
+            const salaSelect = document.getElementById('sala-atraso');
+            const salaNome = salaSelect.options[salaSelect.selectedIndex].text;
+
             const payload = {
-                aluno_id: Number(aluno_id),
-                sala_id: Number(sala_id),
-                data,
-                hora_entrada: hora_atraso,
+                aluno_id: parseInt(aluno_id),
+                aluno_nome: alunoNome,
+                sala_id: parseInt(sala_id),
+                sala_nome: salaNome,
+                data: data,
+                hora_entrada: hora_entrada,
                 motivo_atraso: motivo_atraso,
                 responsavel_nome: responsavel_atraso,
-                responsavel_telefone: telefone_atraso
+                responsavel_telefone: telefone_atraso,
+                // Forçar status PA (Presença com Atraso)
+                status: 'PA'
             };
 
-            mostrarMsg('Enviando...', 'secondary-accent');
+            mostrarMsg('Salvando atraso...', 'secondary-accent');
 
             try {
-                const resp = await fetch('/api/salvar_atraso', {
+                const resp = await fetch('/api/salvar_frequencia_unificada', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify([payload])
                 });
 
-                const json = await resp.json();
-
+                const result = await resp.json();
                 if (resp.ok) {
-                    mostrarMsg(json.message || 'Atraso salvo com sucesso', 'accent');
+                    mostrarMsg('Atraso registrado com sucesso!', 'accent');
                     document.getElementById('form-atraso').reset();
                 } else {
-                    console.error(json);
-                    mostrarMsg(json.error || 'Erro ao salvar atraso', 'danger');
+                    throw new Error(result.error || 'Erro ao salvar atraso');
                 }
-            } catch (e) {
-                console.error(e);
-                mostrarMsg('Erro de rede ao salvar', 'danger');
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg(error.message, 'danger');
+            } finally {
+                // Reabilitar botão
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = 'Salvar Atraso';
+                btnSalvar.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                btnSalvar.classList.add('bg-accent', 'hover:bg-green-600');
             }
         }
 
         // ========== MÓDULO SAÍDA ANTECIPADA ==========
         function configurarModuloSaida() {
             const selectSala = document.getElementById('sala-saida');
-            const selectAluno = document.getElementById('aluno-saida');
             const btnSalvar = document.getElementById('btnSalvarSaida');
             
             if (selectSala) {
-                selectSala.addEventListener('change', () => carregarAlunosSaida());
+                selectSala.addEventListener('change', carregarAlunosSaida);
             }
             
             if (btnSalvar) {
@@ -346,6 +446,8 @@
         async function carregarAlunosSaida() {
             const salaId = document.getElementById('sala-saida').value;
             const sel = document.getElementById('aluno-saida');
+            if (!sel) return;
+            
             sel.innerHTML = '<option value="">Selecione o Aluno</option>';
             if (!salaId) return;
             
@@ -361,6 +463,7 @@
         }
 
         async function salvarSaida() {
+            const btnSalvar = document.getElementById('btnSalvarSaida');
             const aluno_id = document.getElementById('aluno-saida').value;
             const sala_id = document.getElementById('sala-saida').value;
             const data = document.getElementById('data-saida').value;
@@ -374,37 +477,57 @@
                 return;
             }
 
+            // Desabilitar botão
+            btnSalvar.disabled = true;
+            btnSalvar.innerHTML = 'Salvando...';
+            btnSalvar.classList.remove('bg-accent', 'hover:bg-green-600');
+            btnSalvar.classList.add('bg-gray-500', 'cursor-not-allowed');
+
+            // Buscar nomes do aluno e sala
+            const alunoSelect = document.getElementById('aluno-saida');
+            const alunoNome = alunoSelect.options[alunoSelect.selectedIndex].text;
+            const salaSelect = document.getElementById('sala-saida');
+            const salaNome = salaSelect.options[salaSelect.selectedIndex].text;
+
             const payload = {
-                aluno_id: Number(aluno_id),
-                sala_id: Number(sala_id),
-                data,
+                aluno_id: parseInt(aluno_id),
+                aluno_nome: alunoNome,
+                sala_id: parseInt(sala_id),
+                sala_nome: salaNome,
+                data: data,
                 hora_saida: hora_saida,
                 motivo_saida: motivo_saida,
                 responsavel_nome: responsavel_saida,
-                responsavel_telefone: telefone_saida
+                responsavel_telefone: telefone_saida,
+                // Forçar status PS (Presença com Saída Antecipada)
+                status: 'PS'
             };
 
-            mostrarMsg('Enviando...', 'secondary-accent');
+            mostrarMsg('Salvando saída antecipada...', 'secondary-accent');
 
             try {
-                const resp = await fetch('/api/salvar_saida_antecipada', {
+                const resp = await fetch('/api/salvar_frequencia_unificada', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify([payload])
                 });
 
-                const json = await resp.json();
-
+                const result = await resp.json();
                 if (resp.ok) {
-                    mostrarMsg(json.message || 'Saída antecipada salva com sucesso', 'accent');
+                    mostrarMsg('Saída antecipada registrada com sucesso!', 'accent');
                     document.getElementById('form-saida').reset();
                 } else {
-                    console.error(json);
-                    mostrarMsg(json.error || 'Erro ao salvar saída antecipada', 'danger');
+                    throw new Error(result.error || 'Erro ao salvar saída antecipada');
                 }
-            } catch (e) {
-                console.error(e);
-                mostrarMsg('Erro de rede ao salvar', 'danger');
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg(error.message, 'danger');
+            } finally {
+                // Reabilitar botão
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = 'Salvar Saída Antecipada';
+                btnSalvar.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                btnSalvar.classList.add('bg-accent', 'hover:bg-green-600');
             }
         }
 
@@ -428,6 +551,8 @@
                 "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
             ];
             const sel = document.getElementById('mesSelectRelatorio');
+            if (!sel) return;
+            
             sel.innerHTML = '<option value="">Selecione o Mês</option>';
             meses.forEach((m,i) => {
                 sel.innerHTML += `<option value="${i+1}">${m}</option>`;
@@ -454,6 +579,8 @@
 
         function montarTabelaRelatorio(dados, mes) {
             const container = document.getElementById("tabelaContainerRelatorio");
+            if (!container) return;
+            
             container.innerHTML = "";
             const ano = new Date().getFullYear();
             const dias = [];
@@ -530,30 +657,38 @@
                 let modalContent = `
                 <div class="mb-4">
                     <h3 class="text-lg font-bold text-accent">Detalhes da Frequência</h3>
-                    <p class="text-sm text-gray-300">${alunoNome} - ${dayjs(data).format('DD/MM/YYYY')}</p>
+                    <p class="text-sm text-gray-300">Aluno: ${alunoNome}</p>
+                    <p class="text-sm text-gray-300">Data: ${dayjs(data).format('DD/MM/YYYY')}</p>
+                    <p class="text-sm text-gray-300">Status: ${detalhes.status || 'N/A'}</p>
                 </div>
                 `;
                 
-                if (detalhes.hora_entrada || detalhes.motivo_atraso) {
+                // Determinar quais campos mostrar baseado no status
+                const status = detalhes.status;
+                
+                if (status === 'PA' || status === 'PSA') {
+                    // Mostrar dados de atraso
                     modalContent += `
                     <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
                         <h4 class="font-bold text-yellow-400">Entrada com Atraso</h4>
-                        <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
-                        <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
+                        <p class="text-sm"><strong>Hora do Atraso:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
+                        <p class="text-sm"><strong>Motivo do Atraso:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
                     </div>
                     `;
                 }
                 
-                if (detalhes.hora_saida || detalhes.motivo_saida) {
+                if (status === 'PS' || status === 'PSA') {
+                    // Mostrar dados de saída antecipada
                     modalContent += `
-                    <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
-                        <h4 class="font-bold text-yellow-400">Saída Antecipada</h4>
-                        <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_saida || 'N/A'}</p>
-                        <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
+                    <div class="mb-4 p-3 bg-orange-900 rounded-lg">
+                        <h4 class="font-bold text-orange-400">Saída Antecipada</h4>
+                        <p class="text-sm"><strong>Hora da Saída:</strong> ${detalhes.hora_saida || 'N/A'}</p>
+                        <p class="text-sm"><strong>Motivo da Saída:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
                     </div>
                     `;
                 }
                 
+                // Sempre mostrar dados do responsável se disponíveis
                 if (detalhes.responsavel_nome) {
                     modalContent += `
                     <div class="mb-4 p-3 bg-gray-800 rounded-lg">
@@ -564,8 +699,11 @@
                     `;
                 }
                 
-                if (!detalhes.hora_entrada && !detalhes.hora_saida) {
-                    modalContent += `<p class="text-gray-400 text-center">Nenhum detalhe adicional disponível.</p>`;
+                // Caso não haja nenhum detalhe adicional específico
+                if ((status === 'PA' && !detalhes.hora_entrada && !detalhes.motivo_atraso) ||
+                    (status === 'PS' && !detalhes.hora_saida && !detalhes.motivo_saida) ||
+                    (status === 'PSA' && !detalhes.hora_entrada && !detalhes.motivo_atraso && !detalhes.hora_saida && !detalhes.motivo_saida)) {
+                    modalContent += `<p class="text-gray-400 text-center">Nenhum detalhe adicional disponível para este status.</p>`;
                 }
                 
                 const modal = document.createElement('div');
@@ -585,8 +723,28 @@
                 document.body.appendChild(modal);
                 
             } catch (e) {
-                console.error(e);
-                mostrarMsg("Erro ao carregar detalhes da frequência.", 'danger');
+                console.error('Erro ao carregar detalhes:', e);
+                
+                // Modal de erro mais amigável
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-bold text-red-500">Erro ao Carregar Detalhes</h3>
+                        <p class="text-sm text-gray-300 mt-2">Não foi possível conectar ao servidor para obter os detalhes da frequência.</p>
+                        <p class="text-sm text-gray-300 mt-1">Verifique sua conexão com a internet e tente novamente.</p>
+                    </div>
+                    <div class="text-center mt-4">
+                        <button onclick="this.closest('.fixed').remove()" 
+                            class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+                `;
+                
+                document.body.appendChild(modal);
             }
         }
 
@@ -614,47 +772,298 @@
             document.body.appendChild(modal);
         }
 
+        // Função para gerar PDF profissional em formato de planilha
         async function gerarPDFRelatorio() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({
-                orientation: "landscape",
-                unit: "pt",
-                format: "a4"
-            });
+            const btnGerarPDF = document.getElementById('btnGerarPDFRelatorio');
+            
+            try {
+                // Desabilitar botão durante a geração
+                btnGerarPDF.disabled = true;
+                btnGerarPDF.innerHTML = 'Gerando PDF...';
+                btnGerarPDF.classList.remove('bg-accent', 'hover:bg-green-600');
+                btnGerarPDF.classList.add('bg-gray-500', 'cursor-not-allowed');
 
-            const salaSelect = document.getElementById('salaSelectRelatorio');
-            const mesSelect = document.getElementById('mesSelectRelatorio');
-            const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
-            const mesNome = mesSelect.options[esSelect.selectedIndex]?.text || "Mês não selecionado";
-            const ano = new Date().getFullYear();
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: "landscape",
+                    unit: "mm",
+                    format: "a4"
+                });
 
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(16);
-            doc.text("RELATÓRIO DE FREQUÊNCIA", doc.internal.pageSize.getWidth() / 2, 40, { align: "center" });
+                const salaSelect = document.getElementById('salaSelectRelatorio');
+                const mesSelect = document.getElementById('mesSelectRelatorio');
+                const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
+                const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
+                const ano = new Date().getFullYear();
 
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(12);
-            doc.text(`Sala: ${salaNome} — Mês: ${mesNome} / ${ano}`, doc.internal.pageSize.getWidth() / 2, 60, { align: "center" });
+                // Configurações para documento de impressão (fundo branco)
+                doc.setFillColor(255, 255, 255);
+                doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F');
 
-            await doc.html(document.getElementById("tabelaContainerRelatorio"), {
-                x: 20,
-                y: 80,
-                html2canvas: {
-                scale: 0.6,
-                scrollX: 0,
-                scrollY: 0,
-                windowWidth: document.getElementById("tabelaContainerRelatorio").scrollWidth,
-                },
-                callback: function (pdf) {
-                pdf.save(`relatorio_frequencia_${salaNome}_${mesNome}_${ano}.pdf`);
-                },
-            });
+                // Cabeçalho profissional
+                doc.setFillColor(15, 23, 42); // dark-primary
+                doc.rect(0, 0, doc.internal.pageSize.getWidth(), 20, 'F');
+                
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(16);
+                doc.text("RELATÓRIO DE FREQUÊNCIA ESCOLAR", doc.internal.pageSize.getWidth() / 2, 12, { align: "center" });
+
+                // Informações
+                doc.setFontSize(10);
+                doc.text(`Sala: ${salaNome}`, 10, 25);
+                doc.text(`Período: ${mesNome}/${ano}`, 10, 31);
+                doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, doc.internal.pageSize.getWidth() - 10, 25, { align: "right" });
+                doc.text(`Escola: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO`, doc.internal.pageSize.getWidth() - 10, 31, { align: "right" });
+
+                // Linha divisória
+                doc.setDrawColor(200, 200, 200);
+                doc.line(10, 35, doc.internal.pageSize.getWidth() - 10, 35);
+
+                // Verificar se há dados
+                const tabelaContainer = document.getElementById("tabelaContainerRelatorio");
+                if (!tabelaContainer || tabelaContainer.innerHTML.includes("Nenhum registro") || 
+                    tabelaContainer.innerHTML.includes("Selecione a sala")) {
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFontSize(14);
+                    doc.text("Nenhum dado disponível para o relatório selecionado", doc.internal.pageSize.getWidth() / 2, 80, { align: "center" });
+                    doc.save(`relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`);
+                    mostrarMsg('PDF gerado sem dados.', 'warning');
+                    return;
+                }
+
+                // Buscar dados diretamente da API para ter controle total
+                try {
+                    const salaId = salaSelect.value;
+                    const mes = mesSelect.value;
+                    const response = await fetch(`/api/frequencia?sala=${salaId}&mes=${mes}`);
+                    const dados = await response.json();
+                    
+                    await gerarPlanilhaPDF(doc, dados, parseInt(mes), salaNome, mesNome, ano);
+                    
+                } catch (error) {
+                    console.error('Erro ao buscar dados:', error);
+                    // Fallback: usar html2canvas
+                    await gerarPDFFallback(doc, salaNome, mesNome, ano);
+                }
+
+            } catch (error) {
+                console.error('Erro ao gerar PDF:', error);
+                mostrarMsg('Erro ao gerar PDF. Tente novamente.', 'danger');
+            } finally {
+                // Reabilitar o botão
+                btnGerarPDF.disabled = false;
+                btnGerarPDF.innerHTML = 'Gerar PDF';
+                btnGerarPDF.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                btnGerarPDF.classList.add('bg-accent', 'hover:bg-green-600');
+            }
         }
 
-        // Inicializar meses do relatório quando o módulo for carregado
-        document.addEventListener('DOMContentLoaded', () => {
-            carregarMesesRelatorio();
-        });
+        // Função para gerar PDF em formato de planilha
+        async function gerarPlanilhaPDF(doc, dados, mes, salaNome, mesNome, ano) {
+            const alunos = Array.isArray(dados) && dados.length ? dados : [];
+            const anoAtual = new Date().getFullYear();
+            
+            // Calcular dias úteis do mês
+            const dias = [];
+            const totalDias = new Date(anoAtual, mes, 0).getDate();
+            for (let d = 1; d <= totalDias; d++) {
+                const data = dayjs(`${anoAtual}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+                const diaSemana = data.day();
+                if (diaSemana !== 0 && diaSemana !== 6) {
+                    dias.push({
+                        data: data,
+                        dia: d,
+                        diaSemana: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][diaSemana]
+                    });
+                }
+            }
+
+            // Configurações da planilha
+            const startY = 40;
+            const lineHeight = 6;
+            const colWidth = 7;
+            const nomeColWidth = 50;
+            let currentY = startY;
+
+            // Cabeçalho da planilha - estilo Excel
+            doc.setFillColor(79, 70, 229); // Azul escuro
+            doc.rect(10, currentY, doc.internal.pageSize.getWidth() - 20, lineHeight, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            
+            // Coluna do nome
+            doc.text("ALUNO", 12, currentY + 4);
+            
+            // Colunas dos dias
+            dias.forEach((dia, index) => {
+                const xPos = 12 + nomeColWidth + (index * colWidth);
+                doc.text(dia.dia.toString(), xPos + 1, currentY + 4);
+            });
+
+            currentY += lineHeight;
+
+            // Dados dos alunos - estilo planilha
+            doc.setTextColor(0, 0, 0);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+
+            alunos.forEach((aluno, alunoIndex) => {
+                // Alternar cores das linhas para melhor legibilidade (estilo Excel)
+                if (alunoIndex % 2 === 0) {
+                    doc.setFillColor(249, 250, 251); // cinza muito claro
+                } else {
+                    doc.setFillColor(255, 255, 255); // branco
+                }
+                doc.rect(10, currentY, doc.internal.pageSize.getWidth() - 20, lineHeight, 'F');
+
+                // Borda da linha
+                doc.setDrawColor(209, 213, 219);
+                doc.setLineWidth(0.1);
+                doc.line(10, currentY, doc.internal.pageSize.getWidth() - 10, currentY);
+                doc.line(10, currentY + lineHeight, doc.internal.pageSize.getWidth() - 10, currentY + lineHeight);
+
+                // Nome do aluno (truncar se for muito longo)
+                let nomeAluno = aluno.nome;
+                if (nomeAluno.length > 30) {
+                    nomeAluno = nomeAluno.substring(0, 30) + '...';
+                }
+                doc.text(nomeAluno, 12, currentY + 4);
+
+                // Status de frequência
+                dias.forEach((dia, diaIndex) => {
+                    const dataKey = dia.data.format("YYYY-MM-DD");
+                    const freq = aluno.frequencia?.[dataKey] || {};
+                    const status = freq.status || "";
+                    
+                    const xPos = 12 + nomeColWidth + (diaIndex * colWidth);
+                    
+                    // Cores baseadas no status
+                    if (status === "P") {
+                        doc.setTextColor(16, 185, 129); // verde
+                    } else if (status === "F") {
+                        doc.setTextColor(220, 38, 38); // vermelho
+                    } else if (["PA", "PS", "PSA"].includes(status)) {
+                        doc.setTextColor(245, 158, 11); // amarelo/laranja
+                    } else {
+                        doc.setTextColor(100, 100, 100); // cinza
+                    }
+                    
+                    // Centralizar o texto na célula
+                    doc.text(status, xPos + 2, currentY + 4);
+                    doc.setTextColor(0, 0, 0); // reset para preto
+                    
+                    // Borda vertical entre colunas
+                    if (diaIndex < dias.length - 1) {
+                        doc.setDrawColor(209, 213, 219);
+                        doc.setLineWidth(0.1);
+                        doc.line(xPos + colWidth, currentY, xPos + colWidth, currentY + lineHeight);
+                    }
+                });
+
+                // Borda vertical inicial e final
+                doc.setDrawColor(209, 213, 219);
+                doc.setLineWidth(0.1);
+                doc.line(10, currentY, 10, currentY + lineHeight);
+                doc.line(doc.internal.pageSize.getWidth() - 10, currentY, doc.internal.pageSize.getWidth() - 10, currentY + lineHeight);
+                doc.line(10 + nomeColWidth, currentY, 10 + nomeColWidth, currentY + lineHeight);
+
+                currentY += lineHeight;
+
+                // Verificar se precisa de nova página
+                if (currentY + lineHeight > doc.internal.pageSize.getHeight() - 20) {
+                    doc.addPage();
+                    currentY = 20;
+                    
+                    // Recriar cabeçalho da planilha na nova página
+                    doc.setFillColor(79, 70, 229);
+                    doc.rect(10, currentY, doc.internal.pageSize.getWidth() - 20, lineHeight, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("ALUNO", 12, currentY + 4);
+                    
+                    dias.forEach((dia, index) => {
+                        const xPos = 12 + nomeColWidth + (index * colWidth);
+                        doc.text(dia.dia.toString(), xPos + 1, currentY + 4);
+                    });
+                    
+                    currentY += lineHeight;
+                }
+            });
+
+            // Rodapé com legenda
+            const legendaY = doc.internal.pageSize.getHeight() - 10;
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text("Legenda: P = Presença | F = Falta | PA = Atraso | PS = Saída Antecipada | PSA = Atraso + Saída", 
+                     10, legendaY);
+
+            // Estatísticas
+            const totalAlunos = alunos.length;
+            const totalDiasUteis = dias.length;
+            doc.text(`Total de Alunos: ${totalAlunos} | Dias Úteis: ${totalDiasUteis}`, 
+                     doc.internal.pageSize.getWidth() - 10, legendaY, { align: "right" });
+
+            // Salvar PDF
+            const fileName = `relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`;
+            doc.save(fileName);
+            mostrarMsg('PDF gerado com sucesso!', 'accent');
+        }
+
+        // Fallback usando html2canvas
+        async function gerarPDFFallback(doc, salaNome, mesNome, ano) {
+            const tabelaContainer = document.getElementById("tabelaContainerRelatorio");
+            
+            // Criar clone para estilização de impressão
+            const clone = tabelaContainer.cloneNode(true);
+            clone.style.width = '100%';
+            clone.style.backgroundColor = '#ffffff';
+            
+            // Aplicar estilos de impressão
+            clone.querySelectorAll('*').forEach(el => {
+                el.style.color = '#000000';
+                if (el.tagName === 'TABLE') {
+                    el.style.border = '1px solid #000000';
+                    el.style.width = '100%';
+                }
+                if (el.tagName === 'TH' || el.tagName === 'TD') {
+                    el.style.border = '1px solid #000000';
+                    el.style.padding = '4px';
+                    el.style.fontSize = '10px';
+                }
+                if (el.tagName === 'TH') {
+                    el.style.backgroundColor = '#f0f0f0';
+                    el.style.fontWeight = 'bold';
+                }
+            });
+
+            document.body.appendChild(clone);
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px';
+
+            const canvas = await html2canvas(clone, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: clone.scrollWidth,
+                height: clone.scrollHeight
+            });
+
+            document.body.removeChild(clone);
+
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = doc.internal.pageSize.getWidth() - 40;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            doc.addImage(imgData, 'PNG', 20, 40, imgWidth, imgHeight);
+            
+            const fileName = `relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`;
+            doc.save(fileName);
+            mostrarMsg('PDF gerado com sucesso!', 'accent');
+        }
     </script>
     <style>
         .status-btn {
