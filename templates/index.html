@@ -1,103 +1,214 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Escolar - Menu e Informativos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'dark-primary': '#0F172A',
+            'dark-secondary': '#1E293B',
+            'accent': '#34D399',
+            'info': '#60A5FA',
+            'danger': '#F87171',
+            'warning': '#FACC15',
+            'text-light': '#F8FAFC',
+            'disabled': '#4B5563',
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'dark-primary': '#0F172A',
-                        'dark-secondary': '#1E293B',
-                        'accent': '#34D399',
-                        'info': '#60A5FA',
-                        'danger': '#F87171',
-                        'warning': '#FACC15',
-                        'text-light': '#F8FAFC',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                },
-            },
-        };
-    </script>
-
-    <style>
-        html, body {
-            height: 100%;
-        }
-        #app-container {
-            min-height: 100vh;
-        }
-        .btn-disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-    </style>
+  <style>
+    body { 
+      font-family: 'Inter', sans-serif; 
+      margin: 0; 
+      min-height: 100vh; 
+      display: flex; 
+      background-color: #0F172A; 
+      color: #F8FAFC; 
+    }
+    .info-card { 
+      @apply rounded-xl p-5 shadow-lg flex items-start space-x-3; 
+      background-color: rgba(55, 65, 81, 0.5);
+      border-left: 4px solid #9CA3AF;
+    }
+    .info-icon { @apply text-2xl mt-1; }
+    .info-text h3 { @apply text-lg font-semibold; }
+    .info-text p { @apply text-sm text-gray-200 mt-1; }
+    footer { font-size: 0.8rem; color: #94A3B8; text-align: center; margin-top: 2rem; }
+    .menu-button { 
+      padding: 0.75rem; 
+      font-weight: bold; 
+      border-radius: 0.5rem; 
+      transition: all 0.2s; 
+      border: none;
+      cursor: pointer;
+    }
+    .menu-button:enabled:hover { transform: scale(1.05); }
+    .menu-button:disabled { 
+      background-color: #4B5563 !important;
+      color: #9CA3B8 !important;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    @media (min-width: 1024px) {
+      .menu-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    }
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: #94A3B8;
+    }
+    .coming-soon {
+      position: relative;
+    }
+    .coming-soon::after {
+      content: "EM BREVE";
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #FACC15;
+      color: #0F172A;
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 
-<body class="bg-dark-primary font-sans text-text-light">
+<body>
 
-    <div id="app-container" class="flex flex-col items-center justify-between p-4 md:p-8">
+  <!-- LADO ESQUERDO: Lista de Informativos -->
+  <div class="flex-1 flex flex-col justify-start px-8 py-8 lg:px-16 bg-dark-primary">
+    <div class="max-w-3xl mx-auto w-full">
+      <h1 class="text-3xl font-extrabold text-info mb-6">INFORMATIVO IDR</h1>
+      <div id="lista-informativos" class="space-y-4">
+        <div class="empty-state">
+          <p>Carregando informativos...</p>
+        </div>
+      </div>
 
-        <header class="w-full text-center mb-8 mt-4">
-            <h1 class="text-xl sm:text-2xl text-text-light mt-2 font-light tracking-wider border-b border-gray-700 pb-2 inline-block">
-                SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
-            </h1><br>
-            <h2 class="text-xl sm:text-2xl text-text-light mt-2 font-light tracking-wider border-b border-gray-700 pb-2 inline-block">
-                MENU PRINCIPAL
-            </h2>
-        </header>
-
-        <main class="w-full max-w-4xl flex-grow flex items-start justify-center">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full p-4 sm:p-6 bg-dark-secondary rounded-xl shadow-2xl">
-
-                <!-- Botão ativo -->
-                <button onclick="window.location.href='/gestao_ocorrencia'" 
-                    class="p-5 text-xl font-semibold bg-accent hover:bg-emerald-500 transition duration-200 ease-in-out rounded-lg shadow-lg transform hover:scale-[1.02] text-white">
-                    GESTÃO DE OCORRÊNCIA
-                </button>
-
-                <!-- Botões desativados -->
-                <button class="p-5 text-xl font-semibold bg-info text-white rounded-lg shadow-lg btn-disabled">
-                    GESTÃO DE FREQUÊNCIA
-                </button>
-
-                <button class="p-5 text-xl font-semibold bg-info text-white rounded-lg shadow-lg btn-disabled">
-                    GESTÃO DE TECNOLOGIA
-                </button>
-
-                <button class="p-5 text-xl font-semibold bg-info text-white rounded-lg shadow-lg btn-disabled">
-                    GESTÃO DE TUTORIA
-                </button>
-
-                <button class="p-5 text-xl font-semibold bg-danger text-white rounded-lg shadow-lg btn-disabled">
-                    GESTÃO DE AULAS
-                </button>
-
-                <button class="p-5 text-xl font-semibold bg-danger text-white rounded-lg shadow-lg btn-disabled">
-                    CADASTRO
-                </button>
-
-            </div>
-        </main>
-
-        <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
-            <p class="mb-1 text-base font-medium">
-                DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES
-            </p>
-            <p class="text-xs font-light tracking-wide">
-                LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO
-            </p>
-        </footer>
-
+      <footer class="mt-12">
+        © 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes
+      </footer>
     </div>
+  </div>
+
+  <!-- LADO DIREITO: Menu Principal -->
+  <div class="w-full lg:w-[320px] flex flex-col justify-start items-center bg-dark-secondary p-6 shadow-2xl border-l border-gray-700">
+    <div class="w-full max-w-xs text-center">
+      <h1 class="text-lg font-bold text-accent mb-2">SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
+      <h2 class="text-sm text-gray-400 mb-4">MENU PRINCIPAL</h2>
+
+      <div class="grid grid-cols-1 gap-3">
+        <!-- Botão OCORRÊNCIAS - HABILITADO -->
+        <button onclick="window.location.href='/gestao_ocorrencia'" 
+                class="menu-button bg-accent text-white w-full">
+          GESTÃO DE OCORRÊNCIA
+        </button>
+	
+	<!-- Botão FREQUÊNCIA - AGORA HABILITADO -->
+	<button onclick="window.location.href='/gestao_frequencia'" 
+       		class="menu-button bg-accent text-white w-full">
+  	  GESTÃO DE FREQUÊNCIA
+	</button>
+
+        <!-- Botões DESABILITADOS -->
+        
+        <button disabled class="menu-button bg-info text-white w-full coming-soon">
+          GESTÃO DE TECNOLOGIA
+        </button>
+
+        <button disabled class="menu-button bg-info text-white w-full coming-soon">
+          GESTÃO DE TUTORIA
+        </button>
+
+        <button disabled class="menu-button bg-danger text-white w-full coming-soon">
+          GESTÃO DE AULAS
+        </button>
+
+        <button disabled class="menu-button bg-danger text-white w-full coming-soon">
+          CADASTRO
+        </button>
+      </div>
+
+      <!-- Mensagem informativa -->
+      <div class="mt-6 p-3 bg-yellow-900/30 border border-yellow-600 rounded-lg">
+        <p class="text-xs text-yellow-200">
+          <strong>Em desenvolvimento:</strong><br>
+          Apenas oS móduloS de <strong>OCORRÊNCIAS E FREQUÊNCIA</strong> está disponível no momento.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function carregarInformativos() {
+      try {
+        const response = await fetch('/api/informativos');
+        const informativos = await response.json();
+
+        const lista = document.getElementById('lista-informativos');
+        
+        if (!response.ok) {
+          throw new Error('Erro ao carregar informativos');
+        }
+
+        if (informativos.length === 0) {
+          lista.innerHTML = `
+            <div class="empty-state">
+              <p>Nenhum informativo publicado ainda.</p>
+            </div>
+          `;
+          return;
+        }
+
+        lista.innerHTML = '';
+        
+        informativos.forEach(item => {
+          const data = new Date(item.criado_em);
+          const dataFormatada = data.toLocaleDateString('pt-BR');
+          const horaFormatada = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          
+          const card = document.createElement('div');
+          card.className = "info-card";
+          card.innerHTML = `
+            <span class="info-icon">📢</span>
+            <div class="info-text flex-1">
+              <h3>${item.titulo}</h3>
+              <p>${item.mensagem}</p>
+              <div class="text-xs text-gray-400 mt-2">
+                ${dataFormatada} às ${horaFormatada}
+                ${item.autor ? `· Por ${item.autor}` : ''}
+              </div>
+            </div>`;
+          lista.appendChild(card);
+        });
+
+      } catch (error) {
+        console.error('Erro:', error);
+        const lista = document.getElementById('lista-informativos');
+        lista.innerHTML = `
+          <div class="empty-state">
+            <p>Erro ao carregar informativos. Tente recarregar a página.</p>
+          </div>
+        `;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', carregarInformativos);
+    
+    // Recarregar informativos a cada 30 segundos
+    setInterval(carregarInformativos, 30000);
+  </script>
 </body>
 </html>
