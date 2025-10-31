@@ -646,108 +646,60 @@
         }
 
         async function mostrarDetalhesFrequencia(alunoId, data) {
-            try {
-                const resp = await fetch(`/api/frequencia_detalhes/${alunoId}/${data}`);
-                if (!resp.ok) throw new Error("Erro ao carregar detalhes");
-                const detalhes = await resp.json();
-                
-                const aluno = dadosFrequencia.find(a => a.id === alunoId);
-                const alunoNome = aluno ? aluno.nome : 'Aluno';
-                
-                let modalContent = `
-                <div class="mb-4">
-                    <h3 class="text-lg font-bold text-accent">Detalhes da Frequência</h3>
-                    <p class="text-sm text-gray-300">Aluno: ${alunoNome}</p>
-                    <p class="text-sm text-gray-300">Data: ${dayjs(data).format('DD/MM/YYYY')}</p>
-                    <p class="text-sm text-gray-300">Status: ${detalhes.status || 'N/A'}</p>
-                </div>
-                `;
-                
-                // Determinar quais campos mostrar baseado no status
-                const status = detalhes.status;
-                
-                if (status === 'PA' || status === 'PSA') {
-                    // Mostrar dados de atraso
-                    modalContent += `
-                    <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
-                        <h4 class="font-bold text-yellow-400">Entrada com Atraso</h4>
-                        <p class="text-sm"><strong>Hora do Atraso:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
-                        <p class="text-sm"><strong>Motivo do Atraso:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
-                    </div>
-                    `;
-                }
-                
-                if (status === 'PS' || status === 'PSA') {
-                    // Mostrar dados de saída antecipada
-                    modalContent += `
-                    <div class="mb-4 p-3 bg-orange-900 rounded-lg">
-                        <h4 class="font-bold text-orange-400">Saída Antecipada</h4>
-                        <p class="text-sm"><strong>Hora da Saída:</strong> ${detalhes.hora_saida || 'N/A'}</p>
-                        <p class="text-sm"><strong>Motivo da Saída:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
-                    </div>
-                    `;
-                }
-                
-                // Sempre mostrar dados do responsável se disponíveis
-                if (detalhes.responsavel_nome) {
-                    modalContent += `
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg">
-                        <h4 class="font-bold text-gray-300">Responsável</h4>
-                        <p class="text-sm"><strong>Nome:</strong> ${detalhes.responsavel_nome}</p>
-                        <p class="text-sm"><strong>Telefone:</strong> ${detalhes.responsavel_telefone || 'N/A'}</p>
-                    </div>
-                    `;
-                }
-                
-                // Caso não haja nenhum detalhe adicional específico
-                if ((status === 'PA' && !detalhes.hora_entrada && !detalhes.motivo_atraso) ||
-                    (status === 'PS' && !detalhes.hora_saida && !detalhes.motivo_saida) ||
-                    (status === 'PSA' && !detalhes.hora_entrada && !detalhes.motivo_atraso && !detalhes.hora_saida && !detalhes.motivo_saida)) {
-                    modalContent += `<p class="text-gray-400 text-center">Nenhum detalhe adicional disponível para este status.</p>`;
-                }
-                
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-                modal.innerHTML = `
-                <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
-                    ${modalContent}
-                    <div class="text-center mt-4">
-                    <button onclick="this.closest('.fixed').remove()" 
-                        class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
-                        Fechar
-                    </button>
-                    </div>
-                </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-            } catch (e) {
-                console.error('Erro ao carregar detalhes:', e);
-                
-                // Modal de erro mais amigável
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-                modal.innerHTML = `
-                <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-bold text-red-500">Erro ao Carregar Detalhes</h3>
-                        <p class="text-sm text-gray-300 mt-2">Não foi possível conectar ao servidor para obter os detalhes da frequência.</p>
-                        <p class="text-sm text-gray-300 mt-1">Verifique sua conexão com a internet e tente novamente.</p>
-                    </div>
-                    <div class="text-center mt-4">
-                        <button onclick="this.closest('.fixed').remove()" 
-                            class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
-                            Fechar
-                        </button>
-                    </div>
-                </div>
-                `;
-                
-                document.body.appendChild(modal);
-            }
-        }
+    try {
+        const resp = await fetch(`/api/frequencia_detalhes/${alunoId}/${data}`);
+        if (!resp.ok) throw new Error("Erro ao carregar detalhes");
+        const detalhes = await resp.json();
+        
+        const aluno = dadosFrequencia.find(a => a.id === alunoId);
+        const alunoNome = aluno ? aluno.nome : 'Aluno não identificado';
+        
+        // Montar conteúdo fixo do modal
+        const modalContent = `
+        <div class="mb-4">
+            <h3 class="text-lg font-bold text-accent mb-3">Detalhe de Frequência</h3>
+            <p class="text-sm text-gray-300"><strong>Aluno:</strong> ${alunoNome}</p>
+            <p class="text-sm text-gray-300"><strong>Data:</strong> ${dayjs(data).format('DD/MM/YYYY')}</p>
+            <p class="text-sm text-gray-300"><strong>Hora Entrada:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
+            <p class="text-sm text-gray-300"><strong>Motivo Atraso:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
+            <p class="text-sm text-gray-300"><strong>Hora Saída:</strong> ${detalhes.hora_saida || 'N/A'}</p>
+            <p class="text-sm text-gray-300"><strong>Motivo Saída:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="this.closest('.fixed').remove()" 
+                class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
+                Fechar
+            </button>
+        </div>
+        `;
 
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+        <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
+            ${modalContent}
+        </div>`;
+        
+        document.body.appendChild(modal);
+        
+    } catch (e) {
+        console.error('Erro ao carregar detalhes:', e);
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+        <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold text-red-500 mb-2">Erro ao carregar detalhes</h3>
+            <p class="text-sm text-gray-300 mb-4">Não foi possível obter as informações desta frequência.</p>
+            <div class="text-center">
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
+                    Fechar
+                </button>
+            </div>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+}
         function mostrarLegenda() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -1334,4 +1286,5 @@
         </footer>
     </div>
 </body>
+
 </html>
