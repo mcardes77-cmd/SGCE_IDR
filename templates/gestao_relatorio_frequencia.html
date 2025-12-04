@@ -246,41 +246,173 @@
     }
 
     async function gerarPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a4"
-      });
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: "a4"
+  });
 
-      const salaSelect = document.getElementById("salaSelect");
-      const mesSelect = document.getElementById("mesSelect");
-      const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
-      const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
-      const ano = new Date().getFullYear();
+  const salaSelect = document.getElementById("salaSelect");
+  const mesSelect = document.getElementById("mesSelect");
+  const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
+  const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
+  const ano = new Date().getFullYear();
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("RELATÓRIO DE FREQUÊNCIA", doc.internal.pageSize.getWidth() / 2, 40, { align: "center" });
+  // Título
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RELATÓRIO DE FREQUÊNCIA", doc.internal.pageSize.getWidth() / 2, 40, { align: "center" });
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
-      doc.text(`Sala: ${salaNome} — Mês: ${mesNome} / ${ano}`, doc.internal.pageSize.getWidth() / 2, 60, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text(`Sala: ${salaNome} — Mês: ${mesNome} / ${ano}`, doc.internal.pageSize.getWidth() / 2, 60, { align: "center" });
 
-      await doc.html(document.getElementById("tabelaContainer"), {
-        x: 20,
-        y: 80,
-        html2canvas: {
-          scale: 0.6,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: document.getElementById("tabelaContainer").scrollWidth,
-        },
-        callback: function (pdf) {
-          pdf.save(`relatorio_frequencia_${salaNome}_${mesNome}_${ano}.pdf`);
-        },
+  // Obter dados da frequência
+  const sala = document.getElementById("salaSelect").value;
+  const mes = document.getElementById("mesSelect").value;
+  
+  if (!sala || !mes) {
+    alert("Selecione a sala e o mês para gerar o PDF.");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
+    if (!resp.ok) throw new Error("Erro ao carregar frequência");
+    const dadosFrequencia = await resp.json();
+    
+    // Calcular dias úteis do mês
+    const dias = [];
+    const totalDias = new Date(ano, mes, 0).getDate();
+    for (let d = 1; d <= totalDias; d++) {
+      const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+      const diaSemana = data.day();
+      if (diaSemana !== 0 && diaSemana !== 6) dias.push(data);
+    }
+
+    // Configurações da tabela
+    const margin = 40;
+    const startY = 80;
+    const lineHeight = 20;
+    const nomeColWidth = 200; // Coluna Nome com largura dupla (2x)
+    const diaColWidth = 30;   // Colunas de dias menores
+    let currentY = startY;
+
+    // Cabeçalho da tabela
+    doc.setFillColor(15, 23, 42); // dark-primary
+    doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("ALUNO", margin + 10, currentY + lineHeight / 2 + 3);
+    
+    // Cabeçalhos dos dias
+    dias.forEach((dia, index) => {
+      const xPos = margin + nomeColWidth + (index * diaColWidth);
+      doc.setFillColor(15, 23, 42);
+      doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+      doc.text(dia.format("DD"), xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
+    });
+
+    currentY += lineHeight;
+
+    // Dados dos alunos
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    
+    const alunos = Array.isArray(dadosFrequencia) && dadosFrequencia.length ? dadosFrequencia : [];
+    
+    if (alunos.length === 0) {
+      doc.setTextColor(100, 100, 100);
+      doc.text("Nenhum registro encontrado.", margin, currentY + 10);
+    } else {
+      alunos.forEach((aluno, alunoIndex) => {
+        // Alternar cor de fundo das linhas
+        if (alunoIndex % 2 === 0) {
+          doc.setFillColor(240, 240, 240);
+        } else {
+          doc.setFillColor(255, 255, 255);
+        }
+        
+        // Linha do aluno
+        doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
+        doc.setTextColor(0, 0, 0);
+        doc.text(aluno.nome, margin + 5, currentY + lineHeight / 2 + 3);
+        
+        // Status de cada dia
+        dias.forEach((dia, diaIndex) => {
+          const xPos = margin + nomeColWidth + (diaIndex * diaColWidth);
+          const dataKey = dia.format("YYYY-MM-DD");
+          const freq = aluno.frequencia?.[dataKey] || {};
+          const status = freq.status || "";
+          
+          // Fundo da célula
+          if (alunoIndex % 2 === 0) {
+            doc.setFillColor(240, 240, 240);
+          } else {
+            doc.setFillColor(255, 255, 255);
+          }
+          doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+          
+          // Cor do status
+          if (status === "P") {
+            doc.setTextColor(0, 128, 0); // Verde
+          } else if (status === "F") {
+            doc.setTextColor(255, 0, 0); // Vermelho
+          } else if (["PA", "PS", "PSA"].includes(status)) {
+            doc.setTextColor(255, 165, 0); // Laranja
+          } else {
+            doc.setTextColor(100, 100, 100); // Cinza
+          }
+          
+          doc.text(status, xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
+        });
+        
+        currentY += lineHeight;
+        
+        // Verificar se precisa de nova página
+        if (currentY + lineHeight > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage();
+          currentY = margin;
+          
+          // Recriar cabeçalho na nova página
+          doc.setFillColor(15, 23, 42);
+          doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text("ALUNO", margin + 10, currentY + lineHeight / 2 + 3);
+          
+          dias.forEach((dia, index) => {
+            const xPos = margin + nomeColWidth + (index * diaColWidth);
+            doc.setFillColor(15, 23, 42);
+            doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+            doc.text(dia.format("DD"), xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
+          });
+          
+          currentY += lineHeight;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+        }
       });
     }
+
+    // Legenda
+    const legendaY = doc.internal.pageSize.getHeight() - 30;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Legenda: P = Presença | F = Falta | PA = Atraso | PS = Saída Antecipada | PSA = Atraso + Saída", 
+              margin, legendaY);
+    
+    // Salvar PDF
+    doc.save(`relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`);
+    
+  } catch (e) {
+    console.error(e);
+    alert("Erro ao gerar PDF. Tente novamente.");
+  }
+}
   </script>
 </head>
 
@@ -345,3 +477,4 @@
   </div>
 </body>
 </html>
+
