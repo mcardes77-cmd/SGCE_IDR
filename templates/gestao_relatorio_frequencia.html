@@ -245,11 +245,11 @@
       document.body.appendChild(modal);
     }
 
-    async function gerarPDF() {
+   async function gerarPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({
     orientation: "landscape",
-    unit: "pt",
+    unit: "mm",
     format: "a4"
   });
 
@@ -262,13 +262,21 @@
   // Título
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("RELATÓRIO DE FREQUÊNCIA", doc.internal.pageSize.getWidth() / 2, 40, { align: "center" });
+  doc.text("RELATÓRIO DE FREQUÊNCIA ESCOLAR", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
 
+  // Informações
+  doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text(`Sala: ${salaNome} — Mês: ${mesNome} / ${ano}`, doc.internal.pageSize.getWidth() / 2, 60, { align: "center" });
+  doc.text(`Sala: ${salaNome}`, 20, 25);
+  doc.text(`Período: ${mesNome}/${ano}`, 20, 30);
+  doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, doc.internal.pageSize.getWidth() - 20, 25, { align: "right" });
+  doc.text(`Escola: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO`, doc.internal.pageSize.getWidth() - 20, 30, { align: "right" });
 
-  // Obter dados da frequência
+  // Linha divisória
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, 35, doc.internal.pageSize.getWidth() - 20, 35);
+
+  // Obter dados
   const sala = document.getElementById("salaSelect").value;
   const mes = document.getElementById("mesSelect").value;
   
@@ -282,129 +290,146 @@
     if (!resp.ok) throw new Error("Erro ao carregar frequência");
     const dadosFrequencia = await resp.json();
     
-    // Calcular dias úteis do mês
+    // Calcular dias úteis
     const dias = [];
     const totalDias = new Date(ano, mes, 0).getDate();
     for (let d = 1; d <= totalDias; d++) {
       const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
       const diaSemana = data.day();
-      if (diaSemana !== 0 && diaSemana !== 6) dias.push(data);
+      if (diaSemana !== 0 && diaSemana !== 6) {
+        dias.push({
+          data: data,
+          dia: d
+        });
+      }
     }
 
-    // Configurações da tabela
-    const margin = 40;
-    const startY = 80;
-    const lineHeight = 20;
-    const nomeColWidth = 400; // Coluna Nome com largura dupla (2x)
-    const diaColWidth = 30;   // Colunas de dias menores
+    // Configurações da tabela - COLUNA NOME MAIOR
+    const startY = 40;
+    const lineHeight = 6;
+    const nomeColWidth = 60;  // COLUNA NOME COM 60mm (largura aumentada)
+    const diaColWidth = 5;    // Colunas de dias menores (5mm cada)
     let currentY = startY;
 
+    // Verificar se cabe na página
+    const larguraNecessaria = nomeColWidth + (dias.length * diaColWidth);
+    const larguraPagina = doc.internal.pageSize.getWidth() - 40; // 20mm de margem de cada lado
+    
+    if (larguraNecessaria > larguraPagina) {
+      // Ajustar tamanho das colunas de dias
+      const novaDiaColWidth = (larguraPagina - nomeColWidth) / dias.length;
+      diaColWidth = Math.max(3, novaDiaColWidth); // Mínimo de 3mm
+    }
+
     // Cabeçalho da tabela
-    doc.setFillColor(15, 23, 42); // dark-primary
-    doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
+    doc.setFillColor(79, 70, 229); // Azul escuro
+    doc.rect(20, currentY, nomeColWidth, lineHeight, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("ALUNO", margin + 10, currentY + lineHeight / 2 + 3);
+    doc.setFontSize(9);
+    doc.text("ALUNO", 22, currentY + lineHeight/2 + 1);
     
     // Cabeçalhos dos dias
     dias.forEach((dia, index) => {
-      const xPos = margin + nomeColWidth + (index * diaColWidth);
-      doc.setFillColor(15, 23, 42);
+      const xPos = 20 + nomeColWidth + (index * diaColWidth);
+      doc.setFillColor(79, 70, 229);
       doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-      doc.text(dia.format("DD"), xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
+      doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
     });
 
     currentY += lineHeight;
 
     // Dados dos alunos
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    
     const alunos = Array.isArray(dadosFrequencia) && dadosFrequencia.length ? dadosFrequencia : [];
     
-    if (alunos.length === 0) {
-      doc.setTextColor(100, 100, 100);
-      doc.text("Nenhum registro encontrado.", margin, currentY + 10);
-    } else {
-      alunos.forEach((aluno, alunoIndex) => {
-        // Alternar cor de fundo das linhas
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+
+    alunos.forEach((aluno, alunoIndex) => {
+      // Alternar cor de fundo
+      if (alunoIndex % 2 === 0) {
+        doc.setFillColor(249, 250, 251); // cinza claro
+      } else {
+        doc.setFillColor(255, 255, 255); // branco
+      }
+      
+      // Linha do aluno
+      doc.rect(20, currentY, nomeColWidth, lineHeight, 'F');
+      
+      // Nome do aluno (truncar se necessário)
+      let nomeAluno = aluno.nome;
+      if (nomeAluno.length > 35) {
+        nomeAluno = nomeAluno.substring(0, 35) + '...';
+      }
+      doc.text(nomeAluno, 22, currentY + lineHeight/2 + 1);
+      
+      // Status de cada dia
+      dias.forEach((dia, diaIndex) => {
+        const xPos = 20 + nomeColWidth + (diaIndex * diaColWidth);
+        const dataKey = dia.data.format("YYYY-MM-DD");
+        const freq = aluno.frequencia?.[dataKey] || {};
+        const status = freq.status || "";
+        
+        // Fundo da célula
         if (alunoIndex % 2 === 0) {
-          doc.setFillColor(240, 240, 240);
+          doc.setFillColor(249, 250, 251);
         } else {
           doc.setFillColor(255, 255, 255);
         }
+        doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
         
-        // Linha do aluno
-        doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
-        doc.setTextColor(0, 0, 0);
-        doc.text(aluno.nome, margin + 5, currentY + lineHeight / 2 + 3);
+        // Cor do status
+        if (status === "P") {
+          doc.setTextColor(16, 185, 129); // verde
+        } else if (status === "F") {
+          doc.setTextColor(220, 38, 38); // vermelho
+        } else if (["PA", "PS", "PSA"].includes(status)) {
+          doc.setTextColor(245, 158, 11); // laranja
+        } else {
+          doc.setTextColor(100, 100, 100); // cinza
+        }
         
-        // Status de cada dia
-        dias.forEach((dia, diaIndex) => {
-          const xPos = margin + nomeColWidth + (diaIndex * diaColWidth);
-          const dataKey = dia.format("YYYY-MM-DD");
-          const freq = aluno.frequencia?.[dataKey] || {};
-          const status = freq.status || "";
-          
-          // Fundo da célula
-          if (alunoIndex % 2 === 0) {
-            doc.setFillColor(240, 240, 240);
-          } else {
-            doc.setFillColor(255, 255, 255);
-          }
+        // Centralizar o status
+        doc.text(status, xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
+        doc.setTextColor(0, 0, 0); // reset
+      });
+      
+      currentY += lineHeight;
+      
+      // Verificar necessidade de nova página
+      if (currentY + lineHeight > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        currentY = 20;
+        
+        // Recriar cabeçalho
+        doc.setFillColor(79, 70, 229);
+        doc.rect(20, currentY, nomeColWidth, lineHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("ALUNO", 22, currentY + lineHeight/2 + 1);
+        
+        dias.forEach((dia, index) => {
+          const xPos = 20 + nomeColWidth + (index * diaColWidth);
+          doc.setFillColor(79, 70, 229);
           doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-          
-          // Cor do status
-          if (status === "P") {
-            doc.setTextColor(0, 128, 0); // Verde
-          } else if (status === "F") {
-            doc.setTextColor(255, 0, 0); // Vermelho
-          } else if (["PA", "PS", "PSA"].includes(status)) {
-            doc.setTextColor(255, 165, 0); // Laranja
-          } else {
-            doc.setTextColor(100, 100, 100); // Cinza
-          }
-          
-          doc.text(status, xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
+          doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
         });
         
         currentY += lineHeight;
-        
-        // Verificar se precisa de nova página
-        if (currentY + lineHeight > doc.internal.pageSize.getHeight() - margin) {
-          doc.addPage();
-          currentY = margin;
-          
-          // Recriar cabeçalho na nova página
-          doc.setFillColor(15, 23, 42);
-          doc.rect(margin, currentY, nomeColWidth, lineHeight, 'F');
-          doc.setTextColor(255, 255, 255);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.text("ALUNO", margin + 10, currentY + lineHeight / 2 + 3);
-          
-          dias.forEach((dia, index) => {
-            const xPos = margin + nomeColWidth + (index * diaColWidth);
-            doc.setFillColor(15, 23, 42);
-            doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-            doc.text(dia.format("DD"), xPos + diaColWidth / 2, currentY + lineHeight / 2 + 3, { align: "center" });
-          });
-          
-          currentY += lineHeight;
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-        }
-      });
-    }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+      }
+    });
 
     // Legenda
-    const legendaY = doc.internal.pageSize.getHeight() - 30;
+    const legendaY = doc.internal.pageSize.getHeight() - 10;
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text("Legenda: P = Presença | F = Falta | PA = Atraso | PS = Saída Antecipada | PSA = Atraso + Saída", 
-              margin, legendaY);
-    
+             20, legendaY);
+
     // Salvar PDF
     doc.save(`relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`);
     
@@ -477,5 +502,6 @@
   </div>
 </body>
 </html>
+
 
 
