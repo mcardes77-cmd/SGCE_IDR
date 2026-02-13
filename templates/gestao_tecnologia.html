@@ -98,24 +98,23 @@
             }
         }
 
-        async function carregarSalas() {
-            try {
-                const response = await fetch('/api/d_salas');
-                salasData = await response.json();
-                
-                const selects = document.querySelectorAll('.select-sala');
-                selects.forEach(select => {
-                    select.innerHTML = '<option value="">Selecione a Sala</option>';
-                    salasData.forEach(sala => {
-                        select.innerHTML += `<option value="${sala.id}">${sala.nome}</option>`;
-                    });
-                });
-            } catch (error) {
-                console.error('Erro ao carregar salas:', error);
-                mostrarMsg('Erro ao carregar salas', 'danger');
-            }
-        }
-
+       async function carregarSalas() {
+    try {
+        const response = await fetch('/api/d_salas'); // ALTERADO
+        salasData = await response.json();
+        
+        const selects = document.querySelectorAll('.select-sala');
+        selects.forEach(select => {
+            select.innerHTML = '<option value="">Selecione a Sala</option>';
+            salasData.forEach(sala => {
+                select.innerHTML += `<option value="${sala.id}">${sala.nome}</option>`;
+            });
+        });
+    } catch (error) {
+        console.error('Erro ao carregar salas:', error);
+        mostrarMsg('Erro ao carregar salas', 'danger');
+    }
+}
         // ========== MÓDULO AGENDAMENTO ==========
         async function salvarAgendamento(event) {
             event.preventDefault();
@@ -514,3 +513,4 @@
 </body>
 
 </html>
+
