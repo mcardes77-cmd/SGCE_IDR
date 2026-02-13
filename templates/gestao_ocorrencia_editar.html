@@ -16,7 +16,8 @@
                         'text-light': '#F8FAFC',
                         'tutor-color': '#007ACC',
                         'coord-color': '#F59E0B',
-                        'gestao-color': '#EF4444'
+                        'gestao-color': '#EF4444',
+                        'responsavel-color': '#8B5CF6'
                     },
                 },
             },
@@ -124,15 +125,42 @@
                     <p class="text-xs text-gray-400 mt-1" id="help-gestao">Este campo será editável apenas se você acessou através do link "G"</p>
                 </div>
 
-                <!-- Campo para solicitar responsável (visível apenas para gestão) -->
-                <div class="mb-4" id="campo-solicitar-responsavel" style="display: none;">
-                    <label class="flex items-center">
-                        <input type="checkbox" id="solicitar-responsavel" class="mr-2 h-5 w-5 text-accent">
-                        <span>Solicitar presença do responsável? (Se não, a ocorrência será finalizada)</span>
-                    </label>
+                <div class="mb-4">
+                    <label class="block text-sm text-gray-300 mb-1">Atendimento Responsável</label>
+                    <textarea id="atendimento_responsavel" class="form-textarea readonly" rows="3" placeholder="Registro do atendimento com os pais..." readonly>Carregando...</textarea>
+                    <p class="text-xs text-gray-400 mt-1" id="help-responsavel">Este campo será editável apenas se você acessou através do link "R"</p>
                 </div>
 
-                <button type="button" onclick="salvarAtendimento()" id="btn-salvar" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white hidden">
+                <!-- Botões para gestão -->
+                <div id="botoes-gestao" class="mb-4" style="display: none;">
+                    <div class="flex gap-4">
+                        <button type="button" onclick="salvarAtendimentoGestao(false)" class="flex-1 bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white">
+                            FINALIZAR OCORRÊNCIA
+                        </button>
+                        <button type="button" onclick="salvarAtendimentoGestao(true)" class="flex-1 bg-warning hover:bg-amber-600 py-3 rounded font-bold text-white">
+                            CONVOCAR PAIS
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 text-center">
+                        Ao clicar em "Convocar Pais", a ocorrência permanecerá com pendência (ícone R) até o registro da presença do responsável.
+                    </p>
+                </div>
+
+                <!-- Botões para responsável -->
+                <div id="botoes-responsavel" class="mb-4" style="display: none;">
+                    <div class="flex items-center mb-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="finalizar-ocorrencia" class="mr-2 h-5 w-5 text-accent" checked>
+                            <span>Finalizar ocorrência após salvar</span>
+                        </label>
+                    </div>
+                    <button type="button" onclick="salvarAtendimentoResponsavel()" class="w-full bg-responsavel-color hover:bg-purple-700 py-3 rounded font-bold text-white">
+                        SALVAR ATENDIMENTO DO RESPONSÁVEL
+                    </button>
+                </div>
+
+                <!-- Botão padrão para tutor/coordenação -->
+                <button type="button" id="btn-salvar" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white hidden">
                     SALVAR ATENDIMENTO
                 </button>
             </form>
@@ -148,7 +176,7 @@
     <script>
         let ocorrenciaAtual = null;
         let nivelAtual = null;
-        let ocorrenciaId = null; // ID interno da ocorrência
+        let ocorrenciaId = null;
         
         const mapaNiveis = {
             'T': {
@@ -171,12 +199,19 @@
                 cor: 'bg-gestao-color',
                 texto: 'text-white',
                 tipo: 'gestao'
+            },
+            'R': {
+                campo: 'atendimento_responsavel',
+                nome: 'RESPONSÁVEL',
+                cor: 'bg-responsavel-color',
+                texto: 'text-white',
+                tipo: 'responsavel'
             }
         };
 
         function iniciarPagina() {
             const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('id'); // número da ocorrência
+            ocorrenciaAtual = urlParams.get('id');
             nivelAtual = urlParams.get('nivel');
             
             if (ocorrenciaAtual) {
@@ -195,7 +230,7 @@
                 const ocorrencia = await response.json();
                 if (ocorrencia.error) throw new Error(ocorrencia.error);
                 
-                ocorrenciaId = ocorrencia.id; // ID interno
+                ocorrenciaId = ocorrencia.id;
                 
                 preencherDadosOcorrencia(ocorrencia);
                 aplicarRegrasEdicao(nivelAtual);
@@ -216,93 +251,170 @@
             document.getElementById('atendimento_tutor').value = ocorrencia.atendimento_tutor || '';
             document.getElementById('atendimento_coordenacao').value = ocorrencia.atendimento_coordenacao || '';
             document.getElementById('atendimento_gestao').value = ocorrencia.atendimento_gestao || '';
+            document.getElementById('atendimento_responsavel').value = ocorrencia.atendimento_responsavel || '';
         }
 
         function aplicarRegrasEdicao(nivel) {
-            const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao'];
-            
-            // Reset: todos readonly
+            const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao', 'atendimento_responsavel'];
             camposAtendimento.forEach(campo => {
                 const element = document.getElementById(campo);
-                element.readOnly = true;
-                element.classList.add('readonly');
-                element.classList.remove('editable');
+                if (element) {
+                    element.readOnly = true;
+                    element.classList.add('readonly');
+                    element.classList.remove('editable');
+                }
             });
-            
+
+            // Esconde todos os botões específicos
             document.getElementById('btn-salvar').classList.add('hidden');
-            document.getElementById('campo-solicitar-responsavel').style.display = 'none';
-            
+            document.getElementById('botoes-gestao').style.display = 'none';
+            document.getElementById('botoes-responsavel').style.display = 'none';
+
             if (nivel && mapaNiveis[nivel]) {
                 const config = mapaNiveis[nivel];
                 const element = document.getElementById(config.campo);
-                element.readOnly = false;
-                element.classList.remove('readonly');
-                element.classList.add('editable');
-                
+                if (element) {
+                    element.readOnly = false;
+                    element.classList.remove('readonly');
+                    element.classList.add('editable');
+                }
+
                 const badge = document.getElementById('badge-nivel');
                 badge.textContent = `EDITANDO: ${config.nome}`;
                 badge.className = `badge-nivel ${config.cor} ${config.texto}`;
                 badge.classList.remove('hidden');
-                
-                document.getElementById('btn-salvar').classList.remove('hidden');
-                
-                // Se for gestão, mostra o campo de solicitar responsável
+
                 if (nivel === 'G') {
-                    document.getElementById('campo-solicitar-responsavel').style.display = 'block';
+                    document.getElementById('botoes-gestao').style.display = 'block';
+                } else if (nivel === 'R') {
+                    document.getElementById('botoes-responsavel').style.display = 'block';
+                } else {
+                    document.getElementById('btn-salvar').classList.remove('hidden');
+                    document.getElementById('btn-salvar').setAttribute('onclick', `salvarAtendimento('${nivel}')`);
                 }
-                
-                setTimeout(() => {
-                    element.focus();
-                }, 100);
             }
         }
 
-        async function salvarAtendimento() {
-            if (!ocorrenciaId || !nivelAtual) {
+        async function salvarAtendimento(nivel) {
+            if (!ocorrenciaId || !nivel) {
                 mostrarMensagem('Erro: ID da ocorrência não encontrado', 'error');
                 return;
             }
-            
-            const config = mapaNiveis[nivelAtual];
+
+            const config = mapaNiveis[nivel];
             const texto = document.getElementById(config.campo).value;
-            
+
             if (!texto.trim()) {
                 mostrarMensagem('Por favor, digite o atendimento antes de salvar.', 'error');
                 return;
             }
-            
-            const dadosEnviar = {
-                tipo: config.tipo,
-                texto: texto.trim()
-            };
-            
-            // Se for gestão, incluir flag de solicitar responsável
-            if (nivelAtual === 'G') {
-                dadosEnviar.solicitar_responsavel = document.getElementById('solicitar-responsavel').checked;
-            }
-            
+
             try {
+                const dadosEnviar = {
+                    tipo: config.tipo,
+                    texto: texto.trim()
+                };
+
                 const response = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dadosEnviar)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (response.ok && result.ok) {
                     mostrarMensagem('Atendimento salvo com sucesso! Redirecionando...', 'success');
                     setTimeout(() => {
                         window.location.href = '/gestao_ocorrencia';
                     }, 2000);
                 } else {
-                    const erroDetalhado = result.error || 'Erro desconhecido';
-                    mostrarMensagem('Erro ao salvar: ' + erroDetalhado, 'error');
-                    console.error('Erro detalhado:', result);
+                    mostrarMensagem('Erro ao salvar: ' + (result.error || 'Erro desconhecido'), 'error');
                 }
             } catch (error) {
                 mostrarMensagem('Erro de conexão: ' + error.message, 'error');
-                console.error('Erro completo:', error);
+            }
+        }
+
+        async function salvarAtendimentoGestao(convocarPais) {
+            if (!ocorrenciaId) {
+                mostrarMensagem('Erro: ID da ocorrência não encontrado', 'error');
+                return;
+            }
+
+            const config = mapaNiveis['G'];
+            const texto = document.getElementById(config.campo).value;
+
+            if (!texto.trim()) {
+                mostrarMensagem('Por favor, digite o atendimento antes de salvar.', 'error');
+                return;
+            }
+
+            const dadosEnviar = {
+                tipo: config.tipo,
+                texto: texto.trim(),
+                convocar_pais: convocarPais
+            };
+
+            try {
+                const response = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dadosEnviar)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.ok) {
+                    if (convocarPais) {
+                        mostrarMensagem('Atendimento salvo e pais convocados! Pendência mantida.', 'success');
+                    } else {
+                        mostrarMensagem('Ocorrência finalizada com sucesso!', 'success');
+                    }
+                    setTimeout(() => {
+                        window.location.href = '/gestao_ocorrencia';
+                    }, 2000);
+                } else {
+                    mostrarMensagem('Erro ao salvar: ' + (result.error || 'Erro desconhecido'), 'error');
+                }
+            } catch (error) {
+                mostrarMensagem('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+
+        async function salvarAtendimentoResponsavel() {
+            if (!ocorrenciaId) {
+                mostrarMensagem('Erro: ID da ocorrência não encontrado', 'error');
+                return;
+            }
+
+            const texto = document.getElementById('atendimento_responsavel').value;
+            if (!texto.trim()) {
+                mostrarMensagem('Por favor, digite o atendimento.', 'error');
+                return;
+            }
+
+            const finalizar = document.getElementById('finalizar-ocorrencia').checked;
+
+            try {
+                const response = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento_responsavel`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texto: texto.trim(), finalizar: finalizar })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.ok) {
+                    mostrarMensagem('Atendimento do responsável salvo com sucesso!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/gestao_ocorrencia';
+                    }, 2000);
+                } else {
+                    mostrarMensagem('Erro ao salvar: ' + (result.error || 'Erro desconhecido'), 'error');
+                }
+            } catch (error) {
+                mostrarMensagem('Erro de conexão: ' + error.message, 'error');
             }
         }
 
