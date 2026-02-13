@@ -11,7 +11,7 @@
                 extend: {
                     colors: {
                         'dark-primary': '#0F172A',
-                        'dark-secondary': '#1E293B',
+                        'dark-secondary': '#1E293B',A
                         'accent': '#10B981',
                         'secondary-accent': '#4F46E5',
                         'text-light': '#F8FAFC',
@@ -100,7 +100,7 @@
 
         async function carregarSalas() {
             try {
-                const response = await fetch('/api/salas');
+                const response = await fetch('/api/d_salas');
                 salasData = await response.json();
                 
                 const selects = document.querySelectorAll('.select-sala');
@@ -512,4 +512,5 @@
         </footer>
     </div>
 </body>
+
 </html>
