@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -36,14 +37,14 @@
 
     async function carregarSalas() {
       try {
-        const resp = await fetch("/api/d_salas");  // ALTERADO para /api/d_salas
+        const resp = await fetch("/api/d_salas");
         if (!resp.ok) throw new Error("Erro ao carregar salas");
-        const salas = await resp.json();
-        // A resposta pode vir com { ok: true, data: [...] } ou diretamente array
-        const listaSalas = salas.data || salas;
+        const data = await resp.json();
+        // A API pode retornar { data: [...] } ou diretamente o array
+        const salas = data.data || data;
         const select = document.getElementById("salaSelect");
         select.innerHTML = '<option value="">Selecione a Sala</option>';
-        listaSalas.forEach(s => {
+        salas.forEach(s => {
           select.innerHTML += `<option value="${s.id}">${s.nome}</option>`;
         });
       } catch (err) {
@@ -75,7 +76,7 @@
         const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
         if (!resp.ok) throw new Error("Erro ao carregar frequência");
         dadosFrequencia = await resp.json();
-        console.log("Dados recebidos:", dadosFrequencia); // Para depuração
+        console.log("Dados recebidos da API:", dadosFrequencia); // Depuração
         montarTabela(dadosFrequencia, parseInt(mes));
       } catch (e) {
         console.error(e);
@@ -96,7 +97,11 @@
         if (diaSemana !== 0 && diaSemana !== 6) dias.push(data);
       }
 
-      const alunos = Array.isArray(dados) && dados.length ? dados : [];
+      // Se não há dados, exibe mensagem
+      if (!dados || dados.length === 0) {
+        container.innerHTML = `<p class="text-gray-400 text-center py-8">Nenhum registro de frequência encontrado para este período.</p>`;
+        return;
+      }
 
       let html = `
         <div class="overflow-x-auto">
@@ -109,33 +114,29 @@
       });
       html += `</tr></thead><tbody>`;
 
-      if (alunos.length === 0) {
-        html += `<tr><td colspan="${dias.length + 1}" class="text-gray-400 py-4">Nenhum registro encontrado.</td></tr>`;
-      } else {
-        alunos.forEach(aluno => {
-          html += `<tr><td class="border border-gray-700 text-left px-2">${aluno.nome}</td>`;
-          dias.forEach(d => {
-            const dataKey = d.format("YYYY-MM-DD");
-            const freq = aluno.frequencia?.[dataKey] || {};
-            const status = freq.status || "";
-            
-            let cor = "text-gray-500 cursor-default";
-            let clickHandler = "";
-            
-            if (status === "P") {
-              cor = "text-green-500 font-bold cursor-default";
-            } else if (status === "F") {
-              cor = "text-red-500 font-bold cursor-default";
-            } else if (["PA", "PS", "PSA"].includes(status)) {
-              cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
-              clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
-            }
-            
-            html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
-          });
-          html += `</tr>`;
+      dados.forEach(aluno => {
+        html += `<tr><td class="border border-gray-700 text-left px-2">${aluno.nome}</td>`;
+        dias.forEach(d => {
+          const dataKey = d.format("YYYY-MM-DD");
+          const freq = aluno.frequencia?.[dataKey] || {};
+          const status = freq.status || "";
+          
+          let cor = "text-gray-500 cursor-default";
+          let clickHandler = "";
+          
+          if (status === "P") {
+            cor = "text-green-500 font-bold cursor-default";
+          } else if (status === "F") {
+            cor = "text-red-500 font-bold cursor-default";
+          } else if (["PA", "PS", "PSA"].includes(status)) {
+            cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
+            clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
+          }
+          
+          html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
         });
-      }
+        html += `</tr>`;
+      });
 
       html += `</tbody></table>
         <div class="mt-4 text-gray-400 text-sm text-left">
@@ -212,7 +213,6 @@
             </div>
           </div>
         `;
-        
         document.body.appendChild(modal);
         
       } catch (e) {
@@ -245,31 +245,217 @@
       document.body.appendChild(modal);
     }
 
+    // ========== FUNÇÃO GERAR PDF (VERSÃO COMPLETA) ==========
     async function gerarPDF() {
-      const sala = document.getElementById("salaSelect").value;
-      const mes = document.getElementById("mesSelect").value;
+      const btnGerarPDF = document.getElementById('btnGerarPDF');
+      const salaSelect = document.getElementById('salaSelect');
+      const mesSelect = document.getElementById('mesSelect');
+      const sala = salaSelect.value;
+      const mes = mesSelect.value;
+
       if (!sala || !mes) {
-        alert("Selecione a sala e o mês para gerar o PDF.");
+        alert('Selecione a sala e o mês para gerar o PDF.');
         return;
       }
 
-      try {
-        const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
-        if (!resp.ok) throw new Error("Erro ao carregar frequência");
-        const dadosFrequencia = await resp.json();
+      // Desabilitar botão durante a geração
+      btnGerarPDF.disabled = true;
+      btnGerarPDF.innerHTML = 'Gerando PDF...';
+      btnGerarPDF.classList.remove('bg-accent', 'hover:bg-green-600');
+      btnGerarPDF.classList.add('bg-gray-500', 'cursor-not-allowed');
 
-        if (!dadosFrequencia || dadosFrequencia.length === 0) {
-          alert("Não há dados de frequência para o período selecionado.");
+      try {
+        // Buscar dados da frequência
+        const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
+        if (!resp.ok) throw new Error('Erro ao carregar frequência');
+        const dados = await resp.json();
+
+        if (!dados || dados.length === 0) {
+          alert('Não há dados de frequência para o período selecionado.');
           return;
         }
 
-        // Chama a função de geração do PDF (já implementada no código anterior)
-        // ... (aqui você pode manter a função existente de gerarPDF, que é longa)
-        // Por brevidade, assumimos que ela está correta.
+        const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
+        const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
+        const ano = new Date().getFullYear();
 
-      } catch (e) {
-        console.error(e);
-        alert("Erro ao gerar PDF.");
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4"
+        });
+
+        // Calcular dias úteis do mês
+        const dias = [];
+        const totalDias = new Date(ano, parseInt(mes), 0).getDate();
+        for (let d = 1; d <= totalDias; d++) {
+          const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+          const diaSemana = data.day();
+          if (diaSemana !== 0 && diaSemana !== 6) {
+            dias.push({
+              data: data,
+              dia: d,
+              diaSemana: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][diaSemana]
+            });
+          }
+        }
+
+        // Configurações da planilha
+        const marginLeft = 15;
+        const marginRight = 15;
+        const marginTop = 15;
+        const marginBottom = 20;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const contentWidth = pageWidth - marginLeft - marginRight;
+
+        // Larguras das colunas
+        const nomeColWidth = 80; // Aumentado para caber nomes
+        const diaColWidth = 6;   // 6mm por dia
+
+        // Cabeçalho
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("RELATÓRIO DE FREQUÊNCIA ESCOLAR", pageWidth / 2, marginTop, { align: "center" });
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Sala: ${salaNome}`, marginLeft, marginTop + 10);
+        doc.text(`Período: ${mesNome}/${ano}`, marginLeft, marginTop + 16);
+        doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - marginRight, marginTop + 10, { align: "right" });
+        doc.text(`Escola: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO`, pageWidth - marginRight, marginTop + 16, { align: "right" });
+
+        // Linha divisória
+        doc.setDrawColor(100, 100, 100);
+        doc.line(marginLeft, marginTop + 22, pageWidth - marginRight, marginTop + 22);
+
+        // Iniciar tabela
+        let currentY = marginTop + 28;
+        const lineHeight = 6;
+
+        // Cabeçalho da tabela
+        doc.setFillColor(30, 64, 175);
+        doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text("ALUNO", marginLeft + 3, currentY + lineHeight/2 + 1);
+
+        dias.forEach((dia, index) => {
+          const xPos = marginLeft + nomeColWidth + (index * diaColWidth);
+          doc.setFillColor(30, 64, 175);
+          doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+          doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
+        });
+
+        currentY += lineHeight;
+
+        // Dados dos alunos
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+
+        dados.forEach((aluno, alunoIndex) => {
+          // Alternar cores das linhas
+          if (alunoIndex % 2 === 0) {
+            doc.setFillColor(245, 245, 245);
+          } else {
+            doc.setFillColor(255, 255, 255);
+          }
+          doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
+
+          // Nome do aluno (truncar se necessário)
+          let nomeAluno = aluno.nome;
+          if (nomeAluno.length > 35) {
+            nomeAluno = nomeAluno.substring(0, 35) + '...';
+          }
+          doc.text(nomeAluno, marginLeft + 3, currentY + lineHeight/2 + 1);
+
+          dias.forEach((dia, diaIndex) => {
+            const xPos = marginLeft + nomeColWidth + (diaIndex * diaColWidth);
+            const dataKey = dia.data.format("YYYY-MM-DD");
+            const freq = aluno.frequencia?.[dataKey] || {};
+            const status = freq.status || "";
+
+            // Cor de fundo da célula
+            doc.setFillColor(alunoIndex % 2 === 0 ? 245 : 255, alunoIndex % 2 === 0 ? 245 : 255, alunoIndex % 2 === 0 ? 245 : 255);
+            doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+
+            // Cor do texto baseada no status
+            if (status === "P") {
+              doc.setTextColor(0, 128, 0);
+            } else if (status === "F") {
+              doc.setTextColor(255, 0, 0);
+            } else if (["PA", "PS", "PSA"].includes(status)) {
+              doc.setTextColor(255, 140, 0);
+            } else {
+              doc.setTextColor(100, 100, 100);
+            }
+
+            // Centralizar o status
+            doc.text(status, xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
+
+            // Borda da célula
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(xPos, currentY, diaColWidth, lineHeight);
+          });
+
+          // Borda da coluna do nome
+          doc.setDrawColor(200, 200, 200);
+          doc.rect(marginLeft, currentY, nomeColWidth, lineHeight);
+
+          currentY += lineHeight;
+
+          // Verificar se precisa de nova página
+          if (currentY + lineHeight > pageHeight - marginBottom) {
+            doc.addPage();
+            currentY = marginTop;
+
+            // Recriar cabeçalho na nova página
+            doc.setFillColor(30, 64, 175);
+            doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(9);
+            doc.text("ALUNO", marginLeft + 3, currentY + lineHeight/2 + 1);
+
+            dias.forEach((dia, index) => {
+              const xPos = marginLeft + nomeColWidth + (index * diaColWidth);
+              doc.setFillColor(30, 64, 175);
+              doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
+              doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
+            });
+
+            currentY += lineHeight;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(0, 0, 0);
+          }
+        });
+
+        // Legenda
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Legenda: P = Presença | F = Falta | PA = Atraso | PS = Saída Antecipada | PSA = Atraso + Saída",
+                 marginLeft, pageHeight - marginBottom + 5);
+
+        // Estatísticas
+        doc.text(`Total de Alunos: ${dados.length} | Dias Úteis: ${dias.length}`,
+                 pageWidth - marginRight, pageHeight - marginBottom + 5, { align: "right" });
+
+        // Salvar PDF
+        const fileName = `relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`;
+        doc.save(fileName);
+        alert('PDF gerado com sucesso!');
+
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        alert('Erro ao gerar PDF. Tente novamente.');
+      } finally {
+        // Reabilitar botão
+        btnGerarPDF.disabled = false;
+        btnGerarPDF.innerHTML = 'Gerar PDF';
+        btnGerarPDF.classList.remove('bg-gray-500', 'cursor-not-allowed');
+        btnGerarPDF.classList.add('bg-accent', 'hover:bg-green-600');
       }
     }
   </script>
