@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Tecnologia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-primary': '#0F172A',
+                        'dark-secondary': '#1E293B',
+                        'accent': '#10B981',
+                        'secondary-accent': '#4F46E5',
+                        'text-light': '#F8FAFC',
+                        'danger': '#DC2626',
+                        'warning': '#F59E0B',
+                        'info': '#3B82F6',
+                        'tech-color': '#5C6BC0'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+
+        let moduloAtual = 'menu';
+        let professoresData = [];
+        let salasData = [];
+        let equipamentosData = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await carregarProfessores();
+            await carregarSalas();
+            mostrarModulo('menu');
+        });
+
+        function mostrarModulo(modulo) {
+            moduloAtual = modulo;
+            
+            // Esconder todos os módulos
+            document.querySelectorAll('[id^="modulo-"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Mostrar módulo selecionado
+            document.getElementById(`modulo-${modulo}`).classList.remove('hidden');
+            
+            // Atualizar botões de navegação
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-tech-color', 'text-white');
+                btn.classList.add('bg-gray-700', 'text-gray-300');
+            });
+            
+            const btnAtivo = document.querySelector(`[onclick="mostrarModulo('${modulo}')"]`);
+            if (btnAtivo) {
+                btnAtivo.classList.add('bg-tech-color', 'text-white');
+                btnAtivo.classList.remove('bg-gray-700', 'text-gray-300');
+            }
+        }
+
+        function mostrarMsg(msg, tipo = 'info') {
+            const el = document.getElementById('global-message');
+            if (!el) return;
+            
+            el.textContent = msg;
+            el.className = 'p-3 rounded mt-4 text-white font-bold fixed top-4 right-4 z-50 max-w-sm';
+            el.style.display = 'block';
+            el.classList.remove('bg-danger', 'bg-accent', 'bg-tech-color', 'bg-warning');
+            
+            if (tipo === 'danger') el.classList.add('bg-danger');
+            else if (tipo === 'accent') el.classList.add('bg-accent');
+            else if (tipo === 'tech') el.classList.add('bg-tech-color');
+            else if (tipo === 'warning') el.classList.add('bg-warning');
+            else el.classList.add('bg-secondary-accent');
+            
+            setTimeout(() => el.style.display = 'none', 5000);
+        }
+
+        async function carregarProfessores() {
+            try {
+                const response = await fetch('/api/funcionarios');
+                professoresData = await response.json();
+                
+                const selects = document.querySelectorAll('.select-professor');
+                selects.forEach(select => {
+                    select.innerHTML = '<option value="">Selecione o Professor</option>';
+                    professoresData.forEach(prof => {
+                        select.innerHTML += `<option value="${prof.id}">${prof.nome}</option>`;
+                    });
+                });
+            } catch (error) {
+                console.error('Erro ao carregar professores:', error);
+                mostrarMsg('Erro ao carregar professores', 'danger');
+            }
+        }
+
+        async function carregarSalas() {
+            try {
+                const response = await fetch('/api/salas');
+                salasData = await response.json();
+                
+                const selects = document.querySelectorAll('.select-sala');
+                selects.forEach(select => {
+                    select.innerHTML = '<option value="">Selecione a Sala</option>';
+                    salasData.forEach(sala => {
+                        select.innerHTML += `<option value="${sala.id}">${sala.nome}</option>`;
+                    });
+                });
+            } catch (error) {
+                console.error('Erro ao carregar salas:', error);
+                mostrarMsg('Erro ao carregar salas', 'danger');
+            }
+        }
+
+        // ========== MÓDULO AGENDAMENTO ==========
+        async function salvarAgendamento(event) {
+            event.preventDefault();
+            
+            const formData = {
+                professor_id: document.getElementById('professor-agendamento').value,
+                sala_id: document.getElementById('sala-agendamento').value,
+                data_uso: document.getElementById('data-agendamento').value,
+                aula_id: document.getElementById('aula-agendamento').value,
+                quantidade: document.getElementById('quantidade-agendamento').value
+            };
+
+            if (!formData.professor_id || !formData.sala_id || !formData.data_uso || !formData.aula_id || !formData.quantidade) {
+                mostrarMsg('Preencha todos os campos', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/agendar_equipamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg('Agendamento realizado com sucesso!', 'tech');
+                    document.getElementById('form-agendamento').reset();
+                } else {
+                    mostrarMsg(result.error || 'Erro ao agendar', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
+        // ========== MÓDULO RECEBIMENTO/DEVOLUÇÃO ==========
+        async function carregarAgendamentosPendentes() {
+            const professorId = document.getElementById('professor-recebimento').value;
+            if (!professorId) return;
+
+            try {
+                const response = await fetch(`/api/agendamentos_pendentes/${professorId}`);
+                const agendamentos = await response.json();
+                
+                const select = document.getElementById('agendamento-recebimento');
+                select.innerHTML = '<option value="">Selecione o Agendamento</option>';
+                agendamentos.forEach(ag => {
+                    select.innerHTML += `<option value="${ag.id}">${ag.data_uso} - ${ag.sala_nome} (${ag.quantidade} eq.)</option>`;
+                });
+                select.disabled = false;
+            } catch (error) {
+                console.error('Erro ao carregar agendamentos:', error);
+                mostrarMsg('Erro ao carregar agendamentos', 'danger');
+            }
+        }
+
+        async function finalizarRetirada() {
+            const agendamentoId = document.getElementById('agendamento-recebimento').value;
+            if (!agendamentoId) {
+                mostrarMsg('Selecione um agendamento', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/finalizar_retirada_equipamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agendamento_id: agendamentoId })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg('Retirada finalizada com sucesso!', 'tech');
+                    carregarAgendamentosPendentes();
+                } else {
+                    mostrarMsg(result.error || 'Erro ao finalizar retirada', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
+        async function finalizarDevolucao() {
+            const agendamentoId = document.getElementById('agendamento-recebimento').value;
+            if (!agendamentoId) {
+                mostrarMsg('Selecione um agendamento', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/finalizar_devolucao_equipamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agendamento_id: agendamentoId })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg('Devolução finalizada com sucesso!', 'tech');
+                    carregarAgendamentosPendentes();
+                } else {
+                    mostrarMsg(result.error || 'Erro ao finalizar devolução', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
+        // ========== MÓDULO OCORRÊNCIAS ==========
+        async function salvarOcorrencia(event) {
+            event.preventDefault();
+            
+            const formData = {
+                equipamento_id: document.getElementById('equipamento-ocorrencia').value,
+                professor_id: document.getElementById('professor-ocorrencia').value,
+                data_ocorrencia: document.getElementById('data-ocorrencia').value,
+                descricao: document.getElementById('descricao-ocorrencia').value,
+                acao: document.getElementById('acao-ocorrencia').value
+            };
+
+            if (!formData.equipamento_id || !formData.professor_id || !formData.data_ocorrencia || !formData.descricao) {
+                mostrarMsg('Preencha todos os campos obrigatórios', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/registrar_ocorrencia_equipamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg('Ocorrência registrada com sucesso!', 'tech');
+                    document.getElementById('form-ocorrencia').reset();
+                } else {
+                    mostrarMsg(result.error || 'Erro ao registrar ocorrência', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark-primary text-text-light min-h-screen">
+    <div id="global-message" style="display: none;"></div>
+    
+    <div class="container mx-auto p-4">
+        <header class="text-center mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold text-tech-color mb-2">SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
+            <h2 class="text-xl sm:text-2xl text-text-light font-light border-b border-gray-700 pb-2 inline-block">MÓDULO DE GESTÃO DE TECNOLOGIA</h2>
+            <div class="mt-4 flex flex-wrap justify-center gap-4">
+                <button onclick="window.location.href='/'" class="border border-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg text-gray-300 transition">Voltar ao Menu Principal</button>
+            </div>
+        </header>
+
+        <!-- Menu de Navegação -->
+        <div class="bg-dark-secondary p-6 rounded-lg shadow-lg mb-6">
+            <h3 class="text-lg font-semibold mb-4 text-tech-color">Navegação</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <button onclick="mostrarModulo('agendamento')" class="nav-btn bg-tech-color text-white px-4 py-3 rounded-lg font-semibold transition">
+                    Agendamento
+                </button>
+                <button onclick="mostrarModulo('recebimento')" class="nav-btn bg-gray-700 text-gray-300 px-4 py-3 rounded-lg font-semibold transition hover:bg-gray-600">
+                    Recebimento/Devolução
+                </button>
+                <button onclick="mostrarModulo('ocorrencias')" class="nav-btn bg-gray-700 text-gray-300 px-4 py-3 rounded-lg font-semibold transition hover:bg-gray-600">
+                    Ocorrências
+                </button>
+                <button onclick="mostrarModulo('historico')" class="nav-btn bg-gray-700 text-gray-300 px-4 py-3 rounded-lg font-semibold transition hover:bg-gray-600">
+                    Histórico
+                </button>
+            </div>
+        </div>
+
+        <!-- Área de Conteúdo dos Módulos -->
+        <div id="area-conteudo">
+            
+            <!-- Módulo Menu Principal -->
+            <div id="modulo-menu" class="bg-dark-secondary rounded-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <button onclick="mostrarModulo('agendamento')" 
+                            class="flex flex-col items-center justify-center p-6 text-xl font-bold bg-tech-color hover:bg-indigo-700 transition duration-200 ease-in-out rounded-lg shadow-xl transform hover:scale-[1.03] text-white">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        AGENDAMENTO
+                        <span class="text-sm font-light opacity-80 mt-2">Agendar equipamentos</span>
+                    </button>
+                    
+                    <button onclick="mostrarModulo('recebimento')" 
+                            class="flex flex-col items-center justify-center p-6 text-xl font-bold bg-accent hover:bg-emerald-600 transition duration-200 ease-in-out rounded-lg shadow-xl transform hover:scale-[1.03] text-white">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        RECEBIMENTO
+                        <span class="text-sm font-light opacity-80 mt-2">Retirar/devolver equipamentos</span>
+                    </button>
+                    
+                    <button onclick="mostrarModulo('ocorrencias')" 
+                            class="flex flex-col items-center justify-center p-6 text-xl font-bold bg-warning hover:bg-amber-600 transition duration-200 ease-in-out rounded-lg shadow-xl transform hover:scale-[1.03] text-white">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        OCORRÊNCIAS
+                        <span class="text-sm font-light opacity-80 mt-2">Registrar problemas</span>
+                    </button>
+
+                    <button onclick="mostrarModulo('historico')" 
+                            class="flex flex-col items-center justify-center p-6 text-xl font-bold bg-info hover:bg-blue-600 transition duration-200 ease-in-out rounded-lg shadow-xl transform hover:scale-[1.03] text-white">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        HISTÓRICO
+                        <span class="text-sm font-light opacity-80 mt-2">Consultar registros</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Módulo Agendamento -->
+            <div id="modulo-agendamento" class="hidden bg-dark-secondary rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold mb-6 text-tech-color">AGENDAMENTO DE EQUIPAMENTOS</h3>
+                
+                <form id="form-agendamento" onsubmit="salvarAgendamento(event)" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Professor</label>
+                            <select id="professor-agendamento" class="select-professor w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                                <option value="">Selecione o Professor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Sala de Uso</label>
+                            <select id="sala-agendamento" class="select-sala w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                                <option value="">Selecione a Sala</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Data de Uso</label>
+                            <input type="date" id="data-agendamento" class="w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Aula/Período</label>
+                            <select id="aula-agendamento" class="w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                                <option value="">Selecione a Aula</option>
+                                <option value="1">Aula 1 (08:00-08:50)</option>
+                                <option value="2">Aula 2 (08:50-09:40)</option>
+                                <option value="3">Aula 3 (09:40-10:30)</option>
+                                <option value="4">Aula 4 (10:30-11:20)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Quantidade de Equipamentos</label>
+                        <input type="number" id="quantidade-agendamento" min="1" max="80" class="w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                    </div>
+
+                    <button type="submit" class="w-full bg-tech-color hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                        AGENDAR EQUIPAMENTOS
+                    </button>
+                </form>
+            </div>
+
+            <!-- Módulo Recebimento/Devolução -->
+            <div id="modulo-recebimento" class="hidden bg-dark-secondary rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold mb-6 text-tech-color">RECEBIMENTO E DEVOLUÇÃO</h3>
+                
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Professor</label>
+                            <select id="professor-recebimento" class="select-professor w-full p-3 bg-gray-800 rounded border border-gray-700" 
+                                    onchange="carregarAgendamentosPendentes()" required>
+                                <option value="">Selecione o Professor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Agendamento Pendente</label>
+                            <select id="agendamento-recebimento" class="w-full p-3 bg-gray-800 rounded border border-gray-700" disabled>
+                                <option value="">Selecione o Agendamento</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="finalizarRetirada()" class="bg-accent hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                            CONFIRMAR RECEBIMENTO
+                        </button>
+                        <button onclick="finalizarDevolucao()" class="bg-warning hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                            FINALIZAR DEVOLUÇÃO
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo Ocorrências -->
+            <div id="modulo-ocorrencias" class="hidden bg-dark-secondary rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold mb-6 text-tech-color">REGISTRO DE OCORRÊNCIAS</h3>
+                
+                <form id="form-ocorrencia" onsubmit="salvarOcorrencia(event)" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Equipamento</label>
+                            <select id="equipamento-ocorrencia" class="w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                                <option value="">Selecione o Equipamento</option>
+                                <!-- Equipamentos seriam carregados via API -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Professor Responsável</label>
+                            <select id="professor-ocorrencia" class="select-professor w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                                <option value="">Selecione o Professor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Data da Ocorrência</label>
+                            <input type="date" id="data-ocorrencia" class="w-full p-3 bg-gray-800 rounded border border-gray-700" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Hora da Ocorrência</label>
+                            <input type="time" id="hora-ocorrencia" class="w-full p-3 bg-gray-800 rounded border border-gray-700">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Descrição do Problema</label>
+                        <textarea id="descricao-ocorrencia" rows="4" class="w-full p-3 bg-gray-800 rounded border border-gray-700" 
+                                  placeholder="Descreva o problema encontrado..." required></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Ação Tomada</label>
+                        <textarea id="acao-ocorrencia" rows="3" class="w-full p-3 bg-gray-800 rounded border border-gray-700" 
+                                  placeholder="Descreva as ações tomadas..."></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-tech-color hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                        REGISTRAR OCORRÊNCIA
+                    </button>
+                </form>
+            </div>
+
+            <!-- Módulo Histórico -->
+            <div id="modulo-historico" class="hidden bg-dark-secondary rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold mb-6 text-tech-color">HISTÓRICO DE EQUIPAMENTOS</h3>
+                
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Filtrar por Professor</label>
+                            <select class="select-professor w-full p-3 bg-gray-800 rounded border border-gray-700">
+                                <option value="">Todos os professores</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Data Início</label>
+                            <input type="date" class="w-full p-3 bg-gray-800 rounded border border-gray-700">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Data Fim</label>
+                            <input type="date" class="w-full p-3 bg-gray-800 rounded border border-gray-700">
+                        </div>
+                    </div>
+
+                    <div class="bg-dark-primary p-6 rounded-lg">
+                        <h4 class="text-lg font-bold text-accent mb-4">REGISTROS RECENTES</h4>
+                        <p class="text-center text-gray-400">Histórico de agendamentos e ocorrências será carregado aqui.</p>
+                        <!-- Tabela de histórico seria implementada aqui -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
+            <p class="mb-1 text-base font-medium">DESENVOLVEDOR: MARCELO CARDES E LUIS FELIPE CARDES</p>
+            <p class="text-xs font-light tracking-wide">LICENCIADO COMO TESTE PARA E.E. PEI PROFESSORA IRENE DIAS</p>
+        </footer>
+    </div>
+</body>
+</html>

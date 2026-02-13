@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema Escolar - Menu e Informativos</title>
+  <title>Sistema Escolar - Menu Principal</title>
   <script src="https://cdn.tailwindcss.com"></script>
 
   <script>
@@ -32,175 +32,88 @@
       margin: 0; 
       min-height: 100vh; 
       display: flex; 
+      align-items: center;
+      justify-content: center;
       background-color: #0F172A; 
       color: #F8FAFC; 
     }
-    .info-card { 
-      @apply rounded-xl p-5 shadow-lg flex items-start space-x-3; 
-      background-color: rgba(55, 65, 81, 0.5);
-      border-left: 4px solid #9CA3AF;
-    }
-    .info-icon { @apply text-2xl mt-1; }
-    .info-text h3 { @apply text-lg font-semibold; }
-    .info-text p { @apply text-sm text-gray-200 mt-1; }
-    footer { font-size: 0.8rem; color: #94A3B8; text-align: center; margin-top: 2rem; }
     .menu-button { 
-      padding: 0.75rem; 
-      font-weight: bold; 
-      border-radius: 0.5rem; 
+      padding: 1rem 1.5rem; 
+      font-weight: 600; 
+      border-radius: 0.75rem; 
       transition: all 0.2s; 
       border: none;
       cursor: pointer;
-    }
-    .menu-button:enabled:hover { transform: scale(1.05); }
-    .menu-button:disabled { 
-      background-color: #4B5563 !important;
-      color: #9CA3B8 !important;
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    @media (min-width: 1024px) {
-      .menu-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    }
-    .empty-state {
-      text-align: center;
-      padding: 2rem;
-      color: #94A3B8;
-    }
-    .coming-soon {
-      position: relative;
-    }
-    .coming-soon::after {
-      content: "EM BREVE";
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: #FACC15;
+      background-color: #34D399;
       color: #0F172A;
-      font-size: 0.6rem;
-      padding: 2px 6px;
-      border-radius: 10px;
-      font-weight: bold;
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .menu-button:hover { 
+      transform: scale(1.02); 
+      background-color: #2ecc71;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    }
+    footer { 
+      font-size: 0.8rem; 
+      color: #94A3B8; 
+      text-align: center; 
+      margin-top: 3rem; 
+    }
+    .menu-container {
+      background-color: #1E293B;
+      border-radius: 2rem;
+      padding: 2.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      border: 1px solid #334155;
     }
   </style>
 </head>
 
 <body>
+  <div class="w-full max-w-6xl px-4 py-8">
+    <div class="menu-container">
+      <h1 class="text-2xl md:text-3xl font-extrabold text-accent mb-2 text-center">
+        SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
+      </h1>
+      <h2 class="text-sm text-gray-400 mb-8 text-center">
+        MENU PRINCIPAL
+      </h2>
 
-  <!-- LADO ESQUERDO: Lista de Informativos -->
-  <div class="flex-1 flex flex-col justify-start px-8 py-8 lg:px-16 bg-dark-primary">
-    <div class="max-w-3xl mx-auto w-full">
-      <h1 class="text-3xl font-extrabold text-info mb-6">INFORMATIVO IDR</h1>
-      <div id="lista-informativos" class="space-y-4">
-        <div class="empty-state">
-          <p>Carregando informativos...</p>
-        </div>
-      </div>
-
-      <footer class="mt-12">
-        © 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes
-      </footer>
-    </div>
-  </div>
-
-  <!-- LADO DIREITO: Menu Principal -->
-  <div class="w-full lg:w-[320px] flex flex-col justify-start items-center bg-dark-secondary p-6 shadow-2xl border-l border-gray-700">
-    <div class="w-full max-w-xs text-center">
-      <h1 class="text-lg font-bold text-accent mb-2">SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
-      <h2 class="text-sm text-gray-400 mb-4">MENU PRINCIPAL</h2>
-
-      <div class="grid grid-cols-1 gap-3">
-        <!-- Botão OCORRÊNCIAS - HABILITADO -->
-        <button onclick="window.location.href='/gestao_ocorrencia'" 
-                class="menu-button bg-accent text-white w-full">
+      <!-- Grid profissional de botões -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- GESTÃO DE OCORRÊNCIA -->
+        <button onclick="window.location.href='/gestao_ocorrencia'" class="menu-button">
           GESTÃO DE OCORRÊNCIA
         </button>
-	
-	<!-- Botão FREQUÊNCIA - AGORA HABILITADO -->
-	<button onclick="window.location.href='/gestao_frequencia'" 
-       		class="menu-button bg-accent text-white w-full">
-  	  GESTÃO DE FREQUÊNCIA
-	</button>
 
-        <!-- Botões DESABILITADOS -->
-        
-        <button disabled class="menu-button bg-info text-white w-full coming-soon">
+        <!-- GESTÃO DE FREQUÊNCIA -->
+        <button onclick="window.location.href='/gestao_frequencia'" class="menu-button">
+          GESTÃO DE FREQUÊNCIA
+        </button>
+
+        <!-- GESTÃO DE TECNOLOGIA (agora habilitado) -->
+        <button onclick="window.location.href='/gestao_tecnologia'" class="menu-button">
           GESTÃO DE TECNOLOGIA
         </button>
 
-        <button disabled class="menu-button bg-info text-white w-full coming-soon">
+        <!-- GESTÃO DE TUTORIA (agora habilitado) -->
+        <button onclick="window.location.href='/gestao_tutoria'" class="menu-button">
           GESTÃO DE TUTORIA
         </button>
 
-        <button disabled class="menu-button bg-danger text-white w-full coming-soon">
-          GESTÃO DE AULAS
-        </button>
-
-        <button disabled class="menu-button bg-danger text-white w-full coming-soon">
+        <!-- CADASTRO (agora habilitado) -->
+        <button onclick="window.location.href='/cadastro'" class="menu-button">
           CADASTRO
         </button>
       </div>
 
-  <script>
-    async function carregarInformativos() {
-      try {
-        const response = await fetch('/api/informativos');
-        const informativos = await response.json();
-
-        const lista = document.getElementById('lista-informativos');
-        
-        if (!response.ok) {
-          throw new Error('Erro ao carregar informativos');
-        }
-
-        if (informativos.length === 0) {
-          lista.innerHTML = `
-            <div class="empty-state">
-              <p>Nenhum informativo publicado ainda.</p>
-            </div>
-          `;
-          return;
-        }
-
-        lista.innerHTML = '';
-        
-        informativos.forEach(item => {
-          const data = new Date(item.criado_em);
-          const dataFormatada = data.toLocaleDateString('pt-BR');
-          const horaFormatada = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          
-          const card = document.createElement('div');
-          card.className = "info-card";
-          card.innerHTML = `
-            <span class="info-icon">📢</span>
-            <div class="info-text flex-1">
-              <h3>${item.titulo}</h3>
-              <p>${item.mensagem}</p>
-              <div class="text-xs text-gray-400 mt-2">
-                ${dataFormatada} às ${horaFormatada}
-                ${item.autor ? `· Por ${item.autor}` : ''}
-              </div>
-            </div>`;
-          lista.appendChild(card);
-        });
-
-      } catch (error) {
-        console.error('Erro:', error);
-        const lista = document.getElementById('lista-informativos');
-        lista.innerHTML = `
-          <div class="empty-state">
-            <p>Erro ao carregar informativos. Tente recarregar a página.</p>
-          </div>
-        `;
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', carregarInformativos);
-    
-    // Recarregar informativos a cada 30 segundos
-    setInterval(carregarInformativos, 30000);
-  </script>
+      <footer>
+        © 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes
+      </footer>
+    </div>
+  </div>
 </body>
-
 </html>
-
