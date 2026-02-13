@@ -75,8 +75,17 @@
       try {
         const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
         if (!resp.ok) throw new Error("Erro ao carregar frequência");
-        dadosFrequencia = await resp.json();
-        console.log("Dados recebidos da API:", dadosFrequencia); // Depuração
+        const data = await resp.json();
+        console.log("Dados recebidos da API:", data); // DEPURAÇÃO
+
+        // Se a resposta for um objeto com campo 'data', use data.data, senão use diretamente
+        const dadosFrequencia = data.data || data;
+
+        if (!dadosFrequencia || dadosFrequencia.length === 0) {
+          document.getElementById("tabelaContainer").innerHTML = '<p class="text-gray-400 text-center py-8">Nenhum registro de frequência encontrado para este período.</p>';
+          return;
+        }
+
         montarTabela(dadosFrequencia, parseInt(mes));
       } catch (e) {
         console.error(e);
@@ -95,12 +104,6 @@
         const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
         const diaSemana = data.day();
         if (diaSemana !== 0 && diaSemana !== 6) dias.push(data);
-      }
-
-      // Se não há dados, exibe mensagem
-      if (!dados || dados.length === 0) {
-        container.innerHTML = `<p class="text-gray-400 text-center py-8">Nenhum registro de frequência encontrado para este período.</p>`;
-        return;
       }
 
       let html = `
@@ -268,7 +271,8 @@
         // Buscar dados da frequência
         const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
         if (!resp.ok) throw new Error('Erro ao carregar frequência');
-        const dados = await resp.json();
+        const data = await resp.json();
+        const dados = data.data || data;
 
         if (!dados || dados.length === 0) {
           alert('Não há dados de frequência para o período selecionado.');
