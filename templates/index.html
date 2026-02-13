@@ -5,27 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema Escolar - Menu Principal</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'dark-primary': '#0F172A',
-            'dark-secondary': '#1E293B',
-            'accent': '#34D399',
-            'info': '#60A5FA',
-            'danger': '#F87171',
-            'warning': '#FACC15',
-            'text-light': '#F8FAFC',
-            'disabled': '#4B5563',
-          },
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-        },
-      },
-    }
-  </script>
-
   <style>
     body { 
       font-family: 'Inter', sans-serif; 
@@ -71,45 +50,32 @@
     }
   </style>
 </head>
-
 <body>
   <div class="w-full max-w-6xl px-4 py-8">
     <div class="menu-container">
-      <h1 class="text-2xl md:text-3xl font-extrabold text-accent mb-2 text-center">
+      <h1 class="text-2xl md:text-3xl font-extrabold mb-2 text-center" style="color: #34D399;">
         SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
       </h1>
       <h2 class="text-sm text-gray-400 mb-8 text-center">
         MENU PRINCIPAL
       </h2>
-
-      <!-- Grid profissional de botões -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <!-- GESTÃO DE OCORRÊNCIA -->
         <button onclick="window.location.href='/gestao_ocorrencia'" class="menu-button">
           GESTÃO DE OCORRÊNCIA
         </button>
-
-        <!-- GESTÃO DE FREQUÊNCIA -->
         <button onclick="window.location.href='/gestao_frequencia'" class="menu-button">
           GESTÃO DE FREQUÊNCIA
         </button>
-
-        <!-- GESTÃO DE TECNOLOGIA (agora habilitado) -->
         <button onclick="window.location.href='/gestao_tecnologia'" class="menu-button">
           GESTÃO DE TECNOLOGIA
         </button>
-
-        <!-- GESTÃO DE TUTORIA (agora habilitado) -->
         <button onclick="window.location.href='/gestao_tutoria'" class="menu-button">
           GESTÃO DE TUTORIA
         </button>
-
-        <!-- CADASTRO (agora habilitado) -->
-        <button onclick="window.location.href='/cadastro'" class="menu-button">
+        <button onclick="window.location.href='/gestao_cadastro'" class="menu-button">
           CADASTRO
         </button>
       </div>
-
       <footer>
         © 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes
       </footer>
