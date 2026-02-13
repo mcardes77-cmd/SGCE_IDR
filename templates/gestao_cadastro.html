@@ -19,7 +19,7 @@
                         'secondary-accent': '#3B82F6',
                         'alert-warning': '#F59E0B',
                         'alert-danger': '#DC2626',
-                        'purple-accent': '#8B5CF6' // Adicionado para manter o estilo do código anterior
+                        'purple-accent': '#8B5CF6'
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -29,10 +29,6 @@
         };
 
         let moduloAtual = 'menu';
-        
-        // Estruturas de dados globais (Simulando o Banco de Dados)
-        let usuarios = []; 
-        let equipamentos = [];
         
         // Funções disponíveis
         const funcoesUsuario = [
@@ -51,7 +47,6 @@
         ];
 
         document.addEventListener('DOMContentLoaded', async () => {
-            carregarDadosIniciais();
             mostrarModulo('menu');
             configurarModulosCadastro();
             
@@ -66,29 +61,13 @@
                             else if (id === 'clubes') carregarTabelaClubes();
                             else if (id === 'disciplinas') carregarTabelaDisciplinas();
                             else if (id === 'eletivas') carregarTabelaEletivas();
-                            else if (id === 'equipamento') carregarTabelaEquipamentos(); // NOVO
-                            else if (id === 'usuario') carregarTabelaUsuarios(); // NOVO
+                            else if (id === 'equipamento') carregarTabelaEquipamentos();
+                            else if (id === 'usuario') carregarTabelaUsuarios();
                         }
                     });
                 }).observe(modulo, { attributes: true });
             });
         });
-
-        function carregarDadosIniciais() {
-            // Dados de USUÁRIOS (Tutores e Funcionários)
-            usuarios = [
-                { id: 1, nome: "MARIA SANTOS SILVA", funcao: "TUTOR/PROFESSOR", data_nascimento: "1985-05-20", telefone: "(11) 99999-8888" },
-                { id: 2, nome: "JOAO PEREIRA", funcao: "TUTOR/PROFESSOR", data_nascimento: "1980-08-15", telefone: "(11) 98888-7777" },
-                { id: 3, nome: "ANA COSTA", funcao: "SECRETÁRIO(A)", data_nascimento: "1990-01-10", telefone: "(11) 97777-6666" },
-                { id: 4, nome: "CARLOS ALVES", funcao: "COORDENADOR(A)", data_nascimento: "1975-12-05", telefone: "(11) 96666-5555" }
-            ];
-            
-            // Dados de EQUIPAMENTOS
-            equipamentos = [
-                { id: 1, nome: "DATASHOW SALA 01", patrimonio: "123456", estado: "DISPONÍVEL" },
-                { id: 2, nome: "NOTEBOOK LAB INFO 03", patrimonio: "654321", estado: "EM MANUTENÇÃO" }
-            ];
-        }
 
         function mostrarModulo(modulo) {
             moduloAtual = modulo;
@@ -134,8 +113,8 @@
             configurarModuloClubes();
             configurarModuloDisciplinas();
             configurarModuloEletivas();
-            configurarModuloEquipamento(); // NOVO
-            configurarModuloUsuario(); // NOVO
+            configurarModuloEquipamento();
+            configurarModuloUsuario();
         }
         
         // Função para normalizar texto (maiúsculas e sem acentos)
@@ -153,69 +132,63 @@
             });
         });
 
-        // ========== MÓDULO TUTORES (AJUSTADO) ==========
+        // ========== MÓDULO TUTORES ==========
         function configurarModuloTutores() {
-            const btnSalvar = document.getElementById('btn-salvar-tutor');
-            if (btnSalvar) {
-                // Removido listener pois a funcionalidade de cadastro foi para o módulo USUÁRIO
-                // Este módulo agora é apenas para consulta e ações específicas do tutor, se houver.
-            }
-            carregarDisciplinasTutor(); // Mantido para carregar o select (exemplo)
+            carregarDisciplinasTutor();
         }
 
         async function carregarDisciplinasTutor() {
             const selectDisciplina = document.getElementById('input-disciplina-tutor');
-            const disciplinas = [
-                { nome: "MATEMATICA" }, { nome: "PORTUGUES" }, { nome: "CIENCIAS" }, 
-                { nome: "HISTORIA" }, { nome: "GEOGRAFIA" }, { nome: "INGLES" }, 
-                { nome: "EDUCACAO FISICA" }, { nome: "ARTES" }
-            ];
-            
-            selectDisciplina.innerHTML = '<option value="">SELECIONE A DISCIPLINA</option>';
-            disciplinas.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(disc => {
-                selectDisciplina.innerHTML += `<option value="${disc.nome}">${disc.nome}</option>`;
-            });
+            try {
+                const response = await fetch('/api/disciplinas');
+                const disciplinas = await response.json();
+                selectDisciplina.innerHTML = '<option value="">SELECIONE A DISCIPLINA</option>';
+                disciplinas.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(disc => {
+                    selectDisciplina.innerHTML += `<option value="${disc.nome}">${disc.nome}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar disciplinas:', error);
+            }
         }
         
         async function carregarTabelaTutores() {
             const tableBody = document.getElementById('tutors-table-body');
-            
-            // FILTRA APENAS USUÁRIOS COM FUNÇÃO TUTOR/PROFESSOR
-            const tutores = usuarios.filter(u => u.funcao === 'TUTOR/PROFESSOR');
-            
-            tableBody.innerHTML = '';
-            
-            if (tutores.length === 0) {
-                 tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">NENHUM TUTOR CADASTRADO. USE A ABA "USUÁRIO" PARA CADASTRAR.</td></tr>';
-                 return;
-            }
-            
-            tutores.forEach(tutor => {
-                const dataNasc = tutor.data_nascimento ? new Date(tutor.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
-                // A disciplina não está salva no objeto principal 'usuario', mas a função está
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
-                    <td class="p-3 font-semibold text-text-light">${tutor.nome}</td>
-                    <td class="p-3 text-center">${tutor.funcao}</td>
-                    <td class="p-3 text-center">${tutor.telefone || 'N/A'}</td>
-                    <td class="p-3 text-center">${dataNasc}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="excluirUsuario('${tutor.id}', '${tutor.nome}')"
-                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
-                            EXCLUIR
-                        </button>
-                    </td>
-                </tr>`;
+            try {
+                const response = await fetch('/api/funcionarios');
+                const funcionarios = await response.json();
+                const tutores = funcionarios.filter(u => u.funcao === 'TUTOR/PROFESSOR');
                 
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
-        }
-        
-        // A função de exclusão de tutores agora aponta para a função geral de exclusão de usuário
-        async function excluirTutor(docId, nome) {
-             excluirUsuario(docId, nome);
+                tableBody.innerHTML = '';
+                
+                if (tutores.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">NENHUM TUTOR CADASTRADO. USE A ABA "USUÁRIO" PARA CADASTRAR.</td></tr>';
+                    return;
+                }
+                
+                tutores.forEach(tutor => {
+                    const dataNasc = tutor.data_nascimento ? new Date(tutor.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-semibold text-text-light">${tutor.nome}</td>
+                        <td class="p-3 text-center">${tutor.funcao}</td>
+                        <td class="p-3 text-center">${tutor.telefone || 'N/A'}</td>
+                        <td class="p-3 text-center">${dataNasc}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirUsuario(${tutor.id}, '${tutor.nome}')"
+                                    class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
+                                EXCLUIR
+                            </button>
+                        </td>
+                    </tr>`;
+                    
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar tutores:', error);
+                tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">Erro ao carregar tutores.</td></tr>';
+            }
         }
 
-        // ========== MÓDULO ALUNOS (AJUSTADO PARA USAR TUTORES DA LISTA GLOBAL) ==========
+        // ========== MÓDULO ALUNOS ==========
         function configurarModuloAlunos() {
             const btnSalvar = document.getElementById('btn-salvar-aluno');
             if (btnSalvar) {
@@ -226,18 +199,38 @@
 
         async function carregarOpcoesAluno() {
             await carregarTutoresAluno();
+            await carregarSalasAluno();
         }
 
         async function carregarTutoresAluno() {
             const selectTutor = document.getElementById('input-tutor-aluno');
-            
-            // FILTRA APENAS USUÁRIOS COM FUNÇÃO TUTOR/PROFESSOR
-            const tutores = usuarios.filter(u => u.funcao === 'TUTOR/PROFESSOR');
-            
-            selectTutor.innerHTML = '<option value="">SELECIONE O TUTOR</option>';
-            tutores.forEach(tutor => {
-                selectTutor.innerHTML += `<option value="${tutor.id}">${tutor.nome}</option>`;
-            });
+            try {
+                const response = await fetch('/api/funcionarios');
+                const funcionarios = await response.json();
+                const tutores = funcionarios.filter(u => u.funcao === 'TUTOR/PROFESSOR');
+                
+                selectTutor.innerHTML = '<option value="">SELECIONE O TUTOR</option>';
+                tutores.forEach(tutor => {
+                    selectTutor.innerHTML += `<option value="${tutor.id}">${tutor.nome}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar tutores:', error);
+            }
+        }
+
+        async function carregarSalasAluno() {
+            const selectSala = document.getElementById('input-sala-aluno');
+            try {
+                const response = await fetch('/api/d_salas');
+                const salas = await response.json();
+                
+                selectSala.innerHTML = '<option value="">SELECIONE A SALA</option>';
+                salas.forEach(sala => {
+                    selectSala.innerHTML += `<option value="${sala.id}">${sala.nome}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar salas:', error);
+            }
         }
 
         async function salvarAluno() {
@@ -247,104 +240,346 @@
             const responsavel = normalizarTexto(document.getElementById('input-responsavel-aluno').value.trim());
             const telefone_responsavel = document.getElementById('input-telefone-responsavel-aluno').value.trim();
             const tutor_id = document.getElementById('input-tutor-aluno').value;
+            const sala_id = document.getElementById('input-sala-aluno').value;
             
-            if (!nome || !data_nascimento || !telefone || !responsavel || !telefone_responsavel || !tutor_id) {
+            if (!nome || !data_nascimento || !telefone || !responsavel || !telefone_responsavel || !tutor_id || !sala_id) {
                 mostrarMsg("PREENCHA TODOS OS CAMPOS OBRIGATORIOS.", 'danger');
                 return;
             }
 
-            mostrarMsg('ALUNO CADASTRADO COM SUCESSO!', 'accent');
-            carregarTabelaAlunos();
-            document.getElementById('form-aluno').reset();
+            const payload = {
+                nome,
+                data_nascimento,
+                telefone,
+                responsavel,
+                telefone_responsavel,
+                tutor_id: parseInt(tutor_id),
+                sala_id: parseInt(sala_id)
+            };
+
+            try {
+                const response = await fetch('/api/alunos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg('ALUNO CADASTRADO COM SUCESSO!', 'accent');
+                    document.getElementById('form-aluno').reset();
+                    carregarTabelaAlunos();
+                } else {
+                    mostrarMsg(result.error || 'Erro ao cadastrar aluno', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
         }
 
         async function carregarTabelaAlunos() {
             const tableBody = document.getElementById('alunos-table-body');
-            
-            const alunos = [
-                { id: 1, nome: "ANA CAROLINA OLIVEIRA", data_nascimento: "2010-03-15", telefone: "(11) 97777-6666", responsavel: "PAULO OLIVEIRA", telefone_responsavel: "(11) 96666-5555", tutor_id: 1 },
-                { id: 2, nome: "PEDRO HENRIQUE COSTA", data_nascimento: "2009-07-22", telefone: "(11) 95555-4444", responsavel: "MARIA COSTA", telefone_responsavel: "(11) 94444-3333", tutor_id: 2 }
-            ];
-            
-            tableBody.innerHTML = '';
-            alunos.forEach(aluno => {
-                const dataNasc = aluno.data_nascimento ? new Date(aluno.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
-                const tutor = usuarios.find(u => u.id == aluno.tutor_id);
-                const tutorNome = tutor ? tutor.nome : 'NÃO VINCULADO';
-                const tutorClass = tutorNome !== 'NÃO VINCULADO' ? 'text-accent' : 'text-danger';
-                                        
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
-                    <td class="p-3">${aluno.nome}</td>
-                    <td class="p-3 text-center">${dataNasc}</td>
-                    <td class="p-3 text-center">${aluno.telefone || 'N/A'}</td>
-                    <td class="p-3">${aluno.responsavel || 'N/A'}</td>
-                    <td class="p-3 text-center">${aluno.telefone_responsavel || 'N/A'}</td>
-                    <td class="p-3 text-center ${tutorClass}">${tutorNome}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="excluirAluno('${aluno.id}', '${aluno.nome}')"
-                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
-                            EXCLUIR
-                        </button>
-                    </td>
-                </tr>`;
+            try {
+                const response = await fetch('/api/alunos');
+                const alunos = await response.json();
                 
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
+                tableBody.innerHTML = '';
+                
+                if (alunos.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-gray-400">NENHUM ALUNO CADASTRADO.</td></tr>';
+                    return;
+                }
+                
+                for (const aluno of alunos) {
+                    const dataNasc = aluno.data_nascimento ? new Date(aluno.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
+                    
+                    // Buscar nome do tutor
+                    let tutorNome = 'N/A';
+                    if (aluno.tutor_id) {
+                        try {
+                            const tutorResp = await fetch(`/api/funcionarios/${aluno.tutor_id}`);
+                            const tutor = await tutorResp.json();
+                            tutorNome = tutor.nome || 'N/A';
+                        } catch { }
+                    }
+                    
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3">${aluno.nome}</td>
+                        <td class="p-3 text-center">${dataNasc}</td>
+                        <td class="p-3 text-center">${aluno.telefone || 'N/A'}</td>
+                        <td class="p-3">${aluno.responsavel || 'N/A'}</td>
+                        <td class="p-3 text-center">${aluno.telefone_responsavel || 'N/A'}</td>
+                        <td class="p-3 text-center">${tutorNome}</td>
+                        <td class="p-3 text-center">${aluno.sala_nome || 'N/A'}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirAluno(${aluno.id}, '${aluno.nome}')"
+                                    class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
+                                EXCLUIR
+                            </button>
+                        </td>
+                    </tr>`;
+                    
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar alunos:', error);
+                tableBody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-gray-400">Erro ao carregar alunos.</td></tr>';
+            }
         }
         
-        async function excluirAluno(docId, nome) {
+        async function excluirAluno(id, nome) {
             if (!confirm(`TEM CERTEZA QUE DESEJA EXCLUIR O ALUNO(A) ${nome}?`)) return;
-            mostrarMsg(`ALUNO ${nome} EXCLUIDO COM SUCESSO.`, 'accent');
-            carregarTabelaAlunos();
+            try {
+                const response = await fetch(`/api/alunos/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg(`ALUNO ${nome} EXCLUIDO COM SUCESSO.`, 'accent');
+                    carregarTabelaAlunos();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro ao excluir', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
         }
 
-        // ========== MÓDULO CLUBES, DISCIPLINAS, ELETIVAS (MANTIDOS) ==========
-        function configurarModuloClubes() { /* ... */ }
-        async function salvarClube() { /* ... */ }
+        // ========== MÓDULO CLUBES ==========
+        function configurarModuloClubes() {
+            const btnSalvar = document.getElementById('btn-salvar-clube');
+            if (btnSalvar) btnSalvar.addEventListener('click', salvarClube);
+        }
+
+        async function salvarClube() {
+            const nome = normalizarTexto(document.getElementById('input-nome-clube').value.trim());
+            const semestre = document.getElementById('input-semestre-clube').value;
+            
+            if (!nome || !semestre) {
+                mostrarMsg("PREENCHA TODOS OS CAMPOS OBRIGATORIOS.", 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/clubes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, semestre })
+                });
+                if (response.ok) {
+                    mostrarMsg('CLUBE CADASTRADO COM SUCESSO!', 'accent');
+                    document.getElementById('form-clube').reset();
+                    carregarTabelaClubes();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro ao cadastrar', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
         async function carregarTabelaClubes() { 
             const tableBody = document.getElementById('clubes-table-body');
-            const clubes = [{ id: 1, nome: "CLUBE DE XADREZ", semestre: "1º SEMESTRE" }, { id: 2, nome: "CLUBE DE ROBOTICA", semestre: "2º SEMESTRE" }];
-            tableBody.innerHTML = '';
-            clubes.forEach(c => {
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50"><td class="p-3 font-bold text-center text-secondary-accent">${c.semestre}</td><td class="p-3 font-semibold text-text-light">${c.nome}</td><td class="p-3 text-center"><button onclick="excluirClube('${c.id}', '${c.nome}')" class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button></td></tr>`;
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
+            try {
+                const response = await fetch('/api/clubes');
+                const clubes = await response.json();
+                tableBody.innerHTML = '';
+                if (clubes.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">NENHUM CLUBE CADASTRADO.</td></tr>';
+                    return;
+                }
+                clubes.forEach(c => {
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-bold text-center text-secondary-accent">${c.semestre}</td>
+                        <td class="p-3 font-semibold text-text-light">${c.nome}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirClube(${c.id}, '${c.nome}')" 
+                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button>
+                        </td>
+                    </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error(error);
+                tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">Erro ao carregar clubes.</td></tr>';
+            }
         }
-        async function excluirClube(docId, nome) { /* ... */ }
 
-        function configurarModuloDisciplinas() { /* ... */ }
-        async function salvarDisciplina() { /* ... */ }
+        async function excluirClube(id, nome) {
+            if (!confirm(`EXCLUIR CLUBE ${nome}?`)) return;
+            try {
+                const response = await fetch(`/api/clubes/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg('CLUBE EXCLUIDO', 'accent');
+                    carregarTabelaClubes();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
+        // ========== MÓDULO DISCIPLINAS ==========
+        function configurarModuloDisciplinas() {
+            const btnSalvar = document.getElementById('btn-salvar-disciplina');
+            if (btnSalvar) btnSalvar.addEventListener('click', salvarDisciplina);
+        }
+
+        async function salvarDisciplina() {
+            const nome = normalizarTexto(document.getElementById('input-nome-disciplina').value.trim());
+            const abreviacao = normalizarTexto(document.getElementById('input-abreviacao-disciplina').value.trim());
+            
+            if (!nome || !abreviacao) {
+                mostrarMsg("PREENCHA TODOS OS CAMPOS OBRIGATORIOS.", 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/disciplinas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, abreviacao })
+                });
+                if (response.ok) {
+                    mostrarMsg('DISCIPLINA CADASTRADA!', 'accent');
+                    document.getElementById('form-disciplina').reset();
+                    carregarTabelaDisciplinas();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
         async function carregarTabelaDisciplinas() { 
             const tableBody = document.getElementById('disciplinas-table-body');
-            const disciplinas = [{ abreviacao: "MAT", nome: "MATEMATICA" }, { abreviacao: "PORT", nome: "PORTUGUES" }, { abreviacao: "CIE", nome: "CIENCIAS" }];
-            tableBody.innerHTML = '';
-            disciplinas.forEach(d => {
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50"><td class="p-3 font-semibold text-text-light">${d.nome}</td><td class="p-3 text-center font-bold text-secondary-accent">${d.abreviacao}</td><td class="p-3 text-center"><button onclick="excluirDisciplina('${d.abreviacao}', '${d.nome}')" class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button></td></tr>`;
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
+            try {
+                const response = await fetch('/api/disciplinas');
+                const disciplinas = await response.json();
+                tableBody.innerHTML = '';
+                if (disciplinas.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">NENHUMA DISCIPLINA CADASTRADA.</td></tr>';
+                    return;
+                }
+                disciplinas.forEach(d => {
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-semibold text-text-light">${d.nome}</td>
+                        <td class="p-3 text-center font-bold text-secondary-accent">${d.abreviacao}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirDisciplina(${d.id}, '${d.nome}')" 
+                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button>
+                        </td>
+                    </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error(error);
+                tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">Erro ao carregar disciplinas.</td></tr>';
+            }
         }
-        async function excluirDisciplina(docId, nome) { /* ... */ }
 
-        function configurarModuloEletivas() { /* ... */ }
-        async function salvarEletiva() { /* ... */ }
+        async function excluirDisciplina(id, nome) {
+            if (!confirm(`EXCLUIR DISCIPLINA ${nome}?`)) return;
+            try {
+                const response = await fetch(`/api/disciplinas/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg('DISCIPLINA EXCLUIDA', 'accent');
+                    carregarTabelaDisciplinas();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
+        // ========== MÓDULO ELETIVAS ==========
+        function configurarModuloEletivas() {
+            const btnSalvar = document.getElementById('btn-salvar-eletiva');
+            if (btnSalvar) btnSalvar.addEventListener('click', salvarEletiva);
+        }
+
+        async function salvarEletiva() {
+            const nome = normalizarTexto(document.getElementById('input-nome-eletiva').value.trim());
+            const semestre = document.getElementById('input-semestre-eletiva').value;
+            
+            if (!nome || !semestre) {
+                mostrarMsg("PREENCHA TODOS OS CAMPOS OBRIGATORIOS.", 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/eletivas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, semestre })
+                });
+                if (response.ok) {
+                    mostrarMsg('ELETIVA CADASTRADA!', 'accent');
+                    document.getElementById('form-eletiva').reset();
+                    carregarTabelaEletivas();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
+
         async function carregarTabelaEletivas() { 
             const tableBody = document.getElementById('eletivas-table-body');
-            const eletivas = [{ id: 1, nome: "PROGRAMACAO", semestre: "1º SEMESTRE" }, { id: 2, nome: "ROBOTICA", semestre: "2º SEMESTRE" }];
-            tableBody.innerHTML = '';
-            eletivas.forEach(e => {
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50"><td class="p-3 font-bold text-center text-secondary-accent">${e.semestre}</td><td class="p-3 font-semibold text-text-light">${e.nome}</td><td class="p-3 text-center"><button onclick="excluirEletiva('${e.id}', '${e.nome}')" class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button></td></tr>`;
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
+            try {
+                const response = await fetch('/api/eletivas');
+                const eletivas = await response.json();
+                tableBody.innerHTML = '';
+                if (eletivas.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">NENHUMA ELETIVA CADASTRADA.</td></tr>';
+                    return;
+                }
+                eletivas.forEach(e => {
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-bold text-center text-secondary-accent">${e.semestre}</td>
+                        <td class="p-3 font-semibold text-text-light">${e.nome}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirEletiva(${e.id}, '${e.nome}')" 
+                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">EXCLUIR</button>
+                        </td>
+                    </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error(error);
+                tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-400">Erro ao carregar eletivas.</td></tr>';
+            }
         }
-        async function excluirEletiva(docId, nome) { /* ... */ }
 
+        async function excluirEletiva(id, nome) {
+            if (!confirm(`EXCLUIR ELETIVA ${nome}?`)) return;
+            try {
+                const response = await fetch(`/api/eletivas/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg('ELETIVA EXCLUIDA', 'accent');
+                    carregarTabelaEletivas();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
+        }
 
-        // ========== NOVO MÓDULO EQUIPAMENTO ==========
+        // ========== MÓDULO EQUIPAMENTO ==========
         function configurarModuloEquipamento() {
             const btnSalvar = document.getElementById('btn-salvar-equipamento');
-            if (btnSalvar) {
-                btnSalvar.addEventListener('click', salvarEquipamento);
-            }
+            if (btnSalvar) btnSalvar.addEventListener('click', salvarEquipamento);
             
             const selectEstado = document.getElementById('input-estado-equipamento');
             estadosEquipamento.forEach(estado => {
@@ -361,56 +596,81 @@
                 mostrarMsg("PREENCHA TODOS OS CAMPOS OBRIGATORIOS.", 'danger');
                 return;
             }
-            
-            equipamentos.push({
-                id: Date.now(),
-                nome,
-                patrimonio,
-                estado
-            });
 
-            mostrarMsg('EQUIPAMENTO CADASTRADO COM SUCESSO!', 'accent');
-            carregarTabelaEquipamentos();
-            document.getElementById('form-equipamento').reset();
+            try {
+                const response = await fetch('/api/equipamentos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, patrimonio, estado })
+                });
+
+                if (response.ok) {
+                    mostrarMsg('EQUIPAMENTO CADASTRADO COM SUCESSO!', 'accent');
+                    document.getElementById('form-equipamento').reset();
+                    carregarTabelaEquipamentos();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro ao cadastrar', 'danger');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
+            }
         }
 
         async function carregarTabelaEquipamentos() {
             const tableBody = document.getElementById('equipamentos-table-body');
-            tableBody.innerHTML = '';
-            
-            if (equipamentos.length === 0) {
-                 tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-400">NENHUM EQUIPAMENTO CADASTRADO.</td></tr>';
-                 return;
-            }
+            try {
+                const response = await fetch('/api/equipamentos');
+                const equipamentos = await response.json();
+                
+                tableBody.innerHTML = '';
+                
+                if (equipamentos.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-400">NENHUM EQUIPAMENTO CADASTRADO.</td></tr>';
+                    return;
+                }
 
-            equipamentos.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(eq => {
-                const estadoClass = eq.estado === 'DISPONÍVEL' ? 'text-accent' : (eq.estado === 'EM MANUTENÇÃO' ? 'text-warning' : 'text-danger');
-                
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
-                    <td class="p-3 font-semibold text-text-light">${eq.nome}</td>
-                    <td class="p-3 text-center">${eq.patrimonio || 'N/A'}</td>
-                    <td class="p-3 text-center font-bold ${estadoClass}">${eq.estado}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="excluirEquipamento(${eq.id}, '${eq.nome}')"
-                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
-                            EXCLUIR
-                        </button>
-                    </td>
-                </tr>`;
-                
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
+                equipamentos.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(eq => {
+                    const estadoClass = eq.estado === 'DISPONÍVEL' ? 'text-accent' : (eq.estado === 'EM MANUTENÇÃO' ? 'text-warning' : 'text-danger');
+                    
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-semibold text-text-light">${eq.nome}</td>
+                        <td class="p-3 text-center">${eq.patrimonio || 'N/A'}</td>
+                        <td class="p-3 text-center font-bold ${estadoClass}">${eq.estado}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="excluirEquipamento(${eq.id}, '${eq.nome}')"
+                                    class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
+                                EXCLUIR
+                            </button>
+                        </td>
+                    </tr>`;
+                    
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar equipamentos:', error);
+                tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-400">Erro ao carregar equipamentos.</td></tr>';
+            }
         }
 
         async function excluirEquipamento(id, nome) {
             if (!confirm(`TEM CERTEZA QUE DESEJA EXCLUIR O EQUIPAMENTO "${nome}"?`)) return;
-            equipamentos = equipamentos.filter(eq => eq.id != id);
-            mostrarMsg(`EQUIPAMENTO "${nome}" EXCLUIDO COM SUCESSO.`, 'accent');
-            carregarTabelaEquipamentos();
+            try {
+                const response = await fetch(`/api/equipamentos/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg(`EQUIPAMENTO "${nome}" EXCLUIDO COM SUCESSO.`, 'accent');
+                    carregarTabelaEquipamentos();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro ao excluir', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
         }
 
-
-        // ========== NOVO MÓDULO USUÁRIO ==========
+        // ========== MÓDULO USUÁRIO ==========
         function configurarModuloUsuario() {
             const btnSalvar = document.getElementById('btn-salvar-usuario');
             if (btnSalvar) {
@@ -436,105 +696,118 @@
             }
             
             const id = form.getAttribute('data-edit-id');
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/funcionarios/${id}` : '/api/funcionarios';
             
-            const novoUsuario = {
-                id: id ? parseInt(id) : Date.now(),
-                nome,
-                funcao,
-                data_nascimento,
-                telefone
-            };
+            const payload = { nome, funcao, data_nascimento, telefone };
 
-            if (id) {
-                const index = usuarios.findIndex(u => u.id == id);
-                if (index > -1) {
-                    usuarios[index] = novoUsuario;
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    mostrarMsg(id ? 'USUÁRIO ATUALIZADO COM SUCESSO!' : 'USUÁRIO CADASTRADO COM SUCESSO!', 'accent');
+                    document.getElementById('form-usuario').reset();
+                    document.getElementById('btn-salvar-usuario').textContent = 'CADASTRAR NOVO USUÁRIO';
+                    form.removeAttribute('data-edit-id');
+                    carregarTabelaUsuarios();
+                    carregarTabelaTutores(); // atualiza a aba de tutores se necessário
+                } else {
+                    mostrarMsg(result.error || 'Erro ao salvar', 'danger');
                 }
-                mostrarMsg('USUÁRIO ATUALIZADO COM SUCESSO!', 'accent');
-            } else {
-                usuarios.push(novoUsuario);
-                mostrarMsg('USUÁRIO CADASTRADO COM SUCESSO!', 'accent');
-            }
-            
-            // Limpar formulário e resetar estado de edição
-            document.getElementById('form-usuario').reset();
-            document.getElementById('btn-salvar-usuario').textContent = 'CADASTRAR NOVO USUÁRIO';
-            form.removeAttribute('data-edit-id');
-
-            carregarTabelaUsuarios();
-            
-            // Recarrega as listas de outros módulos que dependem da lista de usuários
-            if (funcao === 'TUTOR/PROFESSOR') {
-                carregarTabelaTutores();
-                carregarTutoresAluno();
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMsg('Erro de conexão', 'danger');
             }
         }
 
         function editarUsuario(id) {
-            const usuario = usuarios.find(u => u.id == id);
-            if (!usuario) return;
-            
-            const form = document.getElementById('form-usuario');
-            form.elements['input-nome-usuario'].value = usuario.nome;
-            form.elements['input-funcao-usuario'].value = usuario.funcao;
-            form.elements['input-data-nascimento-usuario'].value = usuario.data_nascimento;
-            form.elements['input-telefone-usuario'].value = usuario.telefone;
+            // Buscar dados do usuário via API
+            fetch(`/api/funcionarios/${id}`)
+                .then(res => res.json())
+                .then(usuario => {
+                    if (!usuario) return;
+                    
+                    const form = document.getElementById('form-usuario');
+                    form.elements['input-nome-usuario'].value = usuario.nome;
+                    form.elements['input-funcao-usuario'].value = usuario.funcao;
+                    form.elements['input-data-nascimento-usuario'].value = usuario.data_nascimento;
+                    form.elements['input-telefone-usuario'].value = usuario.telefone;
 
-            // Set form to editing mode
-            form.setAttribute('data-edit-id', id);
-            document.getElementById('btn-salvar-usuario').textContent = 'SALVAR EDIÇÃO DE USUÁRIO';
-            
-            mostrarMsg(`EDITANDO USUÁRIO: ${usuario.nome}`, 'info');
-            // Role a página para o formulário
-            document.getElementById('form-usuario-section').scrollIntoView({ behavior: 'smooth' });
+                    form.setAttribute('data-edit-id', id);
+                    document.getElementById('btn-salvar-usuario').textContent = 'SALVAR EDIÇÃO DE USUÁRIO';
+                    
+                    mostrarMsg(`EDITANDO USUÁRIO: ${usuario.nome}`, 'info');
+                    document.getElementById('form-usuario-section').scrollIntoView({ behavior: 'smooth' });
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar usuário:', error);
+                    mostrarMsg('Erro ao carregar dados do usuário', 'danger');
+                });
         }
 
         async function carregarTabelaUsuarios() {
             const tableBody = document.getElementById('usuarios-table-body');
-            tableBody.innerHTML = '';
+            try {
+                const response = await fetch('/api/funcionarios');
+                const usuarios = await response.json();
+                
+                tableBody.innerHTML = '';
 
-            const listaUsuarios = [...usuarios].sort((a, b) => a.nome.localeCompare(b.nome));
-            
-            if (listaUsuarios.length === 0) {
-                 tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">NENHUM USUÁRIO CADASTRADO.</td></tr>';
-                 return;
+                if (usuarios.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">NENHUM USUÁRIO CADASTRADO.</td></tr>';
+                    return;
+                }
+
+                usuarios.sort((a, b) => a.nome.localeCompare(b.nome)).forEach(user => {
+                    const funcaoClass = user.funcao === 'TUTOR/PROFESSOR' ? 'text-warning' : 'text-secondary-accent';
+                    const dataNasc = user.data_nascimento ? new Date(user.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
+                    
+                    const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
+                        <td class="p-3 font-semibold text-text-light">${user.nome}</td>
+                        <td class="p-3 text-center font-bold ${funcaoClass}">${user.funcao}</td>
+                        <td class="p-3 text-center">${user.telefone || 'N/A'}</td>
+                        <td class="p-3 text-center">${dataNasc}</td>
+                        <td class="p-3 text-center flex gap-2 justify-center">
+                            <button onclick="editarUsuario(${user.id})"
+                                    class="bg-accent hover:bg-green-600 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
+                                EDITAR
+                            </button>
+                            <button onclick="excluirUsuario(${user.id}, '${user.nome}')"
+                                    class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
+                                EXCLUIR
+                            </button>
+                        </td>
+                    </tr>`;
+                    
+                    tableBody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar usuários:', error);
+                tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">Erro ao carregar usuários.</td></tr>';
             }
-
-            listaUsuarios.forEach(user => {
-                const funcaoClass = user.funcao === 'TUTOR/PROFESSOR' ? 'text-warning' : 'text-secondary-accent';
-                const dataNasc = user.data_nascimento ? new Date(user.data_nascimento).toLocaleDateString('pt-BR') : 'N/A';
-                
-                const row = `<tr class="border-b border-gray-700 hover:bg-dark-primary/50">
-                    <td class="p-3 font-semibold text-text-light">${user.nome}</td>
-                    <td class="p-3 text-center font-bold ${funcaoClass}">${user.funcao}</td>
-                    <td class="p-3 text-center">${user.telefone || 'N/A'}</td>
-                    <td class="p-3 text-center">${dataNasc}</td>
-                    <td class="p-3 text-center flex gap-2 justify-center">
-                        <button onclick="editarUsuario(${user.id})"
-                                class="bg-accent hover:bg-green-600 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
-                            EDITAR
-                        </button>
-                        <button onclick="excluirUsuario(${user.id}, '${user.nome}')"
-                                class="bg-danger hover:bg-red-700 text-white font-bold py-1 px-3 rounded-md transition duration-200 text-sm">
-                            EXCLUIR
-                        </button>
-                    </td>
-                </tr>`;
-                
-                tableBody.insertAdjacentHTML('beforeend', row);
-            });
         }
 
         async function excluirUsuario(id, nome) {
             if (!confirm(`TEM CERTEZA QUE DESEJA EXCLUIR O USUÁRIO "${nome}"?`)) return;
-            
-            usuarios = usuarios.filter(u => u.id != id);
-            mostrarMsg(`USUÁRIO "${nome}" EXCLUIDO COM SUCESSO.`, 'accent');
-            carregarTabelaUsuarios();
-            
-            // Atualiza as listas dependentes
-            carregarTabelaTutores();
-            carregarTutoresAluno();
+            try {
+                const response = await fetch(`/api/funcionarios/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    mostrarMsg(`USUÁRIO "${nome}" EXCLUIDO COM SUCESSO.`, 'accent');
+                    carregarTabelaUsuarios();
+                    carregarTabelaTutores();
+                } else {
+                    const err = await response.json();
+                    mostrarMsg(err.error || 'Erro ao excluir', 'danger');
+                }
+            } catch (error) {
+                mostrarMsg('Erro de conexão', 'danger');
+            }
         }
 
     </script>
@@ -695,9 +968,13 @@
                                  <label class="block text-sm font-medium text-gray-300 mb-1">TELEFONE DO RESPONSAVEL *</label>
                                  <input type="text" id="input-telefone-responsavel-aluno" class="form-input" placeholder="EX: (11) 98888-8888" required>
                              </div>
-                             <div class="md:col-span-2">
+                             <div>
                                  <label class="block text-sm font-medium text-gray-300 mb-1">TUTOR *</label>
                                  <select id="input-tutor-aluno" class="form-input" required></select>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-300 mb-1">SALA *</label>
+                                 <select id="input-sala-aluno" class="form-input" required></select>
                              </div>
                          </div>
                          <button type="button" id="btn-salvar-aluno" class="w-full bg-accent hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition">
@@ -718,6 +995,7 @@
                                      <th class="px-3 py-3 border border-gray-700 text-gray-300 text-left">RESPONSAVEL</th>
                                      <th class="px-3 py-3 border border-gray-700 text-gray-300 text-center">TEL. RESP.</th>
                                      <th class="px-3 py-3 border border-gray-700 text-gray-300 text-center">TUTOR</th>
+                                     <th class="px-3 py-3 border border-gray-700 text-gray-300 text-center">SALA</th>
                                      <th class="px-3 py-3 border border-gray-700 text-gray-300 text-center">ACAO</th>
                                  </tr>
                              </thead>
@@ -910,7 +1188,7 @@
                                 <label class="block text-sm font-medium text-gray-300 mb-1">FUNÇÃO / CARGO *</label>
                                 <select id="input-funcao-usuario" name="input-funcao-usuario" class="form-input" required>
                                     <option value="">SELECIONE A FUNÇÃO</option>
-                                    </select>
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-300 mb-1">TELEFONE *</label>
