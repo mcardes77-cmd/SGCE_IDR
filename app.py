@@ -165,7 +165,8 @@ def get_ocorrencia_por_numero(numero):
 def api_professores():
     try:
         if supabase:
-            response = supabase.table('d_funcionarios').select('id, nome, tipo').execute()
+            # Seleciona apenas id e nome (a coluna 'funcao' não é usada no frontend)
+            response = supabase.table('d_funcionarios').select('id, nome').execute()
             professores = handle_supabase_response(response)
             return jsonify(professores)
         return jsonify([])
@@ -1437,5 +1438,6 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
 
