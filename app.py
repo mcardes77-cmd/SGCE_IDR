@@ -165,7 +165,7 @@ def get_ocorrencia_por_numero(numero):
 def api_professores():
     try:
         if supabase:
-            # Seleciona apenas id e nome (a coluna 'funcao' não é usada no frontend)
+            # Seleciona apenas id e nome (a coluna 'tipo' não existe, usamos a tabela d_funcionarios)
             response = supabase.table('d_funcionarios').select('id, nome').execute()
             professores = handle_supabase_response(response)
             return jsonify(professores)
@@ -337,80 +337,6 @@ def api_ocorrencias_filtrar():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
-def api_gerar_pdf_ocorrencias():
-    supabase = get_supabase()
-    try:
-        dados = request.get_json()
-        if not dados or 'numeros' not in dados:
-            return jsonify({"error": "Lista de ocorrências não fornecida"}), 400
-        numeros_selecionados = dados['numeros']
-        if not numeros_selecionados:
-            return jsonify({"error": "Nenhuma ocorrência selecionada"}), 400
-        resp = supabase.table("ocorrencias").select("*").in_("numero", numeros_selecionados).order("data_hora").execute()
-        ocorrencias_selecionadas = handle_supabase_response(resp)
-        if not ocorrencias_selecionadas:
-            return jsonify({"error": "Nenhuma ocorrência encontrada"}), 404
-        ocorrencias_selecionadas = sorted(ocorrencias_selecionadas, key=lambda x: x.get('data_hora', ''))
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch,
-                                leftMargin=0.5*inch, rightMargin=0.5*inch)
-        elements = []
-        styles = getSampleStyleSheet()
-        elements.append(Paragraph("RELATÓRIO DE OCORRÊNCIAS - ASSINATURA", styles['Title']))
-        elements.append(Spacer(1, 0.2*inch))
-        elements.append(Paragraph("<b>E.E. PEI PROFESSOR IRENE DIAS RIBEIRO</b>", styles['Heading2']))
-        elements.append(Spacer(1, 0.1*inch))
-        elements.append(Paragraph(f"<b>Data do Relatório:</b> {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
-        elements.append(Spacer(1, 0.3*inch))
-        for i, oc in enumerate(ocorrencias_selecionadas):
-            elements.append(Paragraph(f"<b>OCORRÊNCIA Nº: {oc.get('numero', 'N/A')}</b>", styles['Heading2']))
-            elements.append(Spacer(1, 0.1*inch))
-            elements.append(Paragraph(f"<b>Aluno:</b> {oc.get('aluno_nome', 'N/A')}", styles['Normal']))
-            data_hora = oc.get('data_hora', '')
-            if data_hora:
-                try:
-                    dt = datetime.fromisoformat(data_hora.replace('Z', '+00:00'))
-                    elements.append(Paragraph(f"<b>Data:</b> {dt.strftime('%d/%m/%Y')}    <b>Hora:</b> {dt.strftime('%H:%M:%S')}", styles['Normal']))
-                except:
-                    elements.append(Paragraph(f"<b>Data/Hora:</b> {data_hora}", styles['Normal']))
-            else:
-                elements.append(Paragraph("<b>Data/Hora:</b> N/A", styles['Normal']))
-            elements.append(Paragraph(f"<b>Professor:</b> {oc.get('professor_nome', 'N/A')}", styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
-            elements.append(Paragraph("<b>Descrição da Ocorrência:</b>", styles['Heading3']))
-            elements.append(Paragraph(oc.get('descricao', 'Nenhuma descrição fornecida'), styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
-            elements.append(Paragraph("<b>Atendimento Professor:</b>", styles['Heading3']))
-            elements.append(Paragraph(oc.get('atendimento_professor', 'Nenhum atendimento registrado'), styles['Normal']))
-            elements.append(Spacer(1, 0.1*inch))
-            for nivel, nome in [('Tutor', 'tutor'), ('Coordenação', 'coordenacao'), ('Gestão', 'gestao')]:
-                elements.append(Paragraph(f"<b>Atendimento {nivel}:</b>", styles['Heading3']))
-                if oc.get(f'solicitado_{nome}'):
-                    atendimento = oc.get(f'atendimento_{nome}', 'Pendente')
-                    if not atendimento or atendimento.strip() == '':
-                        atendimento = 'Pendente'
-                else:
-                    atendimento = 'Atendimento Não Solicitado'
-                elements.append(Paragraph(atendimento, styles['Normal']))
-                elements.append(Spacer(1, 0.1*inch))
-            elements.append(Paragraph(f"<b>Sala:</b> {oc.get('sala_nome', 'N/A')}    <b>Tutor:</b> {oc.get('tutor_nome', 'N/A')}", styles['Normal']))
-            elements.append(Spacer(1, 0.3*inch))
-            if i == len(ocorrencias_selecionadas)-1:
-                elements.append(Paragraph("<b>Assinatura do Responsável: _____</b>", styles['Heading3']))
-                elements.append(Spacer(1, 0.1*inch))
-                elements.append(Paragraph("<b>Data: _____ /_____/_____</b>", styles['Heading3']))
-            else:
-                elements.append(Spacer(1, 0.2*inch))
-        doc.build(elements)
-        for numero in numeros_selecionados:
-            supabase.table("ocorrencias").update({"impressao_pdf": True}).eq("numero", numero).execute()
-        buffer.seek(0)
-        nome_arquivo = f"ocorrencias_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        return send_file(buffer, as_attachment=True, download_name=nome_arquivo, mimetype='application/pdf')
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route("/api/ocorrencias", methods=["GET"])
 def api_list_ocorrencias():
     supabase = get_supabase()
@@ -429,40 +355,6 @@ def api_list_ocorrencias():
         if status:
             q = q.eq("status", status)
         resp = q.order("data_hora", desc=True).execute()
-        data = handle_supabase_response(resp)
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/d_funcionarios", methods=["GET"])
-def api_d_funcionarios():
-    supabase = get_supabase()
-    try:
-        resp = supabase.table("d_funcionarios").select("id, nome").order("nome").execute()
-        data = handle_supabase_response(resp)
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/d_salas", methods=["GET"])
-def api_d_salas():
-    supabase = get_supabase()
-    try:
-        resp = supabase.table("d_salas").select("id, nome").eq('ativa', True).order("nome").execute()
-        data = handle_supabase_response(resp)
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/d_alunos", methods=["GET"])
-def api_d_alunos():
-    supabase = get_supabase()
-    try:
-        sala_id = request.args.get("sala_id")
-        q = supabase.table("d_alunos").select("id, nome, tutor_nome, sala_id")
-        if sala_id:
-            q = q.eq("sala_id", int(sala_id))
-        resp = q.order("nome").execute()
         data = handle_supabase_response(resp)
         return jsonify({"ok": True, "data": data})
     except Exception as e:
@@ -508,24 +400,200 @@ def api_update_atendimento(oc_id):
         payload = request.json or {}
         tipo = payload.get("tipo")
         texto = payload.get("texto", "")
+        convocar_pais = payload.get("convocar_pais", False)
+
         if tipo not in ("tutor", "coordenacao", "gestao"):
             return jsonify({"ok": False, "error": "tipo inválido"}), 400
-        
+
         field_text = f"atendimento_{tipo}"
         field_dt = f"dt_atendimento_{tipo}"
         updates = {field_text: texto, field_dt: now_iso()}
-        
-        # Se for gestão e não solicitou responsável, finalizar a ocorrência
+
         if tipo == "gestao":
-            solicitar_responsavel = payload.get("solicitar_responsavel", False)
-            if not solicitar_responsavel:
+            if convocar_pais:
+                updates["convocado_pais"] = True
+                # Não finaliza, mantém status atual
+            else:
                 updates["status"] = "FINALIZADA"
-        
+                updates["convocado_pais"] = False
+
         resp = supabase.table("ocorrencias").update(updates).eq("id", oc_id).execute()
         data = handle_supabase_response(resp)
         return jsonify({"ok": True, "data": data})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/ocorrencias/<int:oc_id>/atendimento_responsavel", methods=["PUT"])
+def api_update_atendimento_responsavel(oc_id):
+    supabase = get_supabase()
+    try:
+        payload = request.json or {}
+        texto = payload.get("texto", "")
+        finalizar = payload.get("finalizar", True)
+
+        updates = {
+            "atendimento_responsavel": texto,
+            "dt_atendimento_responsavel": now_iso(),
+            "convocado_pais": False
+        }
+
+        if finalizar:
+            updates["status"] = "FINALIZADA"
+
+        resp = supabase.table("ocorrencias").update(updates).eq("id", oc_id).execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# =============================================================
+# ROTA DE GERAÇÃO DE PDF (MODIFICADA PARA INCLUIR ATENDIMENTO DO RESPONSÁVEL)
+# =============================================================
+@app.route('/api/gerar_pdf_ocorrencias', methods=['POST'])
+def api_gerar_pdf_ocorrencias():
+    supabase = get_supabase()
+    try:
+        dados = request.get_json()
+        if not dados or 'numeros' not in dados:
+            return jsonify({"error": "Lista de ocorrências não fornecida"}), 400
+        numeros_selecionados = dados['numeros']
+        if not numeros_selecionados:
+            return jsonify({"error": "Nenhuma ocorrência selecionada"}), 400
+        resp = supabase.table("ocorrencias").select("*").in_("numero", numeros_selecionados).order("data_hora").execute()
+        ocorrencias_selecionadas = handle_supabase_response(resp)
+        if not ocorrencias_selecionadas:
+            return jsonify({"error": "Nenhuma ocorrência encontrada"}), 404
+        ocorrencias_selecionadas = sorted(ocorrencias_selecionadas, key=lambda x: x.get('data_hora', ''))
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch,
+                                leftMargin=0.5*inch, rightMargin=0.5*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+        elements.append(Paragraph("RELATÓRIO DE OCORRÊNCIAS - ASSINATURA", styles['Title']))
+        elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph("<b>E.E. PEI PROFESSOR IRENE DIAS RIBEIRO</b>", styles['Heading2']))
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph(f"<b>Data do Relatório:</b> {datetime.now().strftime('%d/%m/%Y')}", styles['Normal']))
+        elements.append(Spacer(1, 0.3*inch))
+
+        for i, oc in enumerate(ocorrencias_selecionadas):
+            elements.append(Paragraph(f"<b>OCORRÊNCIA Nº: {oc.get('numero', 'N/A')}</b>", styles['Heading2']))
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph(f"<b>Aluno:</b> {oc.get('aluno_nome', 'N/A')}", styles['Normal']))
+            data_hora = oc.get('data_hora', '')
+            if data_hora:
+                try:
+                    dt = datetime.fromisoformat(data_hora.replace('Z', '+00:00'))
+                    elements.append(Paragraph(f"<b>Data:</b> {dt.strftime('%d/%m/%Y')}    <b>Hora:</b> {dt.strftime('%H:%M:%S')}", styles['Normal']))
+                except:
+                    elements.append(Paragraph(f"<b>Data/Hora:</b> {data_hora}", styles['Normal']))
+            else:
+                elements.append(Paragraph("<b>Data/Hora:</b> N/A", styles['Normal']))
+            elements.append(Paragraph(f"<b>Professor:</b> {oc.get('professor_nome', 'N/A')}", styles['Normal']))
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph("<b>Descrição da Ocorrência:</b>", styles['Heading3']))
+            elements.append(Paragraph(oc.get('descricao', 'Nenhuma descrição fornecida'), styles['Normal']))
+            elements.append(Spacer(1, 0.1*inch))
+            elements.append(Paragraph("<b>Atendimento Professor:</b>", styles['Heading3']))
+            elements.append(Paragraph(oc.get('atendimento_professor', 'Nenhum atendimento registrado'), styles['Normal']))
+            elements.append(Spacer(1, 0.1*inch))
+
+            for nivel, nome in [('Tutor', 'tutor'), ('Coordenação', 'coordenacao'), ('Gestão', 'gestao')]:
+                elements.append(Paragraph(f"<b>Atendimento {nivel}:</b>", styles['Heading3']))
+                if oc.get(f'solicitado_{nome}'):
+                    atendimento = oc.get(f'atendimento_{nome}', 'Pendente')
+                    if not atendimento or atendimento.strip() == '':
+                        atendimento = 'Pendente'
+                else:
+                    atendimento = 'Atendimento Não Solicitado'
+                elements.append(Paragraph(atendimento, styles['Normal']))
+                elements.append(Spacer(1, 0.1*inch))
+
+            # Atendimento do Responsável
+            elements.append(Paragraph("<b>Atendimento Responsável:</b>", styles['Heading3']))
+            if oc.get('convocado_pais'):
+                atendimento = oc.get('atendimento_responsavel', 'Pendente')
+                if not atendimento or atendimento.strip() == '':
+                    atendimento = 'Pendente'
+            else:
+                atendimento = 'Responsável não convocado'
+            elements.append(Paragraph(atendimento, styles['Normal']))
+            elements.append(Spacer(1, 0.1*inch))
+
+            elements.append(Paragraph(f"<b>Sala:</b> {oc.get('sala_nome', 'N/A')}    <b>Tutor:</b> {oc.get('tutor_nome', 'N/A')}", styles['Normal']))
+            elements.append(Spacer(1, 0.3*inch))
+
+            if i == len(ocorrencias_selecionadas)-1:
+                elements.append(Paragraph("<b>Assinatura do Responsável: _____</b>", styles['Heading3']))
+                elements.append(Spacer(1, 0.1*inch))
+                elements.append(Paragraph("<b>Data: _____ /_____/_____</b>", styles['Heading3']))
+            else:
+                elements.append(Spacer(1, 0.2*inch))
+
+        doc.build(elements)
+
+        # Atualiza status para ASSINADA e marca como impresso
+        for numero in numeros_selecionados:
+            supabase.table("ocorrencias").update({
+                "impressao_pdf": True,
+                "status": "ASSINADA"
+            }).eq("numero", numero).execute()
+
+        buffer.seek(0)
+        nome_arquivo = f"ocorrencias_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return send_file(buffer, as_attachment=True, download_name=nome_arquivo, mimetype='application/pdf')
+
+    except Exception as e:
+        print(f"Erro ao gerar PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# =============================================================
+# OUTRAS ROTAS DE OCORRÊNCIAS (listagens específicas)
+# =============================================================
+@app.route('/api/ocorrencias_abertas', methods=['GET'])
+def api_ocorrencias_abertas():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table('ocorrencias').select('*').eq('status', 'ATENDIMENTO').order('data_hora', desc=True).execute()
+        return jsonify(handle_supabase_response(resp))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ocorrencias_finalizadas', methods=['GET'])
+def api_ocorrencias_finalizadas():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table('ocorrencias').select('*').in_('status', ['FINALIZADA', 'ASSINADA']).order('data_hora', desc=True).execute()
+        return jsonify(handle_supabase_response(resp))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos_com_ocorrencias_por_sala/<int:sala_id>', methods=['GET'])
+def api_alunos_com_ocorrencias_por_sala(sala_id):
+    supabase = get_supabase()
+    try:
+        resp = supabase.table('ocorrencias').select('aluno_id, aluno_nome').eq('sala_id', sala_id).execute()
+        ocorrencias = handle_supabase_response(resp)
+        alunos_unicos = {}
+        for occ in ocorrencias:
+            if occ.get('aluno_id') and occ.get('aluno_nome'):
+                alunos_unicos[occ['aluno_id']] = occ['aluno_nome']
+        resultado = [{'id': k, 'nome': v} for k, v in alunos_unicos.items()]
+        return jsonify(resultado)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ocorrencias_por_aluno/<int:aluno_id>', methods=['GET'])
+def api_ocorrencias_por_aluno(aluno_id):
+    supabase = get_supabase()
+    try:
+        resp = supabase.table('ocorrencias').select('*').eq('aluno_id', aluno_id).order('data_hora', desc=True).execute()
+        return jsonify(handle_supabase_response(resp))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # =============================================================
 # ROTAS DE FREQUÊNCIA
@@ -759,6 +827,40 @@ def get_frequencia_diaria():
 def api_salas_alias():
     return api_d_salas()
 
+@app.route('/api/d_salas', methods=['GET'])
+def api_d_salas():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table("d_salas").select("id, nome").eq('ativa', True).order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/d_funcionarios', methods=['GET'])
+def api_d_funcionarios():
+    supabase = get_supabase()
+    try:
+        resp = supabase.table("d_funcionarios").select("id, nome").order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/d_alunos', methods=['GET'])
+def api_d_alunos():
+    supabase = get_supabase()
+    try:
+        sala_id = request.args.get("sala_id")
+        q = supabase.table("d_alunos").select("id, nome, tutor_nome, sala_id")
+        if sala_id:
+            q = q.eq("sala_id", int(sala_id))
+        resp = q.order("nome").execute()
+        data = handle_supabase_response(resp)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route('/api/salvar_atraso', methods=['POST'])
 def api_salvar_atraso():
     return salvar_frequencia_unificada()
@@ -770,48 +872,6 @@ def api_salvar_saida_antecipada():
 @app.route('/api/salvar_frequencia', methods=['POST'])
 def api_salvar_frequencia():
     return salvar_frequencia_unificada()
-
-@app.route('/api/ocorrencias_abertas', methods=['GET'])
-def api_ocorrencias_abertas():
-    supabase = get_supabase()
-    try:
-        resp = supabase.table('ocorrencias').select('*').eq('status', 'ATENDIMENTO').order('data_hora', desc=True).execute()
-        return jsonify(handle_supabase_response(resp))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ocorrencias_finalizadas', methods=['GET'])
-def api_ocorrencias_finalizadas():
-    supabase = get_supabase()
-    try:
-        resp = supabase.table('ocorrencias').select('*').in_('status', ['FINALIZADA', 'ASSINADA']).order('data_hora', desc=True).execute()
-        return jsonify(handle_supabase_response(resp))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/alunos_com_ocorrencias_por_sala/<int:sala_id>', methods=['GET'])
-def api_alunos_com_ocorrencias_por_sala(sala_id):
-    supabase = get_supabase()
-    try:
-        resp = supabase.table('ocorrencias').select('aluno_id, aluno_nome').eq('sala_id', sala_id).execute()
-        ocorrencias = handle_supabase_response(resp)
-        alunos_unicos = {}
-        for occ in ocorrencias:
-            if occ.get('aluno_id') and occ.get('aluno_nome'):
-                alunos_unicos[occ['aluno_id']] = occ['aluno_nome']
-        resultado = [{'id': k, 'nome': v} for k, v in alunos_unicos.items()]
-        return jsonify(resultado)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ocorrencias_por_aluno/<int:aluno_id>', methods=['GET'])
-def api_ocorrencias_por_aluno(aluno_id):
-    supabase = get_supabase()
-    try:
-        resp = supabase.table('ocorrencias').select('*').eq('aluno_id', aluno_id).order('data_hora', desc=True).execute()
-        return jsonify(handle_supabase_response(resp))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 # =============================================================
 # MÓDULO TUTORIA
@@ -1438,6 +1498,3 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-
-
-
