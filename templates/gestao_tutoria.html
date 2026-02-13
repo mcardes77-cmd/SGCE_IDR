@@ -98,7 +98,7 @@
 
         async function carregarSalas() {
             try {
-                const response = await fetch('/api/salas');
+                const response = await fetch('/api/d_salas');
                 salasData = await response.json();
                 
                 const selects = document.querySelectorAll('.select-sala');
@@ -530,4 +530,5 @@
         </footer>
     </div>
 </body>
+
 </html>
