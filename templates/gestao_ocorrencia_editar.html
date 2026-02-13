@@ -124,6 +124,14 @@
                     <p class="text-xs text-gray-400 mt-1" id="help-gestao">Este campo será editável apenas se você acessou através do link "G"</p>
                 </div>
 
+                <!-- Campo para solicitar responsável (visível apenas para gestão) -->
+                <div class="mb-4" id="campo-solicitar-responsavel" style="display: none;">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="solicitar-responsavel" class="mr-2 h-5 w-5 text-accent">
+                        <span>Solicitar presença do responsável? (Se não, a ocorrência será finalizada)</span>
+                    </label>
+                </div>
+
                 <button type="button" onclick="salvarAtendimento()" id="btn-salvar" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white hidden">
                     SALVAR ATENDIMENTO
                 </button>
@@ -137,11 +145,10 @@
         </footer>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         let ocorrenciaAtual = null;
         let nivelAtual = null;
-        let ocorrenciaId = null; // Vamos precisar do ID interno, não só do número
+        let ocorrenciaId = null; // ID interno da ocorrência
         
         const mapaNiveis = {
             'T': {
@@ -169,7 +176,7 @@
 
         function iniciarPagina() {
             const urlParams = new URLSearchParams(window.location.search);
-            ocorrenciaAtual = urlParams.get('id'); // Este é o número da ocorrência
+            ocorrenciaAtual = urlParams.get('id'); // número da ocorrência
             nivelAtual = urlParams.get('nivel');
             
             if (ocorrenciaAtual) {
@@ -188,8 +195,7 @@
                 const ocorrencia = await response.json();
                 if (ocorrencia.error) throw new Error(ocorrencia.error);
                 
-                // Guardar o ID interno da ocorrência
-                ocorrenciaId = ocorrencia.id;
+                ocorrenciaId = ocorrencia.id; // ID interno
                 
                 preencherDadosOcorrencia(ocorrencia);
                 aplicarRegrasEdicao(nivelAtual);
@@ -215,6 +221,7 @@
         function aplicarRegrasEdicao(nivel) {
             const camposAtendimento = ['atendimento_tutor', 'atendimento_coordenacao', 'atendimento_gestao'];
             
+            // Reset: todos readonly
             camposAtendimento.forEach(campo => {
                 const element = document.getElementById(campo);
                 element.readOnly = true;
@@ -223,6 +230,7 @@
             });
             
             document.getElementById('btn-salvar').classList.add('hidden');
+            document.getElementById('campo-solicitar-responsavel').style.display = 'none';
             
             if (nivel && mapaNiveis[nivel]) {
                 const config = mapaNiveis[nivel];
@@ -237,6 +245,11 @@
                 badge.classList.remove('hidden');
                 
                 document.getElementById('btn-salvar').classList.remove('hidden');
+                
+                // Se for gestão, mostra o campo de solicitar responsável
+                if (nivel === 'G') {
+                    document.getElementById('campo-solicitar-responsavel').style.display = 'block';
+                }
                 
                 setTimeout(() => {
                     element.focus();
@@ -258,24 +271,20 @@
                 return;
             }
             
+            const dadosEnviar = {
+                tipo: config.tipo,
+                texto: texto.trim()
+            };
+            
+            // Se for gestão, incluir flag de solicitar responsável
+            if (nivelAtual === 'G') {
+                dadosEnviar.solicitar_responsavel = document.getElementById('solicitar-responsavel').checked;
+            }
+            
             try {
-                // CORREÇÃO: Enviar no formato que o backend espera
-                const dadosEnviar = {
-                    tipo: config.tipo, // "tutor", "coordenacao" ou "gestao"
-                    texto: texto.trim()
-                };
-                
-                console.log('Enviando dados para API:', {
-                    url: `/api/ocorrencias/${ocorrenciaId}/atendimento`,
-                    method: 'PUT',
-                    dados: dadosEnviar
-                });
-                
                 const response = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dadosEnviar)
                 });
                 
@@ -316,12 +325,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', iniciarPagina);
-
-        // A função gerarPDFAluno() permanece exatamente igual
-        function gerarPDFAluno() {
-            // Implementação da função gerarPDFAluno aqui
-        }
     </script>
 </body>
 </html>
-
