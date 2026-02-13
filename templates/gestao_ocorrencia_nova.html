@@ -52,7 +52,7 @@
                 <div class="mb-6">
                     <label class="block text-sm text-gray-300 mb-2">Professor Responsável *</label>
                     <select id="professor" class="form-select" required onchange="carregarSalas()">
-                        <option value="">Selecione o professor responsável</option>
+                        <option value="">Carregando professores...</option>
                     </select>
                 </div>
 
@@ -145,12 +145,23 @@
         }
 
         async function carregarProfessores() {
+            const selectProfessor = document.getElementById('professor');
+            selectProfessor.innerHTML = '<option value="">Carregando...</option>';
+            
             try {
                 const response = await fetch('/api/professores');
-                if (!response.ok) throw new Error('Erro ao carregar professores');
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
                 
                 const professores = await response.json();
-                const selectProfessor = document.getElementById('professor');
+                
+                if (!Array.isArray(professores) || professores.length === 0) {
+                    selectProfessor.innerHTML = '<option value="">Nenhum professor cadastrado</option>';
+                    mostrarMensagem('Nenhum professor encontrado. Cadastre um funcionário como professor.', 'error');
+                    return;
+                }
+                
                 selectProfessor.innerHTML = '<option value="">Selecione o professor responsável</option>';
                 
                 professores.forEach(professor => {
@@ -160,13 +171,10 @@
                     selectProfessor.appendChild(option);
                 });
 
-                if (professores.length === 0) {
-                    selectProfessor.innerHTML = '<option value="">Nenhum professor cadastrado</option>';
-                }
             } catch (error) {
                 console.error('Erro ao carregar professores:', error);
-                mostrarMensagem('Erro ao carregar lista de professores', 'error');
-                document.getElementById('professor').innerHTML = '<option value="">Erro ao carregar</option>';
+                selectProfessor.innerHTML = '<option value="">Erro ao carregar professores</option>';
+                mostrarMensagem('Erro ao carregar lista de professores. Verifique o console.', 'error');
             }
         }
 
