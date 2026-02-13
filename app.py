@@ -170,6 +170,7 @@ def api_professores():
             return jsonify(professores)
         return jsonify([])
     except Exception as e:
+        logger.exception("Erro ao buscar professores")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/salas_por_professor/<int:professor_id>')
@@ -1436,4 +1437,5 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
 
