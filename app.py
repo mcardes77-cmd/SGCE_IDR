@@ -508,9 +508,17 @@ def api_update_atendimento(oc_id):
         texto = payload.get("texto", "")
         if tipo not in ("tutor", "coordenacao", "gestao"):
             return jsonify({"ok": False, "error": "tipo inválido"}), 400
+        
         field_text = f"atendimento_{tipo}"
         field_dt = f"dt_atendimento_{tipo}"
         updates = {field_text: texto, field_dt: now_iso()}
+        
+        # Se for gestão e não solicitou responsável, finalizar a ocorrência
+        if tipo == "gestao":
+            solicitar_responsavel = payload.get("solicitar_responsavel", False)
+            if not solicitar_responsavel:
+                updates["status"] = "FINALIZADA"
+        
         resp = supabase.table("ocorrencias").update(updates).eq("id", oc_id).execute()
         data = handle_supabase_response(resp)
         return jsonify({"ok": True, "data": data})
@@ -1428,3 +1436,4 @@ app.register_blueprint(main_bp, url_prefix='/')
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
