@@ -113,29 +113,27 @@
             }
         }
 
-        async function carregarSalas() {
-            try {
-                console.log('Carregando salas...');
-                salasData = await safeFetch('/api/d_salas');
-                console.log('Salas carregadas:', salasData);
-                
-                document.querySelectorAll('.select-sala').forEach(select => {
-                    select.innerHTML = '<option value="">Selecione a Sala</option>';
-                    salasData.forEach(sala => {
-                        const nomeSala = sala.nome || sala.sala || 'Sem nome';
-                        select.innerHTML += `<option value="${sala.id}">${nomeSala}</option>`;
-                    });
-                });
-            } catch (e) {
-                console.error('Erro ao carregar salas:', e);
-                mostrarMsg('Erro ao carregar salas', 'danger');
-                // Preencher com dados de fallback para teste
-                document.querySelectorAll('.select-sala').forEach(select => {
-                    select.innerHTML = '<option value="">Erro ao carregar salas</option>';
-                });
-            }
-        }
-
+       async function carregarSalas() {
+    try {
+        console.log('Carregando salas...');
+        salasData = await safeFetch('/api/d_salas'); // ALTERADO
+        console.log('Salas carregadas:', salasData);
+        
+        document.querySelectorAll('.select-sala').forEach(select => {
+            select.innerHTML = '<option value="">Selecione a Sala</option>';
+            salasData.forEach(sala => {
+                const nomeSala = sala.nome || sala.sala || 'Sem nome';
+                select.innerHTML += `<option value="${sala.id}">${nomeSala}</option>`;
+            });
+        });
+    } catch (e) {
+        console.error('Erro ao carregar salas:', e);
+        mostrarMsg('Erro ao carregar salas', 'danger');
+        document.querySelectorAll('.select-sala').forEach(select => {
+            select.innerHTML = '<option value="">Erro ao carregar salas</option>';
+        });
+    }
+}
         // ========== MÓDULO REGISTRO DE FREQUÊNCIA ==========
         function configurarModuloRegistro() {
             const selectSala = document.getElementById('select-sala-registro');
@@ -1288,3 +1286,4 @@
 </body>
 
 </html>
+
