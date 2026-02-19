@@ -24,56 +24,63 @@
       }
     };
 
-    let dadosGlobal = [];
+    // Inicialização
+    document.addEventListener("DOMContentLoaded", () => {
+      carregarSalas();
+      carregarMeses();
+    });
 
-    async function carregarFiltrosIniciais() {
+    async function carregarSalas() {
       try {
         const resp = await fetch("/api/d_salas");
-        const salas = await resp.json();
+        const data = await resp.json();
+        const salas = data.data || data;
         const select = document.getElementById("salaSelect");
         select.innerHTML = '<option value="" class="text-black">Selecione a Sala</option>';
-        (salas.data || salas).forEach(s => {
+        salas.forEach(s => {
           select.innerHTML += `<option value="${s.id}" class="text-black">${s.nome}</option>`;
         });
-
-        const mesSelect = document.getElementById("mesSelect");
-        const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-        mesSelect.innerHTML = '<option value="" class="text-black">Selecione o Mês</option>';
-        meses.forEach((m, i) => {
-          mesSelect.innerHTML += `<option value="${i+1}" class="text-black">${m}</option>`;
-        });
-      } catch (e) { console.error("Erro ao carregar salas:", e); }
+      } catch (err) { console.error("Erro ao carregar salas"); }
     }
 
-    async function visualizarFrequencia() {
+    function carregarMeses() {
+      const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+      const sel = document.getElementById("mesSelect");
+      sel.innerHTML = '<option value="" class="text-black">Selecione o Mês</option>';
+      meses.forEach((m,i) => {
+        sel.innerHTML += `<option value="${i+1}" class="text-black">${m}</option>`;
+      });
+    }
+
+    async function visualizar() {
       const sala = document.getElementById("salaSelect").value;
       const mes = document.getElementById("mesSelect").value;
       const container = document.getElementById("tabelaContainer");
       const btnPDF = document.getElementById("btnGerarPDF");
 
-      if (!sala || !mes) return alert("Selecione Sala e Mês");
+      if (!sala || !mes) return alert("Selecione a sala e o mês.");
 
-      container.innerHTML = "<p class='text-accent'>A carregar dados...</p>";
-      btnPDF.classList.add("hidden"); // Esconde o PDF enquanto carrega
+      container.innerHTML = '<p class="text-accent animate-pulse">Buscando dados no sistema...</p>';
+      btnPDF.classList.add("hidden"); // Esconde o botão até ter dados
 
       try {
         const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
         const data = await resp.json();
-        dadosGlobal = data.data || data;
+        const dados = data.data || data;
 
-        if (!dadosGlobal || dadosGlobal.length === 0) {
-          container.innerHTML = "Nenhum dado encontrado para esta seleção.";
+        if (!dados || dados.length === 0) {
+          container.innerHTML = '<p class="text-gray-400 py-8">Nenhum registro encontrado para este período.</p>';
           return;
         }
 
-        renderizarTabela(dadosGlobal, mes);
-        btnPDF.classList.remove("hidden"); // Só mostra o botão de PDF se houver dados
+        montarTabela(dados, parseInt(mes));
+        btnPDF.classList.remove("hidden"); // Mostra o botão após montar a tabela
       } catch (e) {
-        container.innerHTML = "Erro ao conectar com o servidor.";
+        container.innerHTML = '<p class="text-red-500">Erro ao conectar com o servidor.</p>';
       }
     }
 
-    function renderizarTabela(dados, mes) {
+    function montarTabela(dados, mes) {
       const container = document.getElementById("tabelaContainer");
       const ano = dayjs().year();
       const diasUteis = [];
@@ -84,18 +91,18 @@
         if (data.day() !== 0 && data.day() !== 6) diasUteis.push(data);
       }
 
-      let html = `<div class='overflow-x-auto'><table id='tabelaDados' class='min-w-full border border-gray-700 text-xs text-center'>
-        <thead class='bg-gray-800 text-accent'><tr>
-        <th class='p-2 border border-gray-700 text-left bg-dark-secondary sticky left-0'>Aluno</th>`;
-      diasUteis.forEach(d => { html += `<th class='p-1 border border-gray-700'>${d.format("DD")}</th>`; });
-      html += `</tr></thead><tbody class='bg-dark-primary'>`;
+      let html = `<div class="overflow-x-auto"><table id="tabelaDados" class="min-w-full border border-gray-700 text-xs text-center rounded-lg">
+            <thead class="bg-dark-primary text-gray-300"><tr>
+            <th class="px-2 py-2 border border-gray-700 text-left bg-dark-secondary sticky left-0 z-10">Aluno</th>`;
+      diasUteis.forEach(d => { html += `<th class="px-1 py-2 border border-gray-700">${d.format("DD")}</th>`; });
+      html += `</tr></thead><tbody class="divide-y divide-gray-700">`;
 
       dados.forEach(aluno => {
-        html += `<tr><td class='p-2 border border-gray-700 text-left bg-gray-900 text-white sticky left-0'>${aluno.nome}</td>`;
+        html += `<tr><td class="border border-gray-700 text-left px-2 py-2 bg-gray-800 text-white sticky left-0 z-10">${aluno.nome}</td>`;
         diasUteis.forEach(d => {
           const status = aluno.frequencia?.[d.format("YYYY-MM-DD")]?.status || "-";
-          const cor = status === "P" ? "text-green-400" : status === "F" ? "text-red-400" : "text-yellow-400";
-          html += `<td class='border border-gray-700 ${cor} font-bold'>${status}</td>`;
+          let cor = status === "P" ? "text-green-500 font-bold" : status === "F" ? "text-red-500 font-bold" : "text-yellow-400 font-bold";
+          html += `<td class="border border-gray-700 ${cor}">${status}</td>`;
         });
         html += `</tr>`;
       });
@@ -106,12 +113,10 @@
     async function gerarPDF() {
       const btn = document.getElementById("btnGerarPDF");
       const container = document.getElementById("tabelaContainer");
+      const salaNome = document.getElementById("salaSelect").selectedOptions[0].text;
       
-      btn.innerHTML = "A PROCESSAR...";
       btn.disabled = true;
-
-      // Espera 500ms para garantir que o DOM está estável
-      await new Promise(r => setTimeout(r, 500));
+      btn.innerHTML = "Processando...";
 
       try {
         const canvas = await html2canvas(container, {
@@ -120,68 +125,83 @@
           backgroundColor: "#1E293B"
         });
 
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('l', 'mm', 'a4');
         const imgData = canvas.toDataURL('image/png');
-        const pdf = new jspdf.jsPDF('l', 'mm', 'a4');
         
         pdf.setFontSize(14);
         pdf.setTextColor(16, 185, 129);
-        pdf.text("SGCE - RELATÓRIO DE FREQUÊNCIA MENSAL", 10, 15);
+        pdf.text(`RELATÓRIO DE FREQUÊNCIA - ${salaNome}`, 10, 15);
         
-        const imgWidth = 277; 
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const pdfWidth = 277;
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         
-        pdf.addImage(imgData, 'PNG', 10, 25, imgWidth, imgHeight);
-        pdf.save(`relatorio_frequencia_${dayjs().format('MM_YYYY')}.pdf`);
-      } catch (e) {
-        alert("Erro ao criar PDF visual.");
+        pdf.addImage(imgData, 'PNG', 10, 25, pdfWidth, pdfHeight);
+        pdf.save(`frequencia_${salaNome.replace(/ /g, '_')}.pdf`);
+      } catch (err) {
+        alert("Erro ao gerar PDF.");
       } finally {
-        btn.innerHTML = "GERAR PDF";
         btn.disabled = false;
+        btn.innerHTML = "Gerar PDF";
       }
     }
-
-    window.onload = carregarFiltrosIniciais;
   </script>
 
   <style>
-    /* Resolve o problema do texto invisível nos selects */
-    select { color: white !important; background-color: #1F2937 !important; }
+    /* GARANTE QUE O TEXTO DO SELECT NÃO FIQUE BRANCO NO BRANCO */
+    select { color: white !important; background-color: #1F2937 !important; border: 1px solid #4B5563 !important; }
     option { color: black !important; background-color: white !important; }
+    
+    /* Scroll suave para a tabela */
+    .overflow-x-auto::-webkit-scrollbar { height: 8px; }
+    .overflow-x-auto::-webkit-scrollbar-thumb { background: #4B5563; border-radius: 4px; }
   </style>
 </head>
 
-<body class="bg-dark-primary text-text-light min-h-screen p-6">
+<body class="bg-dark-primary min-h-screen text-text-light p-4 md:p-8">
   <div class="max-w-7xl mx-auto">
-    <header class="mb-10 text-center">
-      <h1 class="text-3xl font-bold text-accent">SISTEMA SGCE</h1>
-      <p class="text-gray-400">Gestão de Convivência Escolar - Frequência</p>
-      <button onclick="window.location.href='/gestao_frequencia'" class="mt-4 text-xs border border-gray-600 px-4 py-2 rounded hover:bg-gray-800">VOLTAR</button>
+    <header class="text-center mb-8">
+      <h1 class="text-2xl font-bold text-accent tracking-tighter">SISTEMA SGCE</h1>
+      <p class="text-gray-400 text-sm">GESTÃO DE FREQUÊNCIA - RELATÓRIO MENSAL</p>
+      <button onclick="window.location.href='/gestao_frequencia'" 
+              class="mt-4 px-4 py-2 text-xs rounded border border-gray-600 hover:bg-gray-700 transition">
+        VOLTAR AO MENU
+      </button>
     </header>
 
-    <div class="bg-dark-secondary p-6 rounded-xl shadow-lg border border-gray-800">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <main class="bg-dark-secondary rounded-xl p-6 shadow-2xl border border-gray-800">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div>
-          <label class="text-xs font-bold text-gray-500 uppercase">Sala</label>
-          <select id="salaSelect" class="w-full p-3 rounded-lg border border-gray-700 outline-none focus:border-accent"></select>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Sala</label>
+          <select id="salaSelect" class="w-full p-3 rounded-lg outline-none focus:border-accent text-white"></select>
         </div>
         <div>
-          <label class="text-xs font-bold text-gray-500 uppercase">Mês</label>
-          <select id="mesSelect" class="w-full p-3 rounded-lg border border-gray-700 outline-none focus:border-accent"></select>
+          <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Mês</label>
+          <select id="mesSelect" class="w-full p-3 rounded-lg outline-none focus:border-accent text-white"></select>
         </div>
         <div class="flex items-end">
-          <button onclick="visualizarFrequencia()" class="w-full bg-accent hover:bg-emerald-600 text-dark-primary font-bold py-3 rounded-lg transition-all">VISUALIZAR</button>
+          <button id="btnVisualizar" onclick="visualizar()" class="w-full bg-accent hover:bg-emerald-600 text-dark-primary font-bold py-3 rounded-lg transition-all">
+            VISUALIZAR
+          </button>
         </div>
       </div>
 
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Mapa de Frequência</h2>
-        <button id="btnGerarPDF" class="hidden bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-lg text-xs font-bold transition-all">GERAR PDF</button>
+          <h3 class="text-xs font-bold text-gray-500 uppercase">Mapa de Presenças</h3>
+          <button id="btnGerarPDF" class="hidden bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-xs font-bold">
+            GERAR PDF
+          </button>
       </div>
 
-      <div id="tabelaContainer" class="bg-dark-primary/50 rounded-lg p-6 border border-gray-800 min-h-[200px] flex items-center justify-center text-gray-500 italic">
-        Selecione os filtros e clique em visualizar para carregar os dados.
+      <div id="tabelaContainer" class="bg-dark-primary/30 rounded-lg border border-gray-800 p-4 min-h-[300px] flex items-center justify-center text-center text-gray-600">
+        Selecione os filtros acima para visualizar os dados antes de gerar o PDF.
       </div>
-    </div>
+    </main>
+
+    <footer class="mt-8 text-center text-gray-600 text-[10px] uppercase tracking-widest">
+      <p>Desenvolvedor: Marcelo André Nogueira Cardes</p>
+      <p>Escola: E.E. PEI Professora Irene Dias Ribeiro</p>
+    </footer>
   </div>
 </body>
 </html>
