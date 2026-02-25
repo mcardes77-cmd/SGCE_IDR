@@ -670,36 +670,489 @@ def api_update_atendimento(oc_id):
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-# =============================================================
-# ROTAS DE FREQUÊNCIA (já existentes, mantidas)
-# =============================================================
-# ... (todo o código de frequência permanece igual, omitido por brevidade)
-# Inclua aqui todas as rotas de frequência do arquivo original
+# ========== ROTAS DE FREQUÊNCIA ==========
+
+@app.route('/api/d_salas', methods=['GET'])
+def get_salas():
+    """Buscar todas as salas"""
+    try:
+        response = supabase.table('d_salas').select('*').eq('ativa', True).execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/alunos_por_sala/<int:sala_id>', methods=['GET'])
+def get_alunos_por_sala(sala_id):
+    """Buscar alunos por sala"""
+    try:
+        response = supabase.table('d_alunos').select('*').eq('sala_id', sala_id).execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/frequencia/status', methods=['GET'])
+def get_status_frequencia():
+    """Verificar se frequência já foi registrada para uma sala e data"""
+    try:
+        sala_id = request.args.get('sala_id')
+        data = request.args.get('data')
+        
+        if not sala_id or not data:
+            return jsonify({'error': 'sala_id e data são obrigatórios'}), 400
+        
+        # Buscar nome da sala
+        sala_response = supabase.table('d_salas').select('nome').eq('id', sala_id).execute()
+        if not sala_response.data:
+            return jsonify({'error': 'Sala não encontrada'}), 404
+        
+        sala_nome = sala_response.data[0]['nome']
+        
+        # Verificar se existe frequência para esta sala e data
+        response = supabase.table('f_frequencia').select('id').eq('sala_nome', sala_nome).eq('data', data).execute()
+        
+        return jsonify({'registrada': len(response.data) > 0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/salvar_frequencia_unificada', methods=['POST'])
+def salvar_frequencia_unificada():
+    """Salvar frequência, atrasos e saídas antecipadas"""
+    try:
+        dados = request.get_json()
+        
+        if not isinstance(dados, list):
+            return jsonify({'error': 'Dados devem ser uma lista'}), 400
+        
+        resultados = []
+        
+        for registro in dados:
+            # Buscar nome da sala se só tiver sala_id
+            sala_nome = registro.get('sala_nome')
+            if not sala_nome and 'sala_id' in registro:
+                sala_response = supabase.table('d_salas').select('nome').eq('id', registro['sala_id']).execute()
+                if sala_response.data:
+                    sala_nome = sala_response.data[0]['nome']
+                else:
+                    resultados.append({'error': f'Sala com id {registro["sala_id"]} não encontrada'})
+                    continue
+            
+            # Buscar nome do aluno se só tiver aluno_id
+            aluno_nome = registro.get('aluno_nome')
+            if not aluno_nome and 'aluno_id' in registro:
+                aluno_response = supabase.table('d_alunos').select('nome').eq('id', registro['aluno_id']).execute()
+                if aluno_response.data:
+                    aluno_nome = aluno_response.data[0]['nome']
+                else:
+                    resultados.append({'error': f'Aluno com id {registro["aluno_id"]} não encontrado'})
+                    continue
+            
+            if not aluno_nome or not sala_nome:
+                resultados.append({'error': 'Nome do aluno e sala são obrigatórios'})
+                continue
+            
+            # Verificar se já existe registro para este aluno na data
+            existing = supabase.table('f_frequencia')\
+                .select('*')\
+                .eq('aluno_nome', aluno_nome)\
+                .eq('data', registro['data'])\
+                .execute()
+            
+            # Determinar status baseado nos dados
+            status = determinar_status(registro, existing.data[0] if existing.data else None)
+            
+            # Preparar dados para inserção/atualização
+            dados_frequencia = {
+                'aluno_nome': aluno_nome,
+                'sala_nome': sala_nome,
+                'data': registro['data'],
+                'status': status,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Adicionar campos opcionais se existirem
+            campos_opcionais = [
+                'hora_entrada', 'motivo_atraso', 'hora_saida', 
+                'motivo_saida', 'responsavel_nome', 'responsavel_telefone'
+            ]
+            
+            for campo in campos_opcionais:
+                if campo in registro:
+                    dados_frequencia[campo] = registro[campo]
+            
+            if existing.data:
+                # Atualizar registro existente
+                result = supabase.table('f_frequencia')\
+                    .update(dados_frequencia)\
+                    .eq('id', existing.data[0]['id'])\
+                    .execute()
+            else:
+                # Inserir novo registro
+                dados_frequencia['created_at'] = datetime.now().isoformat()
+                result = supabase.table('f_frequencia')\
+                    .insert(dados_frequencia)\
+                    .execute()
+            
+            if result.data:
+                resultados.append(result.data[0])
+            else:
+                resultados.append({'error': 'Falha ao salvar'})
+        
+        return jsonify({'message': 'Dados salvos com sucesso', 'data': resultados}), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def determinar_status(novo_registro, registro_existente):
+    """Determinar o status final baseado no registro existente e novo"""
+    if registro_existente:
+        status_atual = registro_existente.get('status', 'P')
+    else:
+        status_atual = novo_registro.get('status', 'P')  # Default para Presença
+    
+    # Se veio com status explícito, usar esse
+    if 'status' in novo_registro and novo_registro['status'] in ['P', 'F']:
+        return novo_registro['status']
+    
+    # Lógica para combinar status
+    tem_atraso = 'hora_entrada' in novo_registro and novo_registro['hora_entrada']
+    tem_saida = 'hora_saida' in novo_registro and novo_registro['hora_saida']
+    
+    # Se é um registro de frequência normal (sem atraso/saída)
+    if not tem_atraso and not tem_saida and 'status' in novo_registro:
+        return novo_registro['status']
+    
+    # Lógica para status especiais
+    if tem_atraso and tem_saida:
+        return 'PSA'  # Presença com Atraso e Saída Antecipada
+    elif tem_atraso:
+        # Se já tinha saída, vira PSA, senão PA
+        if registro_existente and registro_existente.get('hora_saida'):
+            return 'PSA'
+        return 'PA'   # Presença com Atraso
+    elif tem_saida:
+        # Se já tinha atraso, vira PSA, senão PS
+        if registro_existente and registro_existente.get('hora_entrada'):
+            return 'PSA'
+        return 'PS'   # Presença com Saída Antecipada
+    
+    return status_atual
+
+@app.route('/api/frequencia', methods=['GET'])
+def get_frequencia_relatorio():
+    """Buscar dados de frequência para relatório"""
+    try:
+        sala_id = request.args.get('sala')
+        mes = request.args.get('mes')
+        ano = datetime.now().year
+        
+        if not sala_id or not mes:
+            return jsonify({'error': 'sala e mes são obrigatórios'}), 400
+        
+        # Buscar nome da sala
+        sala_response = supabase.table('d_salas').select('nome').eq('id', sala_id).execute()
+        if not sala_response.data:
+            return jsonify({'error': 'Sala não encontrada'}), 404
+        
+        sala_nome = sala_response.data[0]['nome']
+        
+        # Buscar alunos da sala
+        alunos_response = supabase.table('d_alunos')\
+            .select('id, nome')\
+            .eq('sala_id', sala_id)\
+            .execute()
+        
+        if not alunos_response.data:
+            return jsonify([])
+        
+        # Buscar frequência dos alunos no mês
+        data_inicio = f"{ano}-{mes.zfill(2)}-01"
+        data_fim = f"{ano}-{mes.zfill(2)}-31"
+        
+        frequencia_response = supabase.table('f_frequencia')\
+            .select('*')\
+            .in_('aluno_nome', [aluno['nome'] for aluno in alunos_response.data])\
+            .eq('sala_nome', sala_nome)\
+            .gte('data', data_inicio)\
+            .lte('data', data_fim)\
+            .execute()
+        
+        # Organizar dados
+        resultado = []
+        for aluno in alunos_response.data:
+            frequencia_aluno = {}
+            
+            for freq in frequencia_response.data:
+                if freq['aluno_nome'] == aluno['nome']:
+                    frequencia_aluno[freq['data']] = {
+                        'status': freq['status'],
+                        'hora_entrada': freq.get('hora_entrada'),
+                        'motivo_atraso': freq.get('motivo_atraso'),
+                        'hora_saida': freq.get('hora_saida'),
+                        'motivo_saida': freq.get('motivo_saida'),
+                        'responsavel_nome': freq.get('responsavel_nome'),
+                        'responsavel_telefone': freq.get('responsavel_telefone')
+                    }
+            
+            resultado.append({
+                'id': aluno['id'],
+                'nome': aluno['nome'],
+                'frequencia': frequencia_aluno
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+@app.route("/api/frequencia_detalhes/<int:aluno_id>/<data>", methods=["GET"])
+def frequencia_detalhes(aluno_id, data):
+    try:
+        # Busca o registro de frequência do aluno para a data informada
+        result = supabase.table("f_frequencia") \
+            .select("aluno_id, aluno_nome, data, status, hora_entrada, motivo_atraso, hora_saida, motivo_saida") \
+            .eq("aluno_id", aluno_id) \
+            .eq("data", data) \
+            .limit(1) \
+            .execute()
+
+        if not result.data:
+            return jsonify({"error": "Registro não encontrado"}), 404
+
+        registro = result.data[0]
+
+        return jsonify({
+            "aluno_id": registro.get("aluno_id"),
+            "aluno_nome": registro.get("aluno_nome"),
+            "data": registro.get("data"),
+            "status": registro.get("status"),
+            "hora_entrada": registro.get("hora_entrada"),
+            "motivo_atraso": registro.get("motivo_atraso"),
+            "hora_saida": registro.get("hora_saida"),
+            "motivo_saida": registro.get("motivo_saida"),
+        }), 200
+
+    except Exception as e:
+        print("Erro ao buscar detalhes de frequência:", e)
+        return jsonify({"error": str(e)}), 500
+
+# ========== ROTAS ADICIONAIS PARA COMPATIBILIDADE ==========
+
+@app.route('/api/frequencia_diaria', methods=['GET'])
+def get_frequencia_diaria():
+    """Buscar frequência de uma sala em uma data específica"""
+    try:
+        sala_id = request.args.get('sala_id')
+        data = request.args.get('data')
+        
+        if not sala_id or not data:
+            return jsonify({'error': 'sala_id e data são obrigatórios'}), 400
+        
+        # Buscar nome da sala
+        sala_response = supabase.table('d_salas').select('nome').eq('id', sala_id).execute()
+        if not sala_response.data:
+            return jsonify({'error': 'Sala não encontrada'}), 404
+        
+        sala_nome = sala_response.data[0]['nome']
+        
+        # Buscar alunos da sala
+        alunos_response = supabase.table('d_alunos')\
+            .select('id, nome')\
+            .eq('sala_id', sala_id)\
+            .execute()
+        
+        # Buscar frequência dos alunos na data
+        frequencia_response = supabase.table('f_frequencia')\
+            .select('*')\
+            .in_('aluno_nome', [aluno['nome'] for aluno in alunos_response.data])\
+            .eq('sala_nome', sala_nome)\
+            .eq('data', data)\
+            .execute()
+        
+        resultado = []
+        for aluno in alunos_response.data:
+            freq_aluno = next((f for f in frequencia_response.data if f['aluno_nome'] == aluno['nome']), None)
+            
+            resultado.append({
+                'aluno_id': aluno['id'],
+                'aluno_nome': aluno['nome'],
+                'status': freq_aluno['status'] if freq_aluno else 'P',
+                'hora_entrada': freq_aluno.get('hora_entrada') if freq_aluno else None,
+                'hora_saida': freq_aluno.get('hora_saida') if freq_aluno else None
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 # =============================================================
-# NOVOS ENDPOINTS - MÓDULO TUTORIA (já existentes, mantidos)
+# ROTAS HTML (mantidas)
 # =============================================================
-# ... (código de tutoria permanece igual)
 
-# =============================================================
-# NOVOS ENDPOINTS - MÓDULO TECNOLOGIA (já existentes, mantidos)
-# =============================================================
-# ... (código de tecnologia permanece igual)
+main_bp = Blueprint('main', __name__)
 
-# =============================================================
-# NOVOS ENDPOINTS - MÓDULO CADASTRO (CRUD) (já existentes, mantidos)
-# =============================================================
-# ... (código de cadastro permanece igual)
+@main_bp.route('/')
+def home():
+    return render_template('index.html')
 
-# =============================================================
-# ALIASES E ROTAS ADICIONAIS PARA COMPATIBILIDADE
-# =============================================================
-# ... (código de aliases permanece igual)
+# ocorrencias
+@main_bp.route('/gestao_ocorrencia')
+def gestao_ocorrencia():
+    return render_template('gestao_ocorrencia.html')
 
-# =============================================================
-# ROTAS HTML (Blueprint principal) (já existentes, mantidas)
-# =============================================================
-# ... (código de rotas HTML permanece igual)
+@main_bp.route('/gestao_ocorrencia_nova')
+def gestao_ocorrencia_nova():
+    return render_template('gestao_ocorrencia_nova.html')
+
+@main_bp.route('/gestao_ocorrencia_abertas')
+def gestao_ocorrencia_abertas():
+    return render_template('gestao_ocorrencia_aberta.html')
+
+@main_bp.route('/gestao_ocorrencia_finalizadas')
+def gestao_ocorrencia_finalizadas():
+    return render_template('gestao_ocorrencia_finalizada.html')
+
+@main_bp.route('/gestao_ocorrencia_editar')
+def gestao_ocorrencia_editar():
+    return render_template('gestao_ocorrencia_editar.html')
+
+@main_bp.route('/gestao_relatorio_impressao')
+def gestao_relatorio_impressao():
+    return render_template('gestao_relatorio_impressao.html')
+
+# frequencia
+@main_bp.route('/gestao_frequencia')
+def gestao_frequencia():
+    return render_template('gestao_frequencia.html')
+
+@main_bp.route('/gestao_frequencia_registro')
+def gestao_frequencia_registro():
+    return render_template('gestao_frequencia_registro.html')
+
+@main_bp.route('/gestao_frequencia_atraso')
+def gestao_frequencia_atraso():
+    return render_template('gestao_frequencia_atraso.html')
+
+@main_bp.route('/gestao_frequencia_saida')
+def gestao_frequencia_saida():
+    return render_template('gestao_frequencia_saida.html')
+
+@main_bp.route('/gestao_relatorio_frequencia')
+def gestao_relatorio_frequencia():
+    return render_template('gestao_relatorio_frequencia.html')
+
+# tutoria
+@main_bp.route('/gestao_tutoria')
+def gestao_tutoria():
+    return render_template('gestao_tutoria.html')
+
+@main_bp.route('/gestao_tutoria_ficha')
+def gestao_tutoria_ficha():
+    return render_template('gestao_tutoria_ficha.html')
+
+@main_bp.route('/gestao_validacao_documentos')
+def gestao_validacao_documentos():
+    return render_template('gestao_validacao_documentos.html')
+
+@main_bp.route('/gestao_tutoria_agendamento')
+def gestao_tutoria_agendamento():
+    return render_template('gestao_tutoria_agendamento.html')
+
+@main_bp.route('/gestao_tutoria_registro')
+def gestao_tutoria_registro():
+    return render_template('gestao_tutoria_registro.html')
+
+@main_bp.route('/gestao_tutoria_notas')
+def gestao_tutoria_notas():
+    return render_template('gestao_tutoria_notas.html')
+
+@main_bp.route('/gestao_relatorio_tutoria')
+def gestao_relatorio_tutoria():
+    return render_template('gestao_relatorio_tutoria.html')
+
+# cadastro
+@main_bp.route('/gestao_cadastro')
+def gestao_cadastro():
+    return render_template('gestao_cadastro.html')
+
+@main_bp.route('/gestao_cadastro_professor_funcionario')
+def gestao_cadastro_professor_funcionario():
+    return render_template('gestao_cadastro_professor_funcionario.html')
+
+@main_bp.route('/gestao_cadastro_aluno')
+def gestao_cadastro_aluno():
+    return render_template('gestao_cadastro_aluno.html')
+
+@main_bp.route('/gestao_cadastro_tutor')
+def gestao_cadastro_tutor():
+    return render_template('gestao_cadastro_tutor.html')
+
+@main_bp.route('/gestao_cadastro_sala')
+def gestao_cadastro_sala():
+    return render_template('gestao_cadastro_sala.html')
+
+@main_bp.route('/gestao_cadastro_disciplinas')
+def gestao_cadastro_disciplinas():
+    return render_template('gestao_cadastro_disciplinas.html')
+
+@main_bp.route('/gestao_cadastro_eletiva')
+def gestao_cadastro_eletiva():
+    return render_template('gestao_cadastro_eletiva.html')
+
+@main_bp.route('/gestao_cadastro_clube')
+def gestao_cadastro_clube():
+    return render_template('gestao_cadastro_clube.html')
+
+@main_bp.route('/gestao_cadastro_equipamento')
+def gestao_cadastro_equipamento():
+    return render_template('gestao_cadastro_equipamento.html')
+
+@main_bp.route('/gestao_cadastro_vinculacao_tutor_aluno')
+def gestao_cadastro_vinculacao_tutor_aluno():
+    return render_template('gestao_cadastro_vinculacao_tutor_aluno.html')
+
+@main_bp.route('/gestao_cadastro_vinculacao_disciplina_sala')
+def gestao_cadastro_vinculacao_disciplina_sala():
+    return render_template('gestao_cadastro_vinculacao_disciplina_sala.html')
+
+# aulas
+@main_bp.route('/gestao_aulas')
+def gestao_aulas():
+    return render_template('gestao_aulas.html')
+
+@main_bp.route('/gestao_aulas_plano')
+def gestao_aulas_plano():
+    return render_template('gestao_aulas_plano.html')
+
+@main_bp.route('/gestao_aulas_guia')
+def gestao_aulas_guia():
+    return render_template('gestao_aulas_guia.html')
+
+# correções / tec
+@main_bp.route('/gestao_tecnologia')
+def gestao_tecnologia():
+    return render_template('gestao_tecnologia.html')
+
+@main_bp.route('/gestao_aulas_menu')
+def gestao_aulas_menu():
+    return render_template('gestao_aulas.html')
+
+@main_bp.route('/gestao_tecnologia_agendamento')
+def gestao_tecnologia_agendamento():
+    return render_template('gestao_tecnologia_agendamento.html')
+
+@main_bp.route('/gestao_tecnologia_historico')
+def gestao_tecnologia_historico():
+    return render_template('gestao_tecnologia_historico.html')
+
+@main_bp.route('/gestao_tecnologia_ocorrencia')
+def gestao_tecnologia_ocorrencia():
+    return render_template('gestao_tecnologia_ocorrencia.html')
+
+# Registrar blueprint principal
+app.register_blueprint(main_bp, url_prefix='/')
+
 
 # =============================================================
 # Execução
