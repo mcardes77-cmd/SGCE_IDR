@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Ocorrência</title>
+    <title>Nova Ocorrência - Gestão Escolar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -20,118 +20,125 @@
         };
     </script>
     <style>
-        .form-input, .form-select, .form-textarea {
+        .form-select, .form-textarea {
             background-color: #374151;
             color: #F8FAFC;
             border: 1px solid #4B5563;
             padding: 0.75rem;
             border-radius: 0.375rem;
             width: 100%;
+            transition: all 0.2s;
         }
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
+        .form-select:focus, .form-textarea:focus {
             outline: none;
             border-color: #10B981;
-            ring: 2px solid #10B981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        .form-select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body class="bg-dark-primary text-text-light min-h-screen p-4">
     <div class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-accent">NOVA OCORRÊNCIA</h1>
-            <button onclick="window.location.href='/gestao_ocorrencia'" class="mt-4 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white transition duration-200">
-                ← Voltar para Ocorrências
+            <h1 class="text-2xl font-bold text-accent">REGISTAR NOVA OCORRÊNCIA</h1>
+            <p class="text-gray-400 text-sm mt-2">Preencha os dados abaixo para registar o incidente</p>
+            <button onclick="window.location.href='/gestao_ocorrencia'" class="mt-4 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white transition duration-200 text-sm">
+                ← Voltar ao Menu
             </button>
         </header>
 
-        <div class="bg-dark-secondary p-6 rounded-lg shadow-lg">
-            <div id="mensagem-status" class="hidden mb-4 p-3 rounded text-sm"></div>
+        <div class="bg-dark-secondary p-6 rounded-lg shadow-xl border border-gray-800">
+            <div id="mensagem-status" class="hidden mb-6 p-4 rounded text-sm font-medium"></div>
             
-            <form id="form-ocorrencia">
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Professor Responsável *</label>
+            <form id="form-ocorrencia" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Professor Responsável *</label>
                     <select id="professor" class="form-select" required onchange="carregarSalas()">
-                        <option value="">Selecione o professor responsável</option>
+                        <option value="">A carregar professores...</option>
                     </select>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Sala *</label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Sala/Turma *</label>
                     <select id="sala" class="form-select" required onchange="carregarAlunos()" disabled>
                         <option value="">Selecione o professor primeiro</option>
                     </select>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Aluno *</label>
-                    <select id="aluno" class="form-select" required onchange="carregarTutor()" disabled>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Aluno *</label>
+                    <select id="aluno" class="form-select" required onchange="vincularTutor()" disabled>
                         <option value="">Selecione a sala primeiro</option>
                     </select>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Tutor</label>
-                    <div id="tutor-info" class="p-3 bg-gray-800 rounded text-gray-300">
-                        Será preenchido automaticamente ao selecionar o aluno
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Tutor Vinculado</label>
+                    <div id="tutor-display" class="p-3 bg-gray-800 rounded border border-gray-700 text-gray-400 italic">
+                        O tutor será identificado após selecionar o aluno
                     </div>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Descrição da Ocorrência *</label>
-                    <textarea id="descricao" class="form-textarea" rows="4" placeholder="Descreva detalhadamente o ocorrido..." required></textarea>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Descrição do Ocorrido *</label>
+                    <textarea id="descricao" class="form-textarea" rows="4" placeholder="Detalhes sobre o comportamento ou incidente..." required></textarea>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm text-gray-300 mb-2">Atendimento Professor *</label>
-                    <textarea id="atendimento_professor" class="form-textarea" rows="3" placeholder="Quais medidas imediatas foram tomadas?" required></textarea>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Ação/Atendimento do Professor *</label>
+                    <textarea id="atendimento_professor" class="form-textarea" rows="3" placeholder="Que medidas foram tomadas no momento?" required></textarea>
                 </div>
 
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold mb-3 text-accent">Encaminhar para</h3>
-                    <div class="flex flex-wrap gap-6">
-                        <label class="flex items-center">
-                            <input type="radio" name="destino" value="tutor" class="mr-2 h-5 w-5" checked>
-                            <span>Tutor</span>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-3 text-accent">Encaminhamento Imediato</label>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <label class="flex items-center p-3 bg-gray-800 rounded border border-gray-700 cursor-pointer hover:bg-gray-700">
+                            <input type="radio" name="destino" value="tutor" class="w-4 h-4 text-accent" checked>
+                            <span class="ml-2 text-sm">Tutor</span>
                         </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="destino" value="coordenacao" class="mr-2 h-5 w-5">
-                            <span>Coordenação</span>
+                        <label class="flex items-center p-3 bg-gray-800 rounded border border-gray-700 cursor-pointer hover:bg-gray-700">
+                            <input type="radio" name="destino" value="coordenacao" class="w-4 h-4 text-accent">
+                            <span class="ml-2 text-sm">Coordenação</span>
                         </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="destino" value="gestao" class="mr-2 h-5 w-5">
-                            <span>Gestão</span>
+                        <label class="flex items-center p-3 bg-gray-800 rounded border border-gray-700 cursor-pointer hover:bg-gray-700">
+                            <input type="radio" name="destino" value="gestao" class="w-4 h-4 text-accent">
+                            <span class="ml-2 text-sm">Gestão</span>
                         </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="destino" value="nenhum" class="mr-2 h-5 w-5">
-                            <span>Nenhum</span>
+                        <label class="flex items-center p-3 bg-gray-800 rounded border border-gray-700 cursor-pointer hover:bg-gray-700">
+                            <input type="radio" name="destino" value="nenhum" class="w-4 h-4 text-accent">
+                            <span class="ml-2 text-sm">Nenhum</span>
                         </label>
                     </div>
                 </div>
 
-                <button type="button" id="btn-registrar" onclick="registrarOcorrencia()" class="w-full bg-accent hover:bg-emerald-700 py-3 rounded font-bold text-white transition duration-200">
-                    REGISTRAR OCORRÊNCIA
+                <button type="button" id="btn-submit" onclick="enviarOcorrencia()" class="w-full bg-accent hover:bg-emerald-600 text-white font-bold py-4 rounded-md transition duration-300 shadow-lg transform hover:scale-[1.01]">
+                    REGISTAR OCORRÊNCIA
                 </button>
             </form>
         </div>
 
-        <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
-            <p class="mb-1 text-base font-medium">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
-            <p class="text-xs font-light tracking-wide">LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO</p>
+        <footer class="mt-12 text-center text-gray-500 text-xs pb-8">
+            <p class="font-bold text-gray-400">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
+            <p>SISTEMA DE GESTÃO ESCOLAR UNIFICADO - PEI PROFª IRENE DIAS RIBEIRO</p>
         </footer>
     </div>
 
     <script>
-        let alunosDaSala = [];
-        let tutorNomeSelecionado = "";
+        let alunosCarregados = [];
+        let tutorAtual = "";
 
+        // Inicialização
         document.addEventListener('DOMContentLoaded', carregarProfessores);
 
-        function mostrarMensagem(mensagem, tipo) {
-            const elemento = document.getElementById('mensagem-status');
-            elemento.textContent = mensagem;
-            elemento.className = `mb-4 p-3 rounded text-sm ${tipo === 'success' ? 'bg-green-600' : tipo === 'error' ? 'bg-red-600' : 'bg-blue-600'} text-white`;
-            elemento.classList.remove('hidden');
-            setTimeout(() => elemento.classList.add('hidden'), 5000);
+        function mostrarMensagem(texto, tipo) {
+            const box = document.getElementById('mensagem-status');
+            box.textContent = texto;
+            box.className = `mb-6 p-4 rounded text-sm font-medium ${tipo === 'success' ? 'bg-green-900/50 text-green-400 border border-green-800' : 'bg-red-900/50 text-red-400 border border-red-800'}`;
+            box.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         async function carregarProfessores() {
@@ -139,47 +146,49 @@
                 const response = await fetch('/api/professores');
                 const professores = await response.json();
                 const select = document.getElementById('professor');
-                select.innerHTML = '<option value="">Selecione o professor responsável</option>';
+                
+                select.innerHTML = '<option value="">Selecione o professor</option>';
                 professores.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.id;
-                    opt.textContent = p.nome;
+                    opt.textContent = p.nome; // Campo 'nome' da d_funcionarios
                     select.appendChild(opt);
                 });
-            } catch (error) {
-                mostrarMensagem('Erro ao carregar professores', 'error');
+            } catch (err) {
+                mostrarMensagem('Falha ao ligar ao servidor para carregar professores.', 'error');
             }
         }
 
         async function carregarSalas() {
-            const professorId = document.getElementById('professor').value;
             const salaSelect = document.getElementById('sala');
+            const profId = document.getElementById('professor').value;
             
-            if (!professorId) {
+            if (!profId) {
                 salaSelect.disabled = true;
                 return;
             }
 
             try {
-                // Rota unificada no seu Python: /api/salas_por_professor/<int:professor_id>
-                const response = await fetch(`/api/salas_por_professor/${professorId}`);
+                // Utiliza a rota de salas ativas do seu código
+                const response = await fetch('/api/d_salas');
                 const salas = await response.json();
-                salaSelect.disabled = false;
+                
                 salaSelect.innerHTML = '<option value="">Selecione a sala</option>';
                 salas.forEach(s => {
                     const opt = document.createElement('option');
                     opt.value = s.id;
-                    opt.textContent = s.nome || s.sala;
+                    opt.textContent = s.nome; // Nome da sala
                     salaSelect.appendChild(opt);
                 });
-            } catch (error) {
-                mostrarMensagem('Erro ao carregar salas', 'error');
+                salaSelect.disabled = false;
+            } catch (err) {
+                mostrarMensagem('Erro ao carregar lista de salas.', 'error');
             }
         }
 
         async function carregarAlunos() {
-            const salaId = document.getElementById('sala').value;
             const alunoSelect = document.getElementById('aluno');
+            const salaId = document.getElementById('sala').value;
             
             if (!salaId) {
                 alunoSelect.disabled = true;
@@ -187,57 +196,57 @@
             }
 
             try {
-                // Rota unificada no seu Python: /api/alunos_por_sala/<int:sala_id>
                 const response = await fetch(`/api/alunos_por_sala/${salaId}`);
-                alunosDaSala = await response.json();
-                alunoSelect.disabled = false;
+                alunosCarregados = await response.json();
+                
                 alunoSelect.innerHTML = '<option value="">Selecione o aluno</option>';
-                alunosDaSala.forEach(a => {
+                alunosCarregados.forEach(a => {
                     const opt = document.createElement('option');
                     opt.value = a.id;
-                    opt.textContent = a.nome;
+                    opt.textContent = a.nome; // Campo 'nome' da d_alunos
                     alunoSelect.appendChild(opt);
                 });
-            } catch (error) {
-                mostrarMensagem('Erro ao carregar alunos', 'error');
+                alunoSelect.disabled = false;
+            } catch (err) {
+                mostrarMensagem('Erro ao carregar alunos desta sala.', 'error');
             }
         }
 
-        function carregarTutor() {
+        function vincularTutor() {
             const alunoId = document.getElementById('aluno').value;
-            const tutorInfo = document.getElementById('tutor-info');
-            const aluno = alunosDaSala.find(a => a.id == alunoId);
+            const display = document.getElementById('tutor-display');
+            const aluno = alunosCarregados.find(a => a.id == alunoId);
 
-            if (aluno && aluno.tutor_nome) {
-                tutorNomeSelecionado = aluno.tutor_nome;
-                tutorInfo.textContent = aluno.tutor_nome;
-                tutorInfo.className = 'p-3 bg-green-900 rounded text-green-300 font-medium';
+            if (aluno) {
+                tutorAtual = aluno.tutor_nome || "Não atribuído"; // Campo 'tutor_nome' da d_alunos
+                display.textContent = tutorAtual;
+                display.className = "p-3 bg-emerald-900/30 rounded border border-emerald-800 text-emerald-400 font-bold";
             } else {
-                tutorNomeSelecionado = "";
-                tutorInfo.textContent = 'Tutor não vinculado';
-                tutorInfo.className = 'p-3 bg-yellow-900 rounded text-yellow-300';
+                tutorAtual = "";
+                display.textContent = "O tutor será identificado após selecionar o aluno";
+                display.className = "p-3 bg-gray-800 rounded border border-gray-700 text-gray-400 italic";
             }
         }
 
-        async function registrarOcorrencia() {
-            const btn = document.getElementById('btn-registrar');
-            const form = document.getElementById('form-ocorrencia');
+        async function enviarOcorrencia() {
+            const btn = document.getElementById('btn-submit');
+            const profSelect = document.getElementById('professor');
             
-            if (!form.checkValidity()) {
-                mostrarMensagem('Preencha todos os campos obrigatórios', 'error');
+            // Validação básica
+            if (!profSelect.value || !document.getElementById('aluno').value || !document.getElementById('descricao').value) {
+                mostrarMensagem('Por favor, preencha todos os campos obrigatórios (*).', 'error');
                 return;
             }
 
             btn.disabled = true;
-            btn.textContent = 'Processando...';
+            btn.textContent = 'A PROCESSAR REGISTO...';
 
             try {
-                const profSelect = document.getElementById('professor');
                 const payload = {
                     aluno_id: document.getElementById('aluno').value,
                     professor_id: profSelect.value,
                     professor_nome: profSelect.options[profSelect.selectedIndex].text,
-                    tutor_nome: tutorNomeSelecionado,
+                    tutor_nome: tutorAtual,
                     descricao: document.getElementById('descricao').value,
                     atendimento_professor: document.getElementById('atendimento_professor').value,
                     destino: document.querySelector('input[name="destino"]:checked').value
@@ -249,17 +258,18 @@
                     body: JSON.stringify(payload)
                 });
 
-                const result = await response.json();
-                if (result.success) {
-                    mostrarMensagem('Sucesso! Redirecionando...', 'success');
-                    setTimeout(() => window.location.href = '/gestao_ocorrencia', 1500);
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarMensagem('Ocorrência registada com sucesso! A redirecionar...', 'success');
+                    setTimeout(() => window.location.href = '/gestao_ocorrencia', 2000);
                 } else {
-                    throw new Error(result.error);
+                    throw new Error(data.error || 'Erro desconhecido no servidor');
                 }
-            } catch (error) {
-                mostrarMensagem('Erro: ' + error.message, 'error');
+            } catch (err) {
+                mostrarMensagem('Erro ao gravar: ' + err.message, 'error');
                 btn.disabled = false;
-                btn.textContent = 'REGISTRAR OCORRÊNCIA';
+                btn.textContent = 'REGISTAR OCORRÊNCIA';
             }
         }
     </script>
