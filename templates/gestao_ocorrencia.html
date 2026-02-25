@@ -26,7 +26,7 @@
         };
 
         let ocorrencias = [];
-        let todasOcorrencias = [];
+        let todasOcorrencias = []; // Guarda todas as ocorrências para filtros
         let salas = [];
         let alunos = [];
         let tutores = [];
@@ -34,6 +34,12 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await carregarFiltros();
             await carregarOcorrencias();
+            
+            // Tornar filtros autofiltrantes
+            document.getElementById('filtro-tutor').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtro-status').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtro-sala').addEventListener('change', aplicarFiltros);
+            document.getElementById('filtro-aluno').addEventListener('change', aplicarFiltros);
         });
 
         function mostrarMsg(msg, tipo = 'info') {
@@ -66,17 +72,21 @@
 
         async function carregarFiltros() {
             try {
+                // Carregar ocorrências primeiro para extrair os dados
                 todasOcorrencias = await safeFetch('/api/ocorrencias_todas');
+                
+                // Ordenar por número decrescente
                 todasOcorrencias.sort((a, b) => (b.numero || 0) - (a.numero || 0));
-
-                // Preencher tutor
+                
+                // Extrair tutores únicos da coluna tutor_nome
+                tutores = extrairTutoresUnicos(todasOcorrencias);
                 const selectTutor = document.getElementById('filtro-tutor');
                 selectTutor.innerHTML = '<option value="all">Todos os Tutores</option>';
-                const tutores = extrairTutoresUnicos(todasOcorrencias);
-                tutores.forEach(t => selectTutor.innerHTML += `<option value="${t}">${t}</option>`);
-                selectTutor.addEventListener('change', atualizarFiltrosPorTutor);
+                tutores.forEach(t => {
+                    selectTutor.innerHTML += `<option value="${t}">${t}</option>`;
+                });
 
-                // Status fixo (mas será filtrado dinamicamente)
+                // Status (segundo filtro)
                 const selectStatus = document.getElementById('filtro-status');
                 selectStatus.innerHTML = `
                     <option value="all">Todos os Status</option>
@@ -85,91 +95,92 @@
                     <option value="ASSINADA">Assinada</option>
                 `;
 
-                // Inicialmente preenche todos os dados
-                atualizarFiltrosPorTutor();
+                // Extrair salas únicas da coluna sala_nome
+                salas = extrairSalasUnicas(todasOcorrencias);
+                const selectSala = document.getElementById('filtro-sala');
+                selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
+                salas.forEach(s => {
+                    selectSala.innerHTML += `<option value="${s}">${s}</option>`;
+                });
 
-                // Adicionar listeners para aplicar filtros quando qualquer select mudar
-                document.getElementById('filtro-status').addEventListener('change', aplicarFiltros);
-                document.getElementById('filtro-sala').addEventListener('change', aplicarFiltros);
-                document.getElementById('filtro-aluno').addEventListener('change', aplicarFiltros);
-
+                // Alunos (quarto filtro) - inicialmente vazio
+                const selectAluno = document.getElementById('filtro-aluno');
+                selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
+                
+                // Carregar alunos para filtro inicial
+                await carregarAlunosParaFiltro();
+                
             } catch (e) {
                 console.error('Erro ao carregar filtros:', e);
                 mostrarMsg('Erro ao carregar filtros', 'danger');
             }
         }
 
-        function atualizarFiltrosPorTutor() {
-            const tutorSelecionado = document.getElementById('filtro-tutor').value;
-            const ocorrenciasFiltradas = tutorSelecionado === 'all' 
-                ? todasOcorrencias 
-                : todasOcorrencias.filter(oc => oc.tutor_nome === tutorSelecionado);
-
-            // Status - mostrar apenas status presentes nas ocorrências filtradas
-            const selectStatus = document.getElementById('filtro-status');
-            const statusAtual = selectStatus.value;
-            selectStatus.innerHTML = '<option value="all">Todos os Status</option>';
-            const statusUnicos = [...new Set(ocorrenciasFiltradas.map(oc => oc.status))];
-            ['ATENDIMENTO', 'FINALIZADA', 'ASSINADA'].forEach(s => {
-                if (statusUnicos.includes(s)) {
-                    selectStatus.innerHTML += `<option value="${s}">${s}</option>`;
-                }
-            });
-            selectStatus.value = statusAtual;
-
-            // Salas
-            const selectSala = document.getElementById('filtro-sala');
-            const salaAtual = selectSala.value;
-            selectSala.innerHTML = '<option value="all">Todas as Salas</option>';
-            const salasUnicas = extrairSalasUnicas(ocorrenciasFiltradas);
-            salasUnicas.forEach(s => selectSala.innerHTML += `<option value="${s}">${s}</option>`);
-            selectSala.value = salaAtual;
-
-            // Alunos
+        async function carregarAlunosParaFiltro() {
             const selectAluno = document.getElementById('filtro-aluno');
-            const alunoAtual = selectAluno.value;
+            const alunosUnicos = extrairAlunosUnicos(todasOcorrencias);
+            
             selectAluno.innerHTML = '<option value="all">Todos os Alunos</option>';
-            const alunosUnicos = extrairAlunosUnicos(ocorrenciasFiltradas);
-            alunosUnicos.forEach(a => selectAluno.innerHTML += `<option value="${a}">${a}</option>`);
-            selectAluno.value = alunoAtual;
-
-            aplicarFiltros();
+            alunosUnicos.forEach(a => {
+                selectAluno.innerHTML += `<option value="${a}">${a}</option>`;
+            });
         }
 
         function extrairTutoresUnicos(ocorrencias) {
             const tutoresSet = new Set();
+            
             ocorrencias.forEach(oc => {
-                if (oc.tutor_nome && oc.tutor_nome.trim() !== '') {
-                    tutoresSet.add(oc.tutor_nome.trim());
+                const tutorNome = oc.tutor_nome;
+                if (tutorNome && tutorNome.trim() !== '' && tutorNome !== 'N/A') {
+                    tutoresSet.add(tutorNome.trim());
                 }
             });
+            
+            // Converter para array e ordenar alfabeticamente
             return Array.from(tutoresSet).sort((a, b) => a.localeCompare(b));
         }
 
         function extrairSalasUnicas(ocorrencias) {
             const salasSet = new Set();
+            
             ocorrencias.forEach(oc => {
-                if (oc.sala_nome && oc.sala_nome.trim() !== '') {
-                    salasSet.add(oc.sala_nome.trim());
+                const salaNome = oc.sala_nome;
+                if (salaNome && salaNome.trim() !== '' && salaNome !== 'N/A') {
+                    salasSet.add(salaNome.trim());
                 }
             });
+            
+            // Converter para array e ordenar alfabeticamente
             return Array.from(salasSet).sort((a, b) => a.localeCompare(b));
         }
 
         function extrairAlunosUnicos(ocorrencias) {
             const alunosSet = new Set();
+            
             ocorrencias.forEach(oc => {
-                if (oc.aluno_nome && oc.aluno_nome.trim() !== '') {
-                    alunosSet.add(oc.aluno_nome.trim());
+                const alunoNome = oc.aluno_nome;
+                if (alunoNome && alunoNome.trim() !== '' && alunoNome !== 'N/A') {
+                    alunosSet.add(alunoNome.trim());
                 }
             });
+            
+            // Converter para array e ordenar alfabeticamente
             return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
         }
 
         async function carregarOcorrencias() {
             try {
+                // Usar todas as ocorrências já carregadas, ordenadas por número decrescente
                 ocorrencias = [...todasOcorrencias];
-                ocorrencias = ocorrencias.map(oc => ({ ...oc, status: calcularStatus(oc) }));
+                
+                // Atualizar status das ocorrências
+                ocorrencias = ocorrencias.map(oc => {
+                    return {
+                        ...oc,
+                        status: calcularStatus(oc)
+                    };
+                });
+                
                 renderizarOcorrencias();
             } catch (e) {
                 console.error('Erro ao carregar ocorrências:', e);
@@ -178,25 +189,28 @@
         }
 
         function calcularStatus(ocorrencia) {
-            if (ocorrencia.status === 'ASSINADA') return 'ASSINADA';
-            
-            // Se já foi finalizada, mantém
-            if (ocorrencia.status === 'FINALIZADA') return 'FINALIZADA';
+            // Se já está assinada, mantém ASSINADA
+            if (ocorrencia.status === 'ASSINADA') {
+                return 'ASSINADA';
+            }
 
-            // Verifica se há pendências (T, C, G ou R)
-            const temPendenciaTutor = ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '');
-            const temPendenciaCoordenacao = ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '');
-            const temPendenciaGestao = ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '');
-            const temPendenciaResponsavel = ocorrencia.convocado_pais; // se convocou pais, ainda há pendência
+            // Verifica se há atendimentos pendentes
+            const temAtendimentoPendente = 
+                (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) ||
+                (ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '')) ||
+                (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '')) ||
+                (ocorrencia.solicitado_responsavel && (!ocorrencia.atendimento_responsavel || ocorrencia.atendimento_responsavel.trim() === ''));
 
-            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao && !ocorrencia.convocado_pais) {
+            // Se não há solicitações ou todas foram atendidas, vai para FINALIZADA
+            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao && !ocorrencia.solicitado_responsavel) {
                 return 'FINALIZADA';
             }
 
-            if (!temPendenciaTutor && !temPendenciaCoordenacao && !temPendenciaGestao && !temPendenciaResponsavel) {
+            if (!temAtendimentoPendente) {
                 return 'FINALIZADA';
             }
 
+            // Caso contrário, mantém em ATENDIMENTO
             return 'ATENDIMENTO';
         }
 
@@ -206,36 +220,66 @@
             const salaNome = document.getElementById('filtro-sala').value;
             const alunoNome = document.getElementById('filtro-aluno').value;
             
+            // Filtrar localmente em vez de fazer requisição ao servidor
             let ocorrenciasFiltradas = [...todasOcorrencias];
             
+            // Aplicar filtros
             if (tutorNome !== 'all') {
-                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => oc.tutor_nome === tutorNome);
-            }
-            if (status !== 'all') {
-                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => calcularStatus(oc) === status);
-            }
-            if (salaNome !== 'all') {
-                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => oc.sala_nome === salaNome);
-            }
-            if (alunoNome !== 'all') {
-                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => oc.aluno_nome === alunoNome);
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.tutor_nome === tutorNome
+                );
             }
             
+            if (status !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    calcularStatus(oc) === status
+                );
+            }
+            
+            if (salaNome !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.sala_nome === salaNome
+                );
+            }
+            
+            if (alunoNome !== 'all') {
+                ocorrenciasFiltradas = ocorrenciasFiltradas.filter(oc => 
+                    oc.aluno_nome === alunoNome
+                );
+            }
+            
+            // Manter ordenação decrescente
             ocorrenciasFiltradas.sort((a, b) => (b.numero || 0) - (a.numero || 0));
-            ocorrencias = ocorrenciasFiltradas.map(oc => ({ ...oc, status: calcularStatus(oc) }));
+            
+            // Atualizar status e renderizar
+            ocorrencias = ocorrenciasFiltradas.map(oc => {
+                return {
+                    ...oc,
+                    status: calcularStatus(oc)
+                };
+            });
+            
             renderizarOcorrencias();
         }
 
         function renderizarOcorrencias() {
             const tbody = document.getElementById('ocorrencias-body');
+            
             if (!ocorrencias.length) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-gray-400">Nenhuma ocorrência encontrada</td></tr>`;
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center py-6 text-gray-400">
+                            Nenhuma ocorrência encontrada
+                        </td>
+                    </tr>
+                `;
                 return;
             }
+            
             tbody.innerHTML = ocorrencias.map(oc => `
                 <tr class="border-b border-gray-700 hover:bg-gray-800/50">
                     <td class="p-3 text-sm">
-                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked disabled' : ''} onchange="atualizarSelecao()">
+                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked' : ''} onchange="atualizarSelecao()">
                     </td>
                     <td class="p-3 text-sm font-medium text-accent">${oc.numero}</td>
                     <td class="p-3 text-sm">${formatarData(oc.data_hora || oc.data)}</td>
@@ -257,13 +301,13 @@
                     </td>
                 </tr>
             `).join('');
+            
             atualizarSelecao();
         }
 
         function renderizarAcoes(ocorrencia) {
             let html = '';
             
-            // Ícones de pendências T, C, G
             if (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) {
                 html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=T" class="bg-tutor-color/20 text-tutor-color text-xs font-bold px-2 py-1 rounded-full border border-tutor-color hover:bg-tutor-color hover:text-white transition" title="Atendimento Tutor Pendente">T</a>`;
             }
@@ -275,10 +319,9 @@
             if (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '')) {
                 html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=G" class="bg-gestao-color/20 text-gestao-color text-xs font-bold px-2 py-1 rounded-full border border-gestao-color hover:bg-gestao-color hover:text-white transition" title="Atendimento Gestão Pendente">G</a>`;
             }
-
-            // Ícone R para responsável convocado
-            if (ocorrencia.convocado_pais) {
-                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=R" class="bg-responsavel-color/20 text-responsavel-color text-xs font-bold px-2 py-1 rounded-full border border-responsavel-color hover:bg-responsavel-color hover:text-white transition" title="Pais convocados - Registrar atendimento">R</a>`;
+            
+            if (ocorrencia.solicitado_responsavel && (!ocorrencia.atendimento_responsavel || ocorrencia.atendimento_responsavel.trim() === '')) {
+                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=R" class="bg-responsavel-color/20 text-responsavel-color text-xs font-bold px-2 py-1 rounded-full border border-responsavel-color hover:bg-responsavel-color hover:text-white transition" title="Atendimento Responsável Pendente">R</a>`;
             }
             
             return html;
@@ -303,15 +346,17 @@
         }
 
         function atualizarSelecao() {
-            const selecionadas = document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)').length;
+            const selecionadas = document.querySelectorAll('#ocorrencias-body input:checked').length;
             const total = ocorrencias.length;
             document.getElementById('contador-selecao').textContent = `${selecionadas}/${total} selecionadas`;
         }
 
         async function gerarPDF() {
-            const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')]
+            const selecionadas = [...document.querySelectorAll('#ocorrencias-body input:checked')]
                 .map(c => parseInt(c.value))
                 .filter(num => !isNaN(num));
+
+            console.log('Ocorrências selecionadas:', selecionadas);
 
             if (!selecionadas.length) {
                 mostrarMsg('Selecione pelo menos uma ocorrência para gerar o PDF.', 'danger');
@@ -332,18 +377,25 @@
                     throw new Error(errorData.error || `Falha ao gerar PDF (HTTP ${response.status})`);
                 }
 
+                // Criar blob do PDF
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
+
+                // Criar link para download
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
                 a.download = `ocorrencias_${new Date().toISOString().split('T')[0]}.pdf`;
                 document.body.appendChild(a);
                 a.click();
+
+                // Limpar
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
                 mostrarMsg(`PDF gerado com sucesso para ${selecionadas.length} ocorrência(s)!`, 'accent');
+
+                // Atualizar lista de ocorrências
                 setTimeout(() => carregarOcorrencias(), 1000);
 
             } catch (e) {
@@ -370,12 +422,14 @@
         <div class="bg-dark-secondary p-6 rounded-lg shadow-lg mb-6">
             <h3 class="text-lg font-semibold mb-4 text-accent">Filtros</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- TUTOR (primeiro) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Tutor</label>
                     <select id="filtro-tutor" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
                         <option value="all">Todos os Tutores</option>
                     </select>
                 </div>
+                <!-- STATUS (segundo) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Status</label>
                     <select id="filtro-status" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
@@ -385,12 +439,14 @@
                         <option value="ASSINADA">Assinada</option>
                     </select>
                 </div>
+                <!-- SALA (terceiro) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Sala</label>
                     <select id="filtro-sala" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
                         <option value="all">Todas as Salas</option>
                     </select>
                 </div>
+                <!-- ALUNO (quarto) -->
                 <div>
                     <label class="block text-sm text-gray-300 mb-1">Aluno</label>
                     <select id="filtro-aluno" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600">
@@ -422,7 +478,9 @@
                         </tr>
                     </thead>
                     <tbody id="ocorrencias-body">
-                        <tr><td colspan="9" class="text-center py-6 text-gray-400">Carregando ocorrências...</td></tr>
+                        <tr>
+                            <td colspan="9" class="text-center py-6 text-gray-400">Carregando ocorrências...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>

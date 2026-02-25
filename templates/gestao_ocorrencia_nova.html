@@ -52,7 +52,7 @@
                 <div class="mb-6">
                     <label class="block text-sm text-gray-300 mb-2">Professor Responsável *</label>
                     <select id="professor" class="form-select" required onchange="carregarSalas()">
-                        <option value="">Carregando professores...</option>
+                        <option value="">Selecione o professor responsável</option>
                     </select>
                 </div>
 
@@ -91,19 +91,23 @@
                 </div>
 
                 <div class="mb-6">
-                    <h3 class="text-lg font-semibold mb-3 text-accent">Solicitar Atendimento (Opcional)</h3>
-                    <div class="flex gap-6">
+                    <h3 class="text-lg font-semibold mb-3 text-accent">Encaminhar para (escolha uma opção)</h3>
+                    <div class="flex flex-wrap gap-6">
                         <label class="flex items-center">
-                            <input type="checkbox" id="solicitar_tutor" class="mr-2 h-5 w-5 text-blue-500">
+                            <input type="radio" name="destino" value="tutor" class="mr-2 h-5 w-5 text-blue-500" checked>
                             <span>Tutor</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="checkbox" id="solicitar_coordenacao" class="mr-2 h-5 w-5 text-yellow-500">
+                            <input type="radio" name="destino" value="coordenacao" class="mr-2 h-5 w-5 text-yellow-500">
                             <span>Coordenação</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="checkbox" id="solicitar_gestao" class="mr-2 h-5 w-5 text-red-500">
+                            <input type="radio" name="destino" value="gestao" class="mr-2 h-5 w-5 text-red-500">
                             <span>Gestão</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="destino" value="nenhum" class="mr-2 h-5 w-5 text-gray-400">
+                            <span>Nenhum (finalizar)</span>
                         </label>
                     </div>
                 </div>
@@ -145,23 +149,12 @@
         }
 
         async function carregarProfessores() {
-            const selectProfessor = document.getElementById('professor');
-            selectProfessor.innerHTML = '<option value="">Carregando...</option>';
-            
             try {
                 const response = await fetch('/api/professores');
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP: ${response.status}`);
-                }
+                if (!response.ok) throw new Error('Erro ao carregar professores');
                 
                 const professores = await response.json();
-                
-                if (!Array.isArray(professores) || professores.length === 0) {
-                    selectProfessor.innerHTML = '<option value="">Nenhum professor cadastrado</option>';
-                    mostrarMensagem('Nenhum professor encontrado. Cadastre um funcionário como professor.', 'error');
-                    return;
-                }
-                
+                const selectProfessor = document.getElementById('professor');
                 selectProfessor.innerHTML = '<option value="">Selecione o professor responsável</option>';
                 
                 professores.forEach(professor => {
@@ -170,11 +163,9 @@
                     option.textContent = professor.nome;
                     selectProfessor.appendChild(option);
                 });
-
             } catch (error) {
                 console.error('Erro ao carregar professores:', error);
-                selectProfessor.innerHTML = '<option value="">Erro ao carregar professores</option>';
-                mostrarMensagem('Erro ao carregar lista de professores. Verifique o console.', 'error');
+                mostrarMensagem('Erro ao carregar lista de professores', 'error');
             }
         }
 
@@ -294,6 +285,10 @@
                 return;
             }
 
+            // Obter destino selecionado
+            const destino = document.querySelector('input[name="destino"]:checked').value;
+
+            // 🔒 Desativa o botão enquanto envia
             botao.disabled = true;
             botao.textContent = 'Registrando...';
             botao.classList.add('opacity-70', 'cursor-not-allowed');
@@ -307,7 +302,9 @@
 
                 const response = await fetch('/api/registrar_ocorrencia', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
                         aluno_id: alunoSelecionado,
                         professor_id: professorId,
@@ -315,9 +312,7 @@
                         tutor_nome: tutorNomeSelecionado,
                         descricao: document.getElementById('descricao').value,
                         atendimento_professor: document.getElementById('atendimento_professor').value,
-                        solicitar_tutor: document.getElementById('solicitar_tutor').checked,
-                        solicitar_coordenacao: document.getElementById('solicitar_coordenacao').checked,
-                        solicitar_gestao: document.getElementById('solicitar_gestao').checked
+                        destino: destino  // 'tutor', 'coordenacao', 'gestao' ou 'nenhum'
                     })
                 });
 
@@ -330,6 +325,7 @@
                     }, 2000);
                 } else {
                     mostrarMensagem('Erro ao registrar: ' + (result.error || 'Erro desconhecido'), 'error');
+                    // 🔓 Reativa o botão em caso de erro
                     botao.disabled = false;
                     botao.textContent = 'REGISTRAR OCORRÊNCIA';
                     botao.classList.remove('opacity-70', 'cursor-not-allowed');
@@ -338,6 +334,7 @@
             } catch (error) {
                 console.error('Erro ao registrar ocorrência:', error);
                 mostrarMensagem('Erro de conexão ao registrar ocorrência', 'error');
+                // 🔓 Reativa o botão em caso de erro de rede
                 botao.disabled = false;
                 botao.textContent = 'REGISTRAR OCORRÊNCIA';
                 botao.classList.remove('opacity-70', 'cursor-not-allowed');
