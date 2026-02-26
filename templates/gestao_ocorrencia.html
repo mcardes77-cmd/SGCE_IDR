@@ -18,8 +18,7 @@
                         'secondary-accent': '#3B82F6',
                         'tutor-color': '#007ACC',
                         'coord-color': '#F59E0B',
-                        'gestao-color': '#EF4444',
-                        'responsavel-color': '#8B5CF6'
+                        'gestao-color': '#EF4444'
                     },
                 },
             },
@@ -198,11 +197,10 @@
             const temAtendimentoPendente = 
                 (ocorrencia.solicitado_tutor && (!ocorrencia.atendimento_tutor || ocorrencia.atendimento_tutor.trim() === '')) ||
                 (ocorrencia.solicitado_coordenacao && (!ocorrencia.atendimento_coordenacao || ocorrencia.atendimento_coordenacao.trim() === '')) ||
-                (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '')) ||
-                (ocorrencia.solicitado_responsavel && (!ocorrencia.atendimento_responsavel || ocorrencia.atendimento_responsavel.trim() === ''));
+                (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === ''));
 
             // Se não há solicitações ou todas foram atendidas, vai para FINALIZADA
-            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao && !ocorrencia.solicitado_responsavel) {
+            if (!ocorrencia.solicitado_tutor && !ocorrencia.solicitado_coordenacao && !ocorrencia.solicitado_gestao) {
                 return 'FINALIZADA';
             }
 
@@ -318,10 +316,6 @@
             
             if (ocorrencia.solicitado_gestao && (!ocorrencia.atendimento_gestao || ocorrencia.atendimento_gestao.trim() === '')) {
                 html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=G" class="bg-gestao-color/20 text-gestao-color text-xs font-bold px-2 py-1 rounded-full border border-gestao-color hover:bg-gestao-color hover:text-white transition" title="Atendimento Gestão Pendente">G</a>`;
-            }
-            
-            if (ocorrencia.solicitado_responsavel && (!ocorrencia.atendimento_responsavel || ocorrencia.atendimento_responsavel.trim() === '')) {
-                html += `<a href="/gestao_ocorrencia_editar?id=${ocorrencia.numero}&nivel=R" class="bg-responsavel-color/20 text-responsavel-color text-xs font-bold px-2 py-1 rounded-full border border-responsavel-color hover:bg-responsavel-color hover:text-white transition" title="Atendimento Responsável Pendente">R</a>`;
             }
             
             return html;
