@@ -10,6 +10,7 @@ import os
 import logging
 import time
 from datetime import datetime
+from calendar import monthrange
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -227,6 +228,23 @@ def publicar_informativo():
 # =============================================================
 # APIs DE OCORRÊNCIAS (consolidadas)
 # =============================================================
+
+@app.route('/api/ocorrencias/stats')
+def api_ocorrencias_stats():
+    supabase = get_supabase()
+    try:
+        resp_abertas = supabase.table('ocorrencias').select('id', count='exact').eq('status', 'ATENDIMENTO').execute()
+        abertas = getattr(resp_abertas, 'count', None)
+        if abertas is None:
+            abertas = len(getattr(resp_abertas, 'data', []) or [])
+        hoje_str = datetime.now().date().isoformat()
+        resp_hoje = supabase.table('ocorrencias').select('id').like('data_hora', f"{hoje_str}%").execute()
+        hoje = len(getattr(resp_hoje, 'data', []) or [])
+        return jsonify({'abertas': abertas, 'hoje': hoje})
+    except Exception as e:
+        logger.exception("Erro ao calcular stats de ocorrências")
+        return jsonify({'abertas': 0, 'hoje': 0, 'error': str(e)}), 500
+
 @app.route('/api/professores')
 def api_professores():
     try:
@@ -292,7 +310,7 @@ def api_registrar_ocorrencia():
         atendimento_professor = payload.get("atendimento_professor")
         if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
             return jsonify({"success": False, "error": "Dados obrigatórios faltando"}), 400
-        resp_aluno = supabase.table("d_alunos").select("nome, sala_id, sala_nome, tutor_nome").eq("id", aluno_id).execute()
+        resp_aluno = supabase.table("d_alunos").select("nome, sala_id, sala_nome, tutor_nome, tutor_id").eq("id", aluno_id).execute()
         if not resp_aluno.data:
             return jsonify({"success": False, "error": "Aluno não encontrado"}), 404
         aluno_data = resp_aluno.data[0]
@@ -304,23 +322,43 @@ def api_registrar_ocorrencia():
         if resp_numero.data and len(resp_numero.data) > 0:
             ultimo_numero = resp_numero.data[0].get("numero", 0)
         proximo_numero = ultimo_numero + 1
-        ocorrencia_data = {
-            "numero": proximo_numero,
-            "aluno_id": aluno_id,
-            "aluno_nome": aluno_nome,
-            "sala_nome": sala_nome,
-            "professor_id": professor_id,
-            "professor_nome": professor_nome,
-            "tutor_nome": tutor_nome,
-            "descricao": descricao,
-            "atendimento_professor": atendimento_professor,
-            "solicitado_tutor": payload.get("solicitar_tutor", False),
-            "solicitado_coordenacao": payload.get("solicitar_coordenacao", False),
-            "solicitado_gestao": payload.get("solicitar_gestao", False),
-            "status": "ATENDIMENTO",
-            "data_hora": now_iso()
-        }
-        resp = supabase.table("ocorrencias").insert(ocorrencia_data).execute()
+        destino = (payload.get("destino") or "").lower().strip()
+# destino esperado no front: 'tutor', 'coordenacao', 'gestao', 'nenhum'
+if destino == "tutor":
+    pendencia = "TUTOR"
+elif destino == "coordenacao":
+    pendencia = "COORDENACAO"
+elif destino == "gestao":
+    pendencia = "GESTAO"
+elif destino in ("nenhum", ""):
+    pendencia = "FINALIZADA"
+else:
+    pendencia = "TUTOR"
+
+status_registro = "FINALIZADA" if pendencia == "FINALIZADA" else "ATENDIMENTO"
+
+ocorrencia_data = {
+    "numero": proximo_numero,
+    "aluno_id": aluno_id,
+    "aluno_nome": aluno_nome,
+    "sala_id": aluno_data.get("sala_id"),
+    "sala_nome": sala_nome,
+    "professor_id": professor_id,
+    "professor_nome": professor_nome,
+    "tutor_id": aluno_data.get("tutor_id"),
+    "tutor_nome": tutor_nome,
+    "descricao": descricao,
+    "atendimento_professor": atendimento_professor,
+    # flags antigos (compatibilidade) - escolha única
+    "solicitado_tutor": pendencia == "TUTOR",
+    "solicitado_coordenacao": pendencia == "COORDENACAO",
+    "solicitado_gestao": pendencia == "GESTAO",
+    # novo modelo
+    "pendencia": pendencia,
+    "status": status_registro,
+    "data_hora": now_iso()
+}
+resp = supabase.table("ocorrencias").insert(ocorrencia_data).execute()
         data = handle_supabase_response(resp)
         if data and len(data) > 0:
             return jsonify({
@@ -385,6 +423,58 @@ def salvar_atendimento():
     except Exception as e:
         logger.exception("Erro ao salvar atendimento")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================
+# NOVO FLUXO DE OCORRÊNCIAS (pendencia única)
+# =============================================================
+VALID_PENDENCIAS = {"TUTOR", "COORDENACAO", "GESTAO", "RESPONSAVEL", "FINALIZADA"}
+
+@app.route('/api/ocorrencias/<int:numero>/encaminhar', methods=['POST'])
+def api_ocorrencia_encaminhar(numero):
+    supabase = get_supabase()
+    try:
+        payload = request.json or {}
+        destino = (payload.get('destino') or '').upper().strip()
+        if destino not in VALID_PENDENCIAS or destino == "FINALIZADA":
+            return jsonify({'success': False, 'error': 'destino inválido'}), 400
+
+        updates = {'pendencia': destino, 'status': 'ATENDIMENTO'}
+
+        # compatibilidade flags antigos (escolha única)
+        updates['solicitado_tutor'] = destino == 'TUTOR'
+        updates['solicitado_coordenacao'] = destino == 'COORDENACAO'
+        updates['solicitado_gestao'] = destino == 'GESTAO'
+
+        if destino == 'RESPONSAVEL':
+            updates['responsavel_convocado'] = True
+            updates['dt_convocacao_responsavel'] = now_iso()
+
+        resp = supabase.table('ocorrencias').update(updates).eq('numero', numero).execute()
+        _ = handle_supabase_response(resp)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("Erro ao encaminhar ocorrência")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ocorrencias/<int:numero>/finalizar', methods=['POST'])
+def api_ocorrencia_finalizar(numero):
+    supabase = get_supabase()
+    try:
+        updates = {
+            'status': 'FINALIZADA',
+            'pendencia': 'FINALIZADA',
+            'dt_finalizacao': now_iso(),
+            'solicitado_tutor': False,
+            'solicitado_coordenacao': False,
+            'solicitado_gestao': False,
+        }
+        resp = supabase.table('ocorrencias').update(updates).eq('numero', numero).execute()
+        _ = handle_supabase_response(resp)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("Erro ao finalizar ocorrência")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/tutores_com_ocorrencias')
 def api_tutores_com_ocorrencias():
@@ -756,7 +846,8 @@ def get_frequencia_relatorio():
         if not alunos_response.data:
             return jsonify([])
         data_inicio = f"{ano}-{mes.zfill(2)}-01"
-        data_fim = f"{ano}-{mes.zfill(2)}-31"
+        ultimo_dia = monthrange(ano, int(mes))[1]
+        data_fim = f"{ano}-{mes.zfill(2)}-{str(ultimo_dia).zfill(2)}"
         frequencia_response = supabase.table('f_frequencia')\
             .select('*')\
             .in_('aluno_nome', [aluno['nome'] for aluno in alunos_response.data])\
@@ -791,7 +882,7 @@ def get_frequencia_relatorio():
 def frequencia_detalhes(aluno_id, data):
     try:
         result = supabase.table("f_frequencia") \
-            .select("aluno_id, aluno_nome, data, status, hora_entrada, motivo_atraso, hora_saida, motivo_saida") \
+            .select("aluno_id, aluno_nome, data, status, hora_entrada, motivo_atraso, hora_saida, motivo_saida, responsavel_nome, responsavel_telefone") \
             .eq("aluno_id", aluno_id) \
             .eq("data", data) \
             .limit(1) \
@@ -1390,8 +1481,16 @@ def gestao_ocorrencia_nova():
 def gestao_ocorrencia_abertas():
     return render_template('gestao_ocorrencia_aberta.html')
 
+@main_bp.route('/gestao_ocorrencia_aberta')
+def gestao_ocorrencia_aberta_alias():
+    return render_template('gestao_ocorrencia_aberta.html')
+
 @main_bp.route('/gestao_ocorrencia_finalizadas')
 def gestao_ocorrencia_finalizadas():
+    return render_template('gestao_ocorrencia_finalizada.html')
+
+@main_bp.route('/gestao_ocorrencia_finalizada')
+def gestao_ocorrencia_finalizada_alias():
     return render_template('gestao_ocorrencia_finalizada.html')
 
 @main_bp.route('/gestao_ocorrencia_editar')
