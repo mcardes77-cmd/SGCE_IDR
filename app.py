@@ -430,33 +430,53 @@ def salvar_atendimento():
 # =============================================================
 VALID_PENDENCIAS = {"TUTOR", "COORDENACAO", "GESTAO", "RESPONSAVEL", "FINALIZADA"}
 
-@app.route('/api/ocorrencias/<int:numero>/encaminhar', methods=['POST'])
-def api_ocorrencia_encaminhar(numero):
-    supabase = get_supabase()
+@app.route("/api/ocorrencias/<int:numero>/encaminhar", methods=["POST"])
+def encaminhar_ocorrencia(numero: int):
     try:
-        payload = request.json or {}
-        destino = (payload.get('destino') or '').upper().strip()
-        if destino not in VALID_PENDENCIAS or destino == "FINALIZADA":
-            return jsonify({'success': False, 'error': 'destino inválido'}), 400
+        payload = request.get_json(silent=True) or {}
+        destino = str(payload.get("destino", "")).strip().lower()
 
-        updates = {'pendencia': destino, 'status': 'ATENDIMENTO'}
+        # destino do front: tutor / coordenacao / gestao / responsavel
+        pend_map = {
+            "tutor": "TUTOR",
+            "coordenacao": "COORDENACAO",
+            "coord": "COORDENACAO",
+            "gestao": "GESTAO",
+            "responsavel": "RESPONSAVEL",
+            "r": "RESPONSAVEL",
+        }
 
-        # compatibilidade flags antigos (escolha única)
-        updates['solicitado_tutor'] = destino == 'TUTOR'
-        updates['solicitado_coordenacao'] = destino == 'COORDENACAO'
-        updates['solicitado_gestao'] = destino == 'GESTAO'
+        if destino not in pend_map:
+            return jsonify({"success": False, "error": "Destino inválido"}), 400
 
-        if destino == 'RESPONSAVEL':
-            updates['responsavel_convocado'] = True
-            updates['dt_convocacao_responsavel'] = now_iso()
+        pendencia = pend_map[destino]
 
-        resp = supabase.table('ocorrencias').update(updates).eq('numero', numero).execute()
-        _ = handle_supabase_response(resp)
-        return jsonify({'success': True})
+        # compatibilidade com seu front antigo (flags)
+        solicitado_tutor = pendencia == "TUTOR"
+        solicitado_coordenacao = pendencia == "COORDENACAO"
+        solicitado_gestao = pendencia == "GESTAO"
+        solicitado_responsavel = pendencia == "RESPONSAVEL"
+
+        update_data = {
+            "pendencia": pendencia,
+            "status": "ATENDIMENTO",
+            "solicitado_tutor": solicitado_tutor,
+            "solicitado_coordenacao": solicitado_coordenacao,
+            "solicitado_gestao": solicitado_gestao,
+            "solicitado_responsavel": solicitado_responsavel,
+        }
+
+        if pendencia == "RESPONSAVEL":
+            update_data["responsavel_convocado"] = True
+            update_data["dt_convocacao_responsavel"] = now_iso()
+
+        resp = supabase.table("ocorrencias").update(update_data).eq("numero", numero).execute()
+        data = handle_supabase_response(resp)
+
+        return jsonify({"success": True, "data": data[0] if data else None})
+
     except Exception as e:
-        logger.exception("Erro ao encaminhar ocorrência")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
+        return jsonify({"success": False, "error": str(e)}), 500
 @app.route('/api/ocorrencias/<int:numero>/finalizar', methods=['POST'])
 def api_ocorrencia_finalizar(numero):
     supabase = get_supabase()
