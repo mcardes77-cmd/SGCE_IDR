@@ -432,7 +432,6 @@ VALID_PENDENCIAS = {"TUTOR", "COORDENACAO", "GESTAO", "RESPONSAVEL", "FINALIZADA
 
 @app.route("/api/ocorrencias/<int:numero>/encaminhar", methods=["POST"])
 def encaminhar_ocorrencia(numero: int):
-    try:
         payload = request.get_json(silent=True) or {}
         destino = str(payload.get("destino", "")).strip().lower()
 
