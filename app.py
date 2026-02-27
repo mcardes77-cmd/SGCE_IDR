@@ -432,50 +432,44 @@ VALID_PENDENCIAS = {"TUTOR", "COORDENACAO", "GESTAO", "RESPONSAVEL", "FINALIZADA
 
 @app.route("/api/ocorrencias/<int:numero>/encaminhar", methods=["POST"])
 def encaminhar_ocorrencia(numero: int):
-        payload = request.get_json(silent=True) or {}
-        destino = str(payload.get("destino", "")).strip().lower()
+    payload = request.get_json(silent=True) or {}
+    destino = str(payload.get("destino", "")).strip().lower()
 
-        # destino do front: tutor / coordenacao / gestao / responsavel
-        pend_map = {
-            "tutor": "TUTOR",
-            "coordenacao": "COORDENACAO",
-            "coord": "COORDENACAO",
-            "gestao": "GESTAO",
-            "responsavel": "RESPONSAVEL",
-            "r": "RESPONSAVEL",
-        }
+    pend_map = {
+        "tutor": "TUTOR",
+        "coordenacao": "COORDENACAO",
+        "coord": "COORDENACAO",
+        "gestao": "GESTAO",
+        "responsavel": "RESPONSAVEL",
+        "r": "RESPONSAVEL",
+    }
 
-        if destino not in pend_map:
-            return jsonify({"success": False, "error": "Destino inválido"}), 400
+    if destino not in pend_map:
+        return jsonify({"success": False, "error": "Destino inválido"}), 400
 
-        pendencia = pend_map[destino]
+    pendencia = pend_map[destino]
 
-        # compatibilidade com seu front antigo (flags)
-        solicitado_tutor = pendencia == "TUTOR"
-        solicitado_coordenacao = pendencia == "COORDENACAO"
-        solicitado_gestao = pendencia == "GESTAO"
-        solicitado_responsavel = pendencia == "RESPONSAVEL"
+    # compatibilidade com telas antigas
+    update_data = {
+        "pendencia": pendencia,
+        "status": "ATENDIMENTO",
+        "solicitado_tutor": pendencia == "TUTOR",
+        "solicitado_coordenacao": pendencia == "COORDENACAO",
+        "solicitado_gestao": pendencia == "GESTAO",
+        "solicitado_responsavel": pendencia == "RESPONSAVEL",
+    }
 
-        update_data = {
-            "pendencia": pendencia,
-            "status": "ATENDIMENTO",
-            "solicitado_tutor": solicitado_tutor,
-            "solicitado_coordenacao": solicitado_coordenacao,
-            "solicitado_gestao": solicitado_gestao,
-            "solicitado_responsavel": solicitado_responsavel,
-        }
+    if pendencia == "RESPONSAVEL":
+        update_data["responsavel_convocado"] = True
+        update_data["dt_convocacao_responsavel"] = now_iso()
 
-        if pendencia == "RESPONSAVEL":
-            update_data["responsavel_convocado"] = True
-            update_data["dt_convocacao_responsavel"] = now_iso()
-
+    try:
         resp = supabase.table("ocorrencias").update(update_data).eq("numero", numero).execute()
         data = handle_supabase_response(resp)
-
         return jsonify({"success": True, "data": data[0] if data else None})
-
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/ocorrencias/<int:numero>/finalizar', methods=['POST'])
 def api_ocorrencia_finalizar(numero):
     supabase = get_supabase()
