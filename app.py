@@ -449,10 +449,11 @@ def encaminhar_ocorrencia(numero: int):
 
     pendencia = pend_map[destino]
 
-    # compatibilidade com telas antigas
     update_data = {
         "pendencia": pendencia,
         "status": "ATENDIMENTO",
+
+        # compatibilidade com telas antigas
         "solicitado_tutor": pendencia == "TUTOR",
         "solicitado_coordenacao": pendencia == "COORDENACAO",
         "solicitado_gestao": pendencia == "GESTAO",
