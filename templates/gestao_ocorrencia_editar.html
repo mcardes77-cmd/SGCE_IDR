@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>SGCE - Atendimento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Captura o ID da URL (Ex: /gestao_ocorrencia_editar/15)
+        const ocorrenciaId = window.location.pathname.split('/').pop();
+
+        async function carregarDados() {
+            try {
+                const res = await fetch(`/api/ocorrencia/${ocorrenciaId}`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('aluno-nome').textContent = data.aluno_nome;
+                document.getElementById('sala-nome').textContent = data.sala_nome;
+                document.getElementById('relato-original').value = data.descricao || '';
+                document.getElementById('parecer_tutor').value = data.parecer_tutor || '';
+
+                // Determina qual nível está pendente (primeiro true)
+                let nivelPendente = 'tutor'; // fallback
+                if (data.solicitado_tutor) nivelPendente = 'tutor';
+                else if (data.solicitado_coordenacao) nivelPendente = 'coordenacao';
+                else if (data.solicitado_gestao) nivelPendente = 'gestao';
+                else if (data.solicitado_responsavel) nivelPendente = 'responsavel';
+
+                // Seleciona o nível correto no select "atendendo"
+                document.getElementById('nivel_atendimento').value = nivelPendente;
+
+                // Atualiza as ações disponíveis conforme o nível selecionado
+                atualizarAcoes();
+
+                // Se já houver um parecer para o nível pendente, carregar
+                const campoParecer = `atendimento_${nivelPendente}`;
+                if (data[campoParecer]) {
+                    document.getElementById('parecer_tutor').value = data[campoParecer];
+                }
+            } catch (e) {
+                alert("Erro ao buscar detalhes da ocorrência.");
+            }
+        }
+
+        function atualizarAcoes() {
+            const nivel = document.getElementById('nivel_atendimento').value;
+            const selectAcao = document.getElementById('acao');
+            selectAcao.innerHTML = '';
+
+            let opcoes = [];
+
+            if (nivel === 'tutor') {
+                opcoes = [
+                    { value: 'finalizar', label: 'Finalizar' },
+                    { value: 'encaminhar_coordenacao', label: 'Encaminhar para Coordenação' },
+                    { value: 'encaminhar_gestao', label: 'Encaminhar para Gestão' }
+                ];
+            } else if (nivel === 'coordenacao') {
+                opcoes = [
+                    { value: 'finalizar', label: 'Finalizar' },
+                    { value: 'encaminhar_gestao', label: 'Encaminhar para Gestão' },
+                    { value: 'encaminhar_tutor', label: 'Encaminhar para Tutor' }
+                ];
+            } else if (nivel === 'gestao') {
+                opcoes = [
+                    { value: 'finalizar', label: 'Finalizar' },
+                    { value: 'convocar_responsavel', label: 'Convocar Responsável' },
+                    { value: 'encaminhar_tutor', label: 'Encaminhar para Tutor' },
+                    { value: 'encaminhar_coordenacao', label: 'Encaminhar para Coordenação' }
+                ];
+            } else if (nivel === 'responsavel') {
+                opcoes = [
+                    { value: 'finalizar', label: 'Finalizar' }
+                ];
+            }
+
+            opcoes.forEach(op => {
+                const option = document.createElement('option');
+                option.value = op.value;
+                option.textContent = op.label;
+                selectAcao.appendChild(option);
+            });
+        }
+
+        async function salvarAtendimento() {
+            const btn = document.getElementById('btnSalvar');
+            btn.disabled = true;
+            btn.textContent = "SALVANDO...";
+
+            const nivel = document.getElementById('nivel_atendimento').value;
+            const texto = document.getElementById('parecer_tutor').value;
+            const acao = document.getElementById('acao').value;
+
+            // Se a ação for finalizar, não há redirecionamento; caso contrário, o backend define o novo solicitado
+            const payload = {
+                tipo: nivel,
+                texto: texto,
+                acao: acao
+            };
+
+            try {
+                const res = await fetch(`/api/ocorrencias/${ocorrenciaId}/atendimento`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    alert("Atendimento salvo com sucesso!");
+                    window.location.href = '/gestao_ocorrencia_aberta';
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao salvar: " + (err.error || 'Desconhecido'));
+                    btn.disabled = false;
+                    btn.textContent = "SALVAR ATENDIMENTO";
+                }
+            } catch (e) {
+                alert("Erro ao salvar.");
+                btn.disabled = false;
+                btn.textContent = "SALVAR ATENDIMENTO";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', carregarDados);
+    </script>
+</head>
+<body class="bg-[#0F172A] text-white p-6">
+    <div class="max-w-4xl mx-auto bg-[#1E293B] p-8 rounded-2xl shadow-lg border border-gray-800">
+        <h2 class="text-2xl font-bold text-accent mb-6 border-b border-gray-700 pb-4">ATENDIMENTO DE OCORRÊNCIA</h2>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div>
+                <label class="text-xs text-gray-500 uppercase font-bold">Aluno</label>
+                <p id="aluno-nome" class="text-lg font-semibold text-white">---</p>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500 uppercase font-bold">Sala</label>
+                <p id="sala-nome" class="text-lg font-semibold text-white">---</p>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-400 mb-2">Relato do Professor:</label>
+            <textarea id="relato-original" readonly class="w-full bg-[#0F172A] border border-gray-700 p-4 rounded-lg text-gray-400 text-sm italic"></textarea>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-accent mb-2">Parecer do Tutor / Coordenação:</label>
+            <textarea id="parecer_tutor" rows="5" class="w-full bg-gray-800 border border-gray-600 p-4 rounded-lg focus:border-accent outline-none transition" placeholder="Descreva as medidas tomadas..."></textarea>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 items-end mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Atendendo como:</label>
+                <select id="nivel_atendimento" onchange="atualizarAcoes()" class="w-full bg-gray-800 border border-gray-600 p-3 rounded-lg">
+                    <option value="tutor">Tutor</option>
+                    <option value="coordenacao">Coordenação</option>
+                    <option value="gestao">Gestão</option>
+                    <option value="responsavel">Responsável</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Ação:</label>
+                <select id="acao" class="w-full bg-gray-800 border border-gray-600 p-3 rounded-lg">
+                    <!-- preenchido dinamicamente -->
+                </select>
+            </div>
+            <div>
+                <button id="btnSalvar" onclick="salvarAtendimento()" class="w-full bg-accent hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-lg transition shadow-lg">
+                    SALVAR ATENDIMENTO
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SGCE - Ocorrências Abertas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-primary': '#0F172A',
+                        'dark-secondary': '#1E293B',
+                        'accent': '#10B981',
+                        'text-light': '#F8FAFC'
+                    }
+                }
+            }
+        };
+
+        async function carregarOcorrencias() {
+            try {
+                // Busca apenas as pendentes (com algum solicitado = true e não finalizadas)
+                const res = await fetch('/api/ocorrencias?pendente=true');
+                const dados = await res.json();
+                const corpo = document.getElementById('ocorrencias-corpo');
+                corpo.innerHTML = '';
+
+                if (dados.length === 0) {
+                    corpo.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">Nenhuma ocorrência pendente encontrada.</td></tr>';
+                    return;
+                }
+
+                dados.forEach(item => {
+                    // Determina qual ícone de destino exibir
+                    let iconeDestino = '';
+                    if (item.solicitado_tutor) iconeDestino = 'T';
+                    else if (item.solicitado_coordenacao) iconeDestino = 'C';
+                    else if (item.solicitado_gestao) iconeDestino = 'G';
+                    else if (item.solicitado_responsavel) iconeDestino = 'R';
+                    else iconeDestino = '-';
+
+                    corpo.innerHTML += `
+                        <tr class="hover:bg-gray-800 border-b border-gray-700 transition">
+                            <td class="px-4 py-3 text-accent font-mono">#${item.id}</td>
+                            <td class="px-4 py-3 text-sm">${new Date(item.created_at).toLocaleDateString('pt-BR')}</td>
+                            <td class="px-4 py-3 font-bold">${item.aluno_nome}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${item.sala_nome}</td>
+                            <td class="px-4 py-3 text-sm">${item.professor_nome}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 rounded-full bg-blue-900 text-blue-200 text-[10px] font-bold uppercase">
+                                    ${iconeDestino}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <a href="/gestao_ocorrencia_editar/${item.id}" 
+                                   class="bg-accent hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                                    ATENDER
+                                </a>
+                            </td>
+                        </tr>`;
+                });
+            } catch (e) {
+                console.error(e);
+                document.getElementById('ocorrencias-corpo').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-400">Erro ao carregar dados.</td></tr>';
+            }
+        }
+        document.addEventListener('DOMContentLoaded', carregarOcorrencias);
+    </script>
+</head>
+<body class="bg-dark-primary text-text-light p-6">
+    <header class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-accent">OCORRÊNCIAS PENDENTES</h1>
+            <p class="text-gray-400 text-sm">Lista de ocorrências que aguardam atendimento (T, C, G, R).</p>
+        </div>
+        <button onclick="window.location.href='/gestao_ocorrencia'" class="text-gray-400 hover:text-white transition">← Voltar</button>
+    </header>
+
+    <main class="bg-dark-secondary rounded-xl shadow-2xl overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-black/20 text-gray-400 text-xs uppercase font-semibold">
+                <tr>
+                    <th class="px-4 py-4">ID</th>
+                    <th class="px-4 py-4">Data</th>
+                    <th class="px-4 py-4">Aluno</th>
+                    <th class="px-4 py-4">Sala</th>
+                    <th class="px-4 py-4">Relatado por</th>
+                    <th class="px-4 py-4">Destino</th>
+                    <th class="px-4 py-4">Ação</th>
+                </tr>
+            </thead>
+            <tbody id="ocorrencias-corpo">
+                <tr><td colspan="7" class="text-center py-10">Carregando...</td></tr>
+            </tbody>
+        </table>
+    </main>
+</body>
+</html>
