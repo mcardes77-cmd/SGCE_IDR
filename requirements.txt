@@ -1,5 +1,1 @@
 flask
-gunicorn
-supabase
-python-dotenv
-reportlab
