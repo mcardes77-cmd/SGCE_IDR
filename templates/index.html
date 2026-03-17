@@ -6,81 +6,26 @@
   <title>Sistema Escolar - Menu Principal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #0F172A;
-      color: #F8FAFC;
-    }
-    .menu-button {
-      padding: 1rem 1.5rem;
-      font-weight: 600;
-      border-radius: 0.75rem;
-      transition: all 0.2s;
-      border: none;
-      cursor: pointer;
-      background-color: #34D399;
-      color: #0F172A;
-      width: 100%;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    }
-    .menu-button:hover {
-      transform: scale(1.02);
-      background-color: #2ecc71;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-    }
-    footer {
-      font-size: 0.8rem;
-      color: #94A3B8;
-      text-align: center;
-      margin-top: 3rem;
-    }
-    .menu-container {
-      background-color: #1E293B;
-      border-radius: 2rem;
-      padding: 2.5rem;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-      border: 1px solid #334155;
-    }
+    body { font-family: 'Inter', sans-serif; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #0F172A; color: #F8FAFC; }
+    .menu-button { padding: 1rem 1.5rem; font-weight: 600; border-radius: 0.75rem; transition: all 0.2s; border: none; cursor: pointer; background-color: #34D399; color: #0F172A; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }
+    .menu-button:hover { transform: scale(1.02); background-color: #2ecc71; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4); }
+    footer { font-size: 0.8rem; color: #94A3B8; text-align: center; margin-top: 3rem; }
+    .menu-container { background-color: #1E293B; border-radius: 2rem; padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); border: 1px solid #334155; }
   </style>
 </head>
 <body>
   <div class="w-full max-w-6xl px-4 py-8">
     <div class="menu-container">
-      <h1 class="text-2xl md:text-3xl font-extrabold mb-2 text-center" style="color: #34D399;">
-        SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
-      </h1>
-      <h2 class="text-sm text-gray-400 mb-8 text-center">
-        MENU PRINCIPAL
-      </h2>
-
+      <h1 class="text-2xl md:text-3xl font-extrabold mb-2 text-center" style="color: #34D399;">SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
+      <h2 class="text-sm text-gray-400 mb-8 text-center">MENU PRINCIPAL</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button onclick="window.location.href='/gestao_ocorrencia'" class="menu-button">
-          GESTÃO DE OCORRÊNCIA
-        </button>
-        <button onclick="window.location.href='/gestao_frequencia'" class="menu-button">
-          GESTÃO DE FREQUÊNCIA
-        </button>
-        <button onclick="window.location.href='/gestao_tecnologia'" class="menu-button">
-          GESTÃO DE TECNOLOGIA
-        </button>
-        <button onclick="window.location.href='/gestao_tutoria'" class="menu-button">
-          GESTÃO DE TUTORIA
-        </button>
-        <button onclick="window.location.href='/gestao_cadastro'" class="menu-button">
-          CADASTRO
-        </button>
+        <button onclick="window.location.href='/gestao_ocorrencia'" class="menu-button">GESTÃO DE OCORRÊNCIA</button>
+        <button onclick="window.location.href='/gestao_frequencia'" class="menu-button">GESTÃO DE FREQUÊNCIA</button>
+        <button onclick="window.location.href='/gestao_tecnologia'" class="menu-button">GESTÃO DE TECNOLOGIA</button>
+        <button onclick="window.location.href='/gestao_tutoria'" class="menu-button">GESTÃO DE TUTORIA</button>
+        <button onclick="window.location.href='/gestao_cadastro'" class="menu-button">CADASTRO</button>
       </div>
-
-      <footer>
-        © 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes
-      </footer>
+      <footer>© 2025 E.E. PEI PROFª IRENE DIAS RIBEIRO · Desenvolvido por Marcelo André Nogueira Cardes</footer>
     </div>
   </div>
 </body>
