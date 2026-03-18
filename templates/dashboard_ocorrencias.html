@@ -1,0 +1,184 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - Gestão de Convivência Escolar</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+tailwind.config = {
+theme:{
+extend:{
+colors:{
+'dark-primary':'#0F172A',
+'dark-secondary':'#1E293B',
+'accent':'#10B981',
+'text-light':'#F8FAFC'
+}
+}
+}
+}
+</script>
+</head>
+
+<body class="bg-dark-primary text-text-light min-h-screen p-6">
+
+<div class="max-w-7xl mx-auto">
+
+<header class="mb-8">
+<h1 class="text-3xl font-bold text-accent">PAINEL DE GESTÃO DE OCORRÊNCIAS</h1>
+<p class="text-gray-400">Sistema de Convivência Escolar</p>
+
+<div class="mt-4 flex gap-3">
+<button onclick="window.location.href='/gestao_ocorrencia'" class="bg-accent px-4 py-2 rounded">Gestão de Ocorrências</button>
+<button onclick="window.location.href='/gestao_ocorrencia_nova'" class="bg-gray-700 px-4 py-2 rounded">Nova Ocorrência</button>
+</div>
+</header>
+
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+
+<div class="bg-blue-900 p-5 rounded-lg">
+<p class="text-sm">Pendentes Tutor</p>
+<p id="cardTutor" class="text-3xl font-bold">0</p>
+</div>
+
+<div class="bg-yellow-800 p-5 rounded-lg">
+<p class="text-sm">Pendentes Coordenação</p>
+<p id="cardCoord" class="text-3xl font-bold">0</p>
+</div>
+
+<div class="bg-red-800 p-5 rounded-lg">
+<p class="text-sm">Pendentes Gestão</p>
+<p id="cardGestao" class="text-3xl font-bold">0</p>
+</div>
+
+<div class="bg-green-800 p-5 rounded-lg">
+<p class="text-sm">Finalizadas</p>
+<p id="cardFinalizadas" class="text-3xl font-bold">0</p>
+</div>
+
+</div>
+
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+<div class="bg-dark-secondary p-6 rounded-lg">
+<h3 class="text-lg mb-4">Ocorrências por Status</h3>
+<canvas id="graficoStatus"></canvas>
+</div>
+
+<div class="bg-dark-secondary p-6 rounded-lg">
+<h3 class="text-lg mb-4">Ocorrências por Sala</h3>
+<canvas id="graficoSala"></canvas>
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+
+let ocorrencias = []
+
+async function carregarDados(){
+
+const res = await fetch('/api/ocorrencias_todas')
+ocorrencias = await res.json()
+
+atualizarCards()
+gerarGraficoStatus()
+gerarGraficoSala()
+
+}
+
+function atualizarCards(){
+
+let tutor=0
+let coord=0
+let gestao=0
+let finalizadas=0
+
+ocorrencias.forEach(o=>{
+
+if(o.solicitado_tutor && !o.atendimento_tutor) tutor++
+if(o.solicitado_coordenacao && !o.atendimento_coordenacao) coord++
+if(o.solicitado_gestao && !o.atendimento_gestao) gestao++
+
+if(!o.solicitado_tutor && !o.solicitado_coordenacao && !o.solicitado_gestao){
+finalizadas++
+}
+
+})
+
+document.getElementById("cardTutor").textContent=tutor
+document.getElementById("cardCoord").textContent=coord
+document.getElementById("cardGestao").textContent=gestao
+document.getElementById("cardFinalizadas").textContent=finalizadas
+
+}
+
+
+function gerarGraficoStatus(){
+
+let tutor=0
+let coord=0
+let gestao=0
+let finalizadas=0
+
+ocorrencias.forEach(o=>{
+
+if(o.solicitado_tutor && !o.atendimento_tutor) tutor++
+else if(o.solicitado_coordenacao && !o.atendimento_coordenacao) coord++
+else if(o.solicitado_gestao && !o.atendimento_gestao) gestao++
+else finalizadas++
+
+})
+
+new Chart(document.getElementById('graficoStatus'),{
+type:'doughnut',
+data:{
+labels:['Tutor','Coordenação','Gestão','Finalizadas'],
+datasets:[{
+data:[tutor,coord,gestao,finalizadas]
+}]
+}
+})
+
+}
+
+
+function gerarGraficoSala(){
+
+let salas={}
+
+ocorrencias.forEach(o=>{
+
+if(!salas[o.sala_nome]) salas[o.sala_nome]=0
+salas[o.sala_nome]++
+
+})
+
+new Chart(document.getElementById('graficoSala'),{
+type:'bar',
+data:{
+labels:Object.keys(salas),
+datasets:[{
+label:'Ocorrências',
+data:Object.values(salas)
+}]
+}
+})
+
+}
+
+window.onload=carregarDados
+
+</script>
+
+</body>
+</html>
