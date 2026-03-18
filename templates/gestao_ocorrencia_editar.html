@@ -253,6 +253,7 @@
                 if (!response.ok) throw new Error('Erro ao carregar ocorrência');
                 const data = await response.json();
                 dadosOcorrencia = data;
+                ocorrenciaId = data.id;
 
                 document.getElementById('numero').value = data.numero || '';
                 document.getElementById('status').value = data.status || '';
