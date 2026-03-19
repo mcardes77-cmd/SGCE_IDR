@@ -11,22 +11,27 @@ app = Flask(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# =========================
+# SUPABASE
+# =========================
+
+def get_supabase():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("SUPABASE_URL ou SUPABASE_KEY não configurados.")
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def json_error(message, status=500):
-    return jsonify({"success": False, "error": str(message)}), status
+    return jsonify({
+        "success": False,
+        "error": str(message)
+    }), status
 
-
-def get_supabase():
-    if supabase is None:
-        raise RuntimeError("SUPABASE_URL ou SUPABASE_KEY não configurados.")
-    return supabase
 
 def now_iso():
     return datetime.utcnow().isoformat()
+
 
 def get_next_numero_ocorrencia():
     db = get_supabase()
@@ -41,83 +46,7 @@ def get_next_numero_ocorrencia():
         return int(resp.data[0]["numero"]) + 1
     return 1
 
-@app.route("/api/registrar_ocorrencia", methods=["POST"])
-def api_registrar_ocorrencia():
-    try:
-        db = get_supabase()
-        data = request.get_json() or {}
 
-        aluno_id = data.get("aluno_id")
-        professor_id = data.get("professor_id")
-        professor_nome = data.get("professor_nome")
-        descricao = data.get("descricao")
-        atendimento_professor = data.get("atendimento_professor")
-        destino = (data.get("destino") or "nenhum").lower().strip()
-
-        if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
-            return json_error("Campos obrigatórios faltando", 400)
-
-        resp_aluno = (
-            db.table("d_alunos")
-            .select("id,nome,sala_id,sala_nome,tutor_id,tutor_nome")
-            .eq("id", aluno_id)
-            .limit(1)
-            .execute()
-        )
-
-        if not resp_aluno.data:
-            return json_error("Aluno não encontrado", 404)
-
-        aluno = resp_aluno.data[0]
-
-        solicitado_tutor = False
-        solicitado_coordenacao = False
-        solicitado_gestao = False
-        solicitado_responsavel = False
-        pendencia = "FINALIZADA"
-        status = "FINALIZADA"
-
-        if destino == "tutor":
-            solicitado_tutor = True
-            pendencia = "TUTOR"
-            status = "ATENDIMENTO"
-        elif destino == "coordenacao":
-            solicitado_coordenacao = True
-            pendencia = "COORDENACAO"
-            status = "ATENDIMENTO"
-        elif destino == "gestao":
-            solicitado_gestao = True
-            pendencia = "GESTAO"
-            status = "ATENDIMENTO"
-
-        payload = {
-            "numero": get_next_numero_ocorrencia(),
-            "data_hora": now_iso(),
-            "aluno_id": aluno["id"],
-            "aluno_nome": aluno.get("nome"),
-            "sala_id": aluno.get("sala_id"),
-            "sala_nome": aluno.get("sala_nome"),
-            "professor_id": professor_id,
-            "professor_nome": professor_nome,
-            "tutor_id": aluno.get("tutor_id"),
-            "tutor_nome": aluno.get("tutor_nome"),
-            "descricao": descricao,
-            "atendimento_professor": atendimento_professor,
-            "solicitado_tutor": solicitado_tutor,
-            "solicitado_coordenacao": solicitado_coordenacao,
-            "solicitado_gestao": solicitado_gestao,
-            "solicitado_responsavel": solicitado_responsavel,
-            "pendencia": pendencia,
-            "status": status,
-            "impressao_pdf": False,
-        }
-
-        resp = db.table("ocorrencias").insert(payload).execute()
-        numero = resp.data[0]["numero"] if resp.data else None
-
-        return jsonify({"success": True, "numero": numero})
-    except Exception as e:
-        return json_error(e)
 # =========================
 # ROTAS PRINCIPAIS
 # =========================
@@ -130,6 +59,19 @@ def home():
 @app.route("/health")
 def health():
     return "OK"
+
+
+@app.route("/teste")
+def teste():
+    return "TESTE OK"
+
+
+@app.route("/api/debug_url")
+def debug_url():
+    return jsonify({
+        "SUPABASE_URL": SUPABASE_URL,
+        "supabase_configurado": bool(SUPABASE_URL and SUPABASE_KEY)
+    })
 
 
 # =========================
@@ -210,18 +152,6 @@ def gestao_cadastro():
 
 
 # =========================
-# DEBUG
-# =========================
-
-@app.route("/api/debug_url")
-def debug_url():
-    return jsonify({
-        "SUPABASE_URL": SUPABASE_URL,
-        "supabase_configurado": bool(SUPABASE_URL and SUPABASE_KEY)
-    })
-
-
-# =========================
 # APIS BASE
 # =========================
 
@@ -249,6 +179,7 @@ def api_funcionarios():
 def api_professores():
     try:
         db = get_supabase()
+        # sem filtro por enquanto, para garantir carregamento
         resp = db.table("d_funcionarios").select("*").order("nome").execute()
         return jsonify(resp.data or [])
     except Exception as e:
@@ -330,7 +261,13 @@ def api_ocorrencia_detalhes():
 
     try:
         db = get_supabase()
-        resp = db.table("ocorrencias").select("*").eq("numero", numero).limit(1).execute()
+        resp = (
+            db.table("ocorrencias")
+            .select("*")
+            .eq("numero", numero)
+            .limit(1)
+            .execute()
+        )
 
         if not resp.data:
             return json_error("Ocorrência não encontrada", 404)
@@ -341,13 +278,200 @@ def api_ocorrencia_detalhes():
 
 
 # =========================
-# TESTE
+# OCORRÊNCIAS - GRAVAÇÃO
 # =========================
 
-@app.route("/teste")
-def teste():
-    return "TESTE OK"
+@app.route("/api/registrar_ocorrencia", methods=["POST"])
+def api_registrar_ocorrencia():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
 
+        aluno_id = data.get("aluno_id")
+        professor_id = data.get("professor_id")
+        professor_nome = data.get("professor_nome")
+        descricao = data.get("descricao")
+        atendimento_professor = data.get("atendimento_professor")
+        destino = (data.get("destino") or "nenhum").lower().strip()
+
+        if not aluno_id:
+            return json_error("Aluno não informado", 400)
+        if not professor_id:
+            return json_error("Professor não informado", 400)
+        if not professor_nome:
+            return json_error("Nome do professor não informado", 400)
+        if not descricao:
+            return json_error("Descrição da ocorrência não informada", 400)
+        if not atendimento_professor:
+            return json_error("Atendimento do professor não informado", 400)
+
+        resp_aluno = (
+            db.table("d_alunos")
+            .select("id,nome,sala_id,sala_nome,tutor_id,tutor_nome")
+            .eq("id", aluno_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not resp_aluno.data:
+            return json_error("Aluno não encontrado", 404)
+
+        aluno = resp_aluno.data[0]
+
+        solicitado_tutor = False
+        solicitado_coordenacao = False
+        solicitado_gestao = False
+        solicitado_responsavel = False
+        pendencia = "FINALIZADA"
+        status = "FINALIZADA"
+
+        if destino == "tutor":
+            solicitado_tutor = True
+            pendencia = "TUTOR"
+            status = "ATENDIMENTO"
+        elif destino == "coordenacao":
+            solicitado_coordenacao = True
+            pendencia = "COORDENACAO"
+            status = "ATENDIMENTO"
+        elif destino == "gestao":
+            solicitado_gestao = True
+            pendencia = "GESTAO"
+            status = "ATENDIMENTO"
+        elif destino == "nenhum":
+            pendencia = "FINALIZADA"
+            status = "FINALIZADA"
+
+        payload = {
+            "numero": get_next_numero_ocorrencia(),
+            "data_hora": now_iso(),
+            "aluno_id": aluno.get("id"),
+            "aluno_nome": aluno.get("nome"),
+            "sala_id": aluno.get("sala_id"),
+            "sala_nome": aluno.get("sala_nome"),
+            "professor_id": professor_id,
+            "professor_nome": professor_nome,
+            "tutor_id": aluno.get("tutor_id"),
+            "tutor_nome": aluno.get("tutor_nome"),
+            "descricao": descricao,
+            "atendimento_professor": atendimento_professor,
+            "solicitado_tutor": solicitado_tutor,
+            "solicitado_coordenacao": solicitado_coordenacao,
+            "solicitado_gestao": solicitado_gestao,
+            "solicitado_responsavel": solicitado_responsavel,
+            "pendencia": pendencia,
+            "status": status,
+            "impressao_pdf": False
+        }
+
+        resp = db.table("ocorrencias").insert(payload).execute()
+
+        numero = None
+        if resp.data and len(resp.data) > 0:
+            numero = resp.data[0].get("numero")
+
+        return jsonify({
+            "success": True,
+            "numero": numero
+        })
+
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/ocorrencias/<int:ocorrencia_id>/atendimento", methods=["PUT"])
+def api_salvar_atendimento(ocorrencia_id):
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+
+        tipo = (data.get("tipo") or "").strip().lower()
+        texto = (data.get("texto") or "").strip()
+        acao = (data.get("acao") or "").strip().lower()
+
+        if not texto:
+            return json_error("Texto do atendimento é obrigatório", 400)
+
+        updates = {}
+
+        if tipo == "tutor":
+            updates["atendimento_tutor"] = texto
+        elif tipo == "coordenacao":
+            updates["atendimento_coordenacao"] = texto
+        elif tipo == "gestao":
+            updates["atendimento_gestao"] = texto
+        elif tipo == "responsavel":
+            updates["atendimento_responsavel"] = texto
+        else:
+            return json_error("Tipo inválido", 400)
+
+        if acao == "finalizar":
+            updates["pendencia"] = "FINALIZADA"
+            updates["status"] = "FINALIZADA"
+            updates["solicitado_tutor"] = False
+            updates["solicitado_coordenacao"] = False
+            updates["solicitado_gestao"] = False
+            updates["solicitado_responsavel"] = False
+
+        elif acao == "encaminhar_tutor":
+            updates["pendencia"] = "TUTOR"
+            updates["status"] = "ATENDIMENTO"
+            updates["solicitado_tutor"] = True
+
+        elif acao == "encaminhar_coordenacao":
+            updates["pendencia"] = "COORDENACAO"
+            updates["status"] = "ATENDIMENTO"
+            updates["solicitado_coordenacao"] = True
+
+        elif acao == "encaminhar_gestao":
+            updates["pendencia"] = "GESTAO"
+            updates["status"] = "ATENDIMENTO"
+            updates["solicitado_gestao"] = True
+
+        elif acao == "convocar_responsavel":
+            updates["pendencia"] = "RESPONSAVEL"
+            updates["status"] = "ATENDIMENTO"
+            updates["solicitado_responsavel"] = True
+
+        resp = (
+            db.table("ocorrencias")
+            .update(updates)
+            .eq("id", ocorrencia_id)
+            .execute()
+        )
+
+        return jsonify({
+            "success": True,
+            "data": resp.data
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
+def api_gerar_pdf_ocorrencias():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        numeros = data.get("numeros", [])
+
+        if not numeros:
+            return json_error("Nenhuma ocorrência selecionada", 400)
+
+        db.table("ocorrencias").update({
+            "impressao_pdf": True
+        }).in_("numero", numeros).execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Ocorrências marcadas como impressas."
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+# =========================
+# MAIN
+# =========================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
