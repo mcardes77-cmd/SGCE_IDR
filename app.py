@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect
 from supabase import create_client
 from dotenv import load_dotenv
+from datetime import datetime
 import os
 
 load_dotenv()
@@ -24,7 +25,99 @@ def get_supabase():
         raise RuntimeError("SUPABASE_URL ou SUPABASE_KEY não configurados.")
     return supabase
 
+def now_iso():
+    return datetime.utcnow().isoformat()
 
+def get_next_numero_ocorrencia():
+    db = get_supabase()
+    resp = (
+        db.table("ocorrencias")
+        .select("numero")
+        .order("numero", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if resp.data:
+        return int(resp.data[0]["numero"]) + 1
+    return 1
+
+@app.route("/api/registrar_ocorrencia", methods=["POST"])
+def api_registrar_ocorrencia():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+
+        aluno_id = data.get("aluno_id")
+        professor_id = data.get("professor_id")
+        professor_nome = data.get("professor_nome")
+        descricao = data.get("descricao")
+        atendimento_professor = data.get("atendimento_professor")
+        destino = (data.get("destino") or "nenhum").lower().strip()
+
+        if not all([aluno_id, professor_id, professor_nome, descricao, atendimento_professor]):
+            return json_error("Campos obrigatórios faltando", 400)
+
+        resp_aluno = (
+            db.table("d_alunos")
+            .select("id,nome,sala_id,sala_nome,tutor_id,tutor_nome")
+            .eq("id", aluno_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not resp_aluno.data:
+            return json_error("Aluno não encontrado", 404)
+
+        aluno = resp_aluno.data[0]
+
+        solicitado_tutor = False
+        solicitado_coordenacao = False
+        solicitado_gestao = False
+        solicitado_responsavel = False
+        pendencia = "FINALIZADA"
+        status = "FINALIZADA"
+
+        if destino == "tutor":
+            solicitado_tutor = True
+            pendencia = "TUTOR"
+            status = "ATENDIMENTO"
+        elif destino == "coordenacao":
+            solicitado_coordenacao = True
+            pendencia = "COORDENACAO"
+            status = "ATENDIMENTO"
+        elif destino == "gestao":
+            solicitado_gestao = True
+            pendencia = "GESTAO"
+            status = "ATENDIMENTO"
+
+        payload = {
+            "numero": get_next_numero_ocorrencia(),
+            "data_hora": now_iso(),
+            "aluno_id": aluno["id"],
+            "aluno_nome": aluno.get("nome"),
+            "sala_id": aluno.get("sala_id"),
+            "sala_nome": aluno.get("sala_nome"),
+            "professor_id": professor_id,
+            "professor_nome": professor_nome,
+            "tutor_id": aluno.get("tutor_id"),
+            "tutor_nome": aluno.get("tutor_nome"),
+            "descricao": descricao,
+            "atendimento_professor": atendimento_professor,
+            "solicitado_tutor": solicitado_tutor,
+            "solicitado_coordenacao": solicitado_coordenacao,
+            "solicitado_gestao": solicitado_gestao,
+            "solicitado_responsavel": solicitado_responsavel,
+            "pendencia": pendencia,
+            "status": status,
+            "impressao_pdf": False,
+        }
+
+        resp = db.table("ocorrencias").insert(payload).execute()
+        numero = resp.data[0]["numero"] if resp.data else None
+
+        return jsonify({"success": True, "numero": numero})
+    except Exception as e:
+        return json_error(e)
 # =========================
 # ROTAS PRINCIPAIS
 # =========================
