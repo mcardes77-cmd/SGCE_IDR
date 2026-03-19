@@ -83,7 +83,6 @@ def gestao_relatorio_impressao():
     return redirect("/gestao_ocorrencia")
 
 
-# aliases antigos -> redireciona para a tela única
 @app.route("/gestao_ocorrencia_aberta")
 @app.route("/gestao_ocorrencia_abertas")
 @app.route("/gestao_ocorrencia_finalizada")
@@ -144,6 +143,13 @@ def gestao_cadastro():
 # APIS BASE - SUPABASE
 # =========================
 
+@app.route("/api/debug_url")
+def debug_url():
+    return jsonify({
+        "SUPABASE_URL": SUPABASE_URL
+    })
+
+
 @app.route("/api/salas")
 def api_salas():
     try:
@@ -181,21 +187,7 @@ def api_professores():
             .order("nome")
             .execute()
         )
-        dados = resp.data or []
-
-        professores = []
-        for item in dados:
-            funcao = (item.get("funcao") or "").upper()
-            tipo = (item.get("tipo") or "").upper()
-
-            if (
-                "PROFESSOR" in funcao
-                or "TUTOR" in funcao
-                or tipo == "DOCENTE"
-            ):
-                professores.append(item)
-
-        return jsonify(professores)
+        return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
 
@@ -203,7 +195,6 @@ def api_professores():
 @app.route("/api/salas_por_professor/<int:professor_id>")
 def api_salas_por_professor(professor_id):
     try:
-        # provisório: retorna todas as salas
         resp = (
             supabase.table("d_salas")
             .select("id,nome")
@@ -257,12 +248,6 @@ def api_alunos_por_tutor(tutor_id):
         return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
-
-@app.route("/api/debug_url")
-def debug_url():
-    return {
-        "SUPABASE_URL": SUPABASE_URL
-    }
 
 
 # =========================
@@ -408,7 +393,6 @@ def api_salvar_atendimento(ocorrencia_id):
         else:
             return json_error("Tipo inválido", 400)
 
-        # fluxo profissional
         if acao == "finalizar":
             updates["pendencia"] = "FINALIZADA"
             updates["status"] = "FINALIZADA"
@@ -465,7 +449,10 @@ def api_gerar_pdf_ocorrencias():
             .execute()
         )
 
-        return jsonify({"success": True, "message": "Ocorrências marcadas como impressas."})
+        return jsonify({
+            "success": True,
+            "message": "Ocorrências marcadas como impressas."
+        })
     except Exception as e:
         return json_error(e)
 
