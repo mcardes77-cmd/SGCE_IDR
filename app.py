@@ -258,6 +258,12 @@ def api_alunos_por_tutor(tutor_id):
     except Exception as e:
         return json_error(e)
 
+@app.route("/api/debug_url")
+def debug_url():
+    return {
+        "SUPABASE_URL": SUPABASE_URL
+    }
+
 
 # =========================
 # APIS - OCORRÊNCIAS
