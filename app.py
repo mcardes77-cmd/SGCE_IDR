@@ -88,6 +88,20 @@ def api_alunos_por_sala(sala_id):
     except Exception as e:
         return json_error(e)
 
+@app.route("/api/ocorrencias_todas")
+def api_ocorrencias_todas():
+    try:
+        db = get_supabase()
+        resp = (
+            db.table("ocorrencias")
+            .select("*")
+            .order("numero", desc=True)
+            .execute()
+        )
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
 from datetime import datetime
 from flask import request
 
@@ -203,19 +217,6 @@ def api_registrar_ocorrencia():
     except Exception as e:
         return json_error(e)
 
-@app.route("/api/ocorrencias_todas")
-def api_ocorrencias_todas():
-    try:
-        db = get_supabase()
-        resp = (
-            db.table("ocorrencias")
-            .select("*")
-            .order("numero", desc=True)
-            .execute()
-        )
-        return jsonify(resp.data or [])
-    except Exception as e:
-        return json_error(e)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
