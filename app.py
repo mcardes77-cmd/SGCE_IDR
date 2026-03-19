@@ -83,6 +83,7 @@ def gestao_relatorio_impressao():
     return redirect("/gestao_ocorrencia")
 
 
+# aliases antigos -> redireciona para a tela única
 @app.route("/gestao_ocorrencia_aberta")
 @app.route("/gestao_ocorrencia_abertas")
 @app.route("/gestao_ocorrencia_finalizada")
@@ -143,13 +144,6 @@ def gestao_cadastro():
 # APIS BASE - SUPABASE
 # =========================
 
-@app.route("/api/debug_url")
-def debug_url():
-    return jsonify({
-        "SUPABASE_URL": SUPABASE_URL
-    })
-
-
 @app.route("/api/salas")
 def api_salas():
     try:
@@ -180,21 +174,24 @@ def api_funcionarios():
 
 @app.route("/api/professores")
 def api_professores():
-    try:
-        resp = (
-            supabase.table("d_funcionarios")
-            .select("id,nome,tipo,funcao,ativo")
-            .order("nome")
-            .execute()
-        )
-        return jsonify(resp.data or [])
-    except Exception as e:
-        return json_error(e)
+    ...
+    professores = []
+    for item in dados:
+        funcao = (item.get("funcao") or "").upper()
+        tipo = (item.get("tipo") or "").upper()
+
+        if (
+            "PROFESSOR" in funcao
+            or "TUTOR" in funcao
+            or tipo == "DOCENTE"
+        ):
+            professores.append(item)
 
 
 @app.route("/api/salas_por_professor/<int:professor_id>")
 def api_salas_por_professor(professor_id):
     try:
+        # provisório: retorna todas as salas
         resp = (
             supabase.table("d_salas")
             .select("id,nome")
@@ -248,6 +245,12 @@ def api_alunos_por_tutor(tutor_id):
         return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
+
+@app.route("/api/debug_url")
+def debug_url():
+    return {
+        "SUPABASE_URL": SUPABASE_URL
+    }
 
 
 # =========================
@@ -393,6 +396,7 @@ def api_salvar_atendimento(ocorrencia_id):
         else:
             return json_error("Tipo inválido", 400)
 
+        # fluxo profissional
         if acao == "finalizar":
             updates["pendencia"] = "FINALIZADA"
             updates["status"] = "FINALIZADA"
@@ -449,10 +453,7 @@ def api_gerar_pdf_ocorrencias():
             .execute()
         )
 
-        return jsonify({
-            "success": True,
-            "message": "Ocorrências marcadas como impressas."
-        })
+        return jsonify({"success": True, "message": "Ocorrências marcadas como impressas."})
     except Exception as e:
         return json_error(e)
 
@@ -659,4 +660,4 @@ def api_frequencia_detalhes(aluno_id, data_ref):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port) 
