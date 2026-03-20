@@ -2,12 +2,7 @@ Substitua no GitHub:
 - app.py
 - templates/gestao_ocorrencia.html
 - templates/gestao_ocorrencia_editar.html
-- templates/gestao_ocorrencia_nova.html
 
-requirements.txt:
-flask
-gunicorn
-supabase
-python-dotenv
-
-Depois faça commit, push e aguarde o Railway redeployar.
+No Supabase, execute se ainda nao fez:
+alter table ocorrencias add column if not exists atendimento_responsavel text;
+alter table ocorrencias add column if not exists solicitado_responsavel boolean default false;
