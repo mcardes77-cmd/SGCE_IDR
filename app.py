@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime
@@ -37,6 +37,17 @@ def home():
 def health():
     return "OK"
 
+@app.route("/teste")
+def teste():
+    return "TESTE OK"
+
+@app.route("/api/debug_url")
+def debug_url():
+    return jsonify({
+        "SUPABASE_URL": SUPABASE_URL,
+        "supabase_configurado": bool(SUPABASE_URL and SUPABASE_KEY)
+    })
+
 @app.route("/gestao_ocorrencia")
 def gestao_ocorrencia():
     return render_template("gestao_ocorrencia.html")
@@ -50,11 +61,82 @@ def gestao_ocorrencia_nova():
 def gestao_ocorrencia_editar(ocorrencia_id=None):
     return render_template("gestao_ocorrencia_editar.html", ocorrencia_id=ocorrencia_id)
 
+@app.route("/gestao_relatorio_impressao")
+def gestao_relatorio_impressao():
+    return render_template("gestao_relatorio_impressao.html")
+
+@app.route("/relatorio_ocorrencias_pdf")
+def relatorio_ocorrencias_pdf():
+    numeros_raw = request.args.get("numeros", "").strip()
+    if not numeros_raw:
+        return "Nenhuma ocorrência informada.", 400
+    try:
+        numeros = [int(x.strip()) for x in numeros_raw.split(",") if x.strip()]
+        db = get_supabase()
+        resp = db.table("ocorrencias").select("*").in_("numero", numeros).order("numero").execute()
+        ocorrencias = resp.data or []
+        nome_aluno = ocorrencias[0].get("aluno_nome", "") if ocorrencias else ""
+        return render_template("relatorio_ocorrencias_pdf.html", ocorrencias=ocorrencias, nome_aluno=nome_aluno, data_geracao=datetime.now().strftime("%d/%m/%Y %H:%M"))
+    except Exception as e:
+        return f"Erro ao abrir relatório: {e}", 500
+
+@app.route("/gestao_ocorrencia_aberta")
+@app.route("/gestao_ocorrencia_abertas")
+@app.route("/gestao_ocorrencia_finalizada")
+@app.route("/gestao_ocorrencia_finalizadas")
+def aliases_ocorrencias():
+    return redirect("/gestao_ocorrencia")
+
+@app.route("/api/professores")
+def api_professores():
+    try:
+        db = get_supabase()
+        resp = db.table("d_funcionarios").select("*").order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salas")
+def api_salas():
+    try:
+        db = get_supabase()
+        resp = db.table("d_salas").select("*").order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salas_por_professor/<int:professor_id>")
+def api_salas_por_professor(professor_id):
+    try:
+        db = get_supabase()
+        resp = db.table("d_salas").select("*").order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/alunos_por_sala/<int:sala_id>")
+def api_alunos_por_sala(sala_id):
+    try:
+        db = get_supabase()
+        resp = db.table("d_alunos").select("*").eq("sala_id", sala_id).order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
 @app.route("/api/ocorrencias_todas")
 def api_ocorrencias_todas():
     try:
         db = get_supabase()
         resp = db.table("ocorrencias").select("*").order("numero", desc=True).execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/ocorrencias_por_aluno/<int:aluno_id>")
+def api_ocorrencias_por_aluno(aluno_id):
+    try:
+        db = get_supabase()
+        resp = db.table("ocorrencias").select("*").eq("aluno_id", aluno_id).order("numero", desc=True).execute()
         return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
@@ -78,7 +160,6 @@ def api_registrar_ocorrencia():
     try:
         db = get_supabase()
         data = request.get_json() or {}
-
         aluno_id = data.get("aluno_id")
         professor_id = data.get("professor_id")
         professor_nome = data.get("professor_nome")
@@ -100,8 +181,8 @@ def api_registrar_ocorrencia():
         resp_aluno = db.table("d_alunos").select("id,nome,sala_id,sala_nome,tutor_id,tutor_nome").eq("id", aluno_id).limit(1).execute()
         if not resp_aluno.data:
             return json_error("Aluno não encontrado", 404)
-
         aluno = resp_aluno.data[0]
+
         solicitado_tutor = False
         solicitado_coordenacao = False
         solicitado_gestao = False
@@ -155,20 +236,11 @@ def api_salvar_atendimento(ocorrencia_id):
     try:
         db = get_supabase()
         data = request.get_json() or {}
-
         tipo = (data.get("tipo") or "").strip().lower()
         texto = (data.get("texto") or "").strip()
         acao = (data.get("acao") or "").strip().lower()
-
         if not texto:
             return json_error("Texto do atendimento é obrigatório", 400)
-
-        resp_atual = db.table("ocorrencias").select("*").eq("id", ocorrencia_id).limit(1).execute()
-        if not resp_atual.data:
-            return json_error("Ocorrência não encontrada", 404)
-
-        ocorrencia = resp_atual.data[0]
-        pendencia_atual = (ocorrencia.get("pendencia") or "").strip().upper()
 
         updates = {}
         if tipo == "tutor":
@@ -182,28 +254,13 @@ def api_salvar_atendimento(ocorrencia_id):
         else:
             return json_error("Tipo inválido", 400)
 
-        fluxo_permitido = {
-            "TUTOR": {"finalizar", "encaminhar_coordenacao", "encaminhar_gestao"},
-            "COORDENACAO": {"finalizar", "encaminhar_tutor", "encaminhar_gestao"},
-            "GESTAO": {"finalizar", "encaminhar_tutor", "encaminhar_coordenacao", "convocar_responsavel"},
-            "RESPONSAVEL": {"finalizar"},
-            "FINALIZADA": set()
-        }
-
-        if pendencia_atual not in fluxo_permitido:
-            pendencia_atual = "FINALIZADA"
-
-        if acao not in fluxo_permitido[pendencia_atual]:
-            return json_error(f"Ação '{acao}' não permitida para pendência atual '{pendencia_atual}'", 400)
-
-        updates["solicitado_tutor"] = False
-        updates["solicitado_coordenacao"] = False
-        updates["solicitado_gestao"] = False
-        updates["solicitado_responsavel"] = False
-
         if acao == "finalizar":
             updates["pendencia"] = "FINALIZADA"
             updates["status"] = "FINALIZADA"
+            updates["solicitado_tutor"] = False
+            updates["solicitado_coordenacao"] = False
+            updates["solicitado_gestao"] = False
+            updates["solicitado_responsavel"] = False
         elif acao == "encaminhar_tutor":
             updates["pendencia"] = "TUTOR"
             updates["status"] = "ATENDIMENTO"
@@ -222,7 +279,21 @@ def api_salvar_atendimento(ocorrencia_id):
             updates["solicitado_responsavel"] = True
 
         resp = db.table("ocorrencias").update(updates).eq("id", ocorrencia_id).execute()
-        return jsonify({"success": True, "pendencia_anterior": pendencia_atual, "nova_pendencia": updates.get("pendencia"), "data": resp.data})
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
+def api_gerar_pdf_ocorrencias():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        numeros = data.get("numeros", [])
+        if not numeros:
+            return json_error("Nenhuma ocorrência selecionada", 400)
+        db.table("ocorrencias").update({"impressao_pdf": True}).in_("numero", numeros).execute()
+        numeros_str = ",".join(str(n) for n in numeros)
+        return jsonify({"success": True, "print_url": f"/relatorio_ocorrencias_pdf?numeros={numeros_str}"})
     except Exception as e:
         return json_error(e)
 
