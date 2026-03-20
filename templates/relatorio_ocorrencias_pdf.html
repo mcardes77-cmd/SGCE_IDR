@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório de Ocorrências</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .page-break { page-break-before: always; }
+}
+</style>
+</head>
+<body class="bg-white text-black p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="no-print mb-6 flex gap-3">
+      <button onclick="window.print()" class="bg-green-600 text-white px-4 py-2 rounded">Imprimir / Salvar em PDF</button>
+      <button onclick="window.close()" class="bg-gray-600 text-white px-4 py-2 rounded">Fechar</button>
+    </div>
+
+    <header class="mb-8 text-center">
+      <h1 class="text-2xl font-bold">RELATÓRIO DE OCORRÊNCIAS</h1>
+      <p class="text-sm mt-2">Aluno: {{ nome_aluno }}</p>
+      <p class="text-sm">Gerado em: {{ data_geracao }}</p>
+    </header>
+
+    {% for o in ocorrencias %}
+    <section class="border border-gray-300 rounded-lg p-4 mb-6 {% if not loop.first %}page-break{% endif %}">
+      <div class="grid grid-cols-2 gap-4 mb-3">
+        <div><strong>Número:</strong> {{ o.numero }}</div>
+        <div><strong>Data:</strong> {{ o.data_hora or '' }}</div>
+        <div><strong>Aluno:</strong> {{ o.aluno_nome or '' }}</div>
+        <div><strong>Sala:</strong> {{ o.sala_nome or '' }}</div>
+        <div><strong>Professor:</strong> {{ o.professor_nome or '' }}</div>
+        <div><strong>Status:</strong> {{ o.status or '' }}</div>
+        <div><strong>Pendência:</strong> {{ o.pendencia or '' }}</div>
+        <div><strong>Tutor:</strong> {{ o.tutor_nome or '' }}</div>
+      </div>
+
+      <div class="mb-3">
+        <h3 class="font-bold">Descrição da Ocorrência</h3>
+        <p class="whitespace-pre-wrap">{{ o.descricao or '' }}</p>
+      </div>
+
+      <div class="mb-3">
+        <h3 class="font-bold">Atendimento Professor</h3>
+        <p class="whitespace-pre-wrap">{{ o.atendimento_professor or '' }}</p>
+      </div>
+
+      {% if o.atendimento_tutor %}
+      <div class="mb-3">
+        <h3 class="font-bold">Atendimento Tutor</h3>
+        <p class="whitespace-pre-wrap">{{ o.atendimento_tutor }}</p>
+      </div>
+      {% endif %}
+
+      {% if o.atendimento_coordenacao %}
+      <div class="mb-3">
+        <h3 class="font-bold">Atendimento Coordenação</h3>
+        <p class="whitespace-pre-wrap">{{ o.atendimento_coordenacao }}</p>
+      </div>
+      {% endif %}
+
+      {% if o.atendimento_gestao %}
+      <div class="mb-3">
+        <h3 class="font-bold">Atendimento Gestão</h3>
+        <p class="whitespace-pre-wrap">{{ o.atendimento_gestao }}</p>
+      </div>
+      {% endif %}
+
+      {% if o.atendimento_responsavel %}
+      <div class="mb-3">
+        <h3 class="font-bold">Atendimento Responsável</h3>
+        <p class="whitespace-pre-wrap">{{ o.atendimento_responsavel }}</p>
+      </div>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 400);
+    });
+  </script>
+</body>
+</html>
