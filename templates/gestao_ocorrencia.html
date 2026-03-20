@@ -167,6 +167,35 @@
             return Array.from(alunosSet).sort((a, b) => a.localeCompare(b));
         }
 
+        
+        function siglaPendencia(oc) {
+            const pend = String(oc.pendencia || "").toUpperCase();
+
+            if (pend === "TUTOR") return "T";
+            if (pend === "COORDENACAO") return "C";
+            if (pend === "GESTAO") return "G";
+            if (pend === "RESPONSAVEL") return "R";
+            if (pend === "FINALIZADA") return "F";
+
+            if (oc.solicitado_responsavel && !oc.atendimento_responsavel) return "R";
+            if (oc.solicitado_gestao && !oc.atendimento_gestao) return "G";
+            if (oc.solicitado_coordenacao && !oc.atendimento_coordenacao) return "C";
+            if (oc.solicitado_tutor && !oc.atendimento_tutor) return "T";
+
+            return "-";
+        }
+
+        function classePendencia(oc) {
+            const sigla = siglaPendencia(oc);
+            if (sigla === "T") return "bg-blue-600 text-white";
+            if (sigla === "C") return "bg-yellow-500 text-black";
+            if (sigla === "G") return "bg-red-600 text-white";
+            if (sigla === "R") return "bg-purple-600 text-white";
+            if (sigla === "F") return "bg-green-600 text-white";
+            return "bg-gray-600 text-white";
+        }
+
+
         async function carregarOcorrencias() {
             try {
                 // Usar todas as ocorrências já carregadas, ordenadas por número decrescente
@@ -277,7 +306,7 @@
             tbody.innerHTML = ocorrencias.map(oc => `
                 <tr class="border-b border-gray-700 hover:bg-gray-800/50">
                     <td class="p-3 text-sm">
-                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked' : ''} onchange="atualizarSelecao()">
+                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked disabled' : ''} onchange="atualizarSelecao()">
                     </td>
                     <td class="p-3 text-sm font-medium text-accent">${oc.numero}</td>
                     <td class="p-3 text-sm">${formatarData(oc.data_hora || oc.data)}</td>

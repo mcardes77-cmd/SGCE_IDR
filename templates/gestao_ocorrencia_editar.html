@@ -104,7 +104,7 @@
                     <textarea id="atendimento_professor" class="form-textarea readonly-box" rows="3" readonly></textarea>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div>
                         <label class="block text-sm text-blue-300 mb-2">Atendimento Tutor</label>
                         <textarea id="atendimento_tutor" class="form-textarea readonly-box" rows="4" readonly></textarea>
@@ -116,6 +116,10 @@
                     <div>
                         <label class="block text-sm text-red-300 mb-2">Atendimento Gestão</label>
                         <textarea id="atendimento_gestao" class="form-textarea readonly-box" rows="4" readonly></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-purple-300 mb-2">Atendimento Responsável</label>
+                        <textarea id="atendimento_responsavel" class="form-textarea readonly-box" rows="4" readonly></textarea>
                     </div>
                 </div>
 
@@ -253,9 +257,6 @@
                 if (!response.ok) throw new Error('Erro ao carregar ocorrência');
                 const data = await response.json();
                 dadosOcorrencia = data;
-                if (data.id) {
-                    ocorrenciaId = data.id;
-                }
 
                 document.getElementById('numero').value = data.numero || '';
                 document.getElementById('status').value = data.status || '';
@@ -267,6 +268,8 @@
                 document.getElementById('atendimento_tutor').value = data.atendimento_tutor || '';
                 document.getElementById('atendimento_coordenacao').value = data.atendimento_coordenacao || '';
                 document.getElementById('atendimento_gestao').value = data.atendimento_gestao || '';
+                const campoResponsavel = document.getElementById('atendimento_responsavel');
+                if (campoResponsavel) campoResponsavel.value = data.atendimento_responsavel || '';
 
                 const nivel = obterNivelPendente(data);
                 document.getElementById('nivel_atual').value = nivel;
