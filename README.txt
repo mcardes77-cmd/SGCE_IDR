@@ -1,14 +1,13 @@
-PACOTE LIMPO DAS TELAS DO SISTEMA
+Substitua no GitHub:
+- app.py
+- templates/gestao_ocorrencia.html
+- templates/gestao_ocorrencia_editar.html
+- templates/gestao_ocorrencia_nova.html
 
-O que este pacote resolve:
-- organiza as telas principais na pasta templates
-- usa a tela nova de gestao_ocorrencia como tela única
-- remove a necessidade de páginas separadas de abertas/finalizadas
-- inclui app.py pronto para subir no Railway/Render
+requirements.txt:
+flask
+gunicorn
+supabase
+python-dotenv
 
-Start command:
-gunicorn app:app
-
-Observação:
-As telas estão prontas para abrir.
-As APIs de dados do Supabase precisam continuar sendo integradas no próximo passo.
+Depois faça commit, push e aguarde o Railway redeployar.
