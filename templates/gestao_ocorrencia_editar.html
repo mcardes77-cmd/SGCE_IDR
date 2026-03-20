@@ -201,6 +201,13 @@
             return 'finalizada';
         }
 
+            if (data.solicitado_tutor && !(data.atendimento_tutor || '').trim()) return 'tutor';
+            if (data.solicitado_coordenacao && !(data.atendimento_coordenacao || '').trim()) return 'coordenacao';
+            if (data.solicitado_gestao && !(data.atendimento_gestao || '').trim()) return 'gestao';
+            if (data.solicitado_responsavel && !(data.atendimento_responsavel || '').trim()) return 'responsavel';
+            return 'finalizada';
+        }
+
         function montarAcoes(nivel) {
             const container = document.getElementById('acoes-disponiveis');
             container.innerHTML = '';
@@ -257,6 +264,7 @@
                 if (!response.ok) throw new Error('Erro ao carregar ocorrência');
                 const data = await response.json();
                 dadosOcorrencia = data;
+                if (data.id) { ocorrenciaId = data.id; }
 
                 document.getElementById('numero').value = data.numero || '';
                 document.getElementById('status').value = data.status || '';

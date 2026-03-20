@@ -177,10 +177,10 @@
             if (pend === "RESPONSAVEL") return "R";
             if (pend === "FINALIZADA") return "F";
 
-            if (oc.solicitado_responsavel && !oc.atendimento_responsavel) return "R";
-            if (oc.solicitado_gestao && !oc.atendimento_gestao) return "G";
-            if (oc.solicitado_coordenacao && !oc.atendimento_coordenacao) return "C";
-            if (oc.solicitado_tutor && !oc.atendimento_tutor) return "T";
+            if (oc.solicitado_responsavel && !(oc.atendimento_responsavel || "").trim()) return "R";
+            if (oc.solicitado_gestao && !(oc.atendimento_gestao || "").trim()) return "G";
+            if (oc.solicitado_coordenacao && !(oc.atendimento_coordenacao || "").trim()) return "C";
+            if (oc.solicitado_tutor && !(oc.atendimento_tutor || "").trim()) return "T";
 
             return "-";
         }
@@ -306,7 +306,7 @@
             tbody.innerHTML = ocorrencias.map(oc => `
                 <tr class="border-b border-gray-700 hover:bg-gray-800/50">
                     <td class="p-3 text-sm">
-                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked disabled' : ''} onchange="atualizarSelecao()">
+                        <input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-accent" ${oc.impressao_pdf ? 'checked' : ''} onchange="atualizarSelecao()">
                     </td>
                     <td class="p-3 text-sm font-medium text-accent">${oc.numero}</td>
                     <td class="p-3 text-sm">${formatarData(oc.data_hora || oc.data)}</td>
