@@ -1,8 +1,7 @@
 Substitua no GitHub:
 - app.py
-- templates/gestao_ocorrencia.html
-- templates/gestao_ocorrencia_editar.html
+- templates/gestao_relatorio_impressao.html
+- templates/relatorio_ocorrencias_pdf.html
 
-No Supabase, execute se ainda nao fez:
-alter table ocorrencias add column if not exists atendimento_responsavel text;
-alter table ocorrencias add column if not exists solicitado_responsavel boolean default false;
+Esta correção restaura as rotas de nova ocorrência e listagem,
+mantendo o PDF funcional por página de impressão.
