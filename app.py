@@ -3,6 +3,7 @@ from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime
 import os
+from modulos_profissionais import registrar_modulos_profissionais
 
 load_dotenv()
 app = Flask(__name__)
@@ -24,6 +25,8 @@ def get_next_numero_ocorrencia():
     if resp.data:
         return int(resp.data[0]["numero"]) + 1
     return 1
+
+registrar_modulos_profissionais(app, supabase, json_error, now_iso)
 
 @app.route("/")
 def home():
