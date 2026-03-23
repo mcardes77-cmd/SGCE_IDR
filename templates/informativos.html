@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Informativos</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+<div class="max-w-5xl mx-auto">
+<header class="mb-8 flex justify-between items-center"><h1 class="text-3xl font-bold text-emerald-400">Informativos</h1><button onclick="window.location.href='/'" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Voltar</button></header>
+<div id="msg" class="hidden mb-4 px-4 py-3 rounded"></div>
+<section class="bg-slate-800 rounded-2xl p-6 shadow mb-6">
+  <div class="mb-4"><label class="block text-sm text-slate-300 mb-1">Título</label><input id="titulo" class="w-full rounded-lg bg-slate-700 border border-slate-600 p-3"></div>
+  <div class="mb-4"><label class="block text-sm text-slate-300 mb-1">Conteúdo</label><textarea id="conteudo" rows="4" class="w-full rounded-lg bg-slate-700 border border-slate-600 p-3"></textarea></div>
+  <button onclick="salvar()" class="bg-emerald-600 hover:bg-emerald-700 px-5 py-3 rounded-lg font-bold">Publicar informativo</button>
+</section>
+<section id="lista" class="space-y-4"></section>
+</div>
+<script>
+function show(msg,tipo='info'){const el=document.getElementById('msg');el.textContent=msg;el.className='mb-4 px-4 py-3 rounded text-white';if(tipo==='error')el.classList.add('bg-red-600');else if(tipo==='success')el.classList.add('bg-green-600');else el.classList.add('bg-blue-600');el.classList.remove('hidden');}
+async function carregar(){const r=await fetch('/api/informativos');const data=await r.json();document.getElementById('lista').innerHTML=(data||[]).map(i=>`<div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-xl font-semibold text-emerald-400">${i.titulo||''}</div><div class="text-sm text-slate-400 mt-1">${(i.created_at||'').substring(0,10)}</div><div class="mt-3 whitespace-pre-wrap">${i.conteudo||''}</div></div>`).join('')||'<div class="text-slate-400">Sem informativos.</div>';}
+async function salvar(){const payload={titulo:document.getElementById('titulo').value.trim(),conteudo:document.getElementById('conteudo').value.trim()};if(!payload.titulo||!payload.conteudo){show('Preencha título e conteúdo.','error');return;}const r=await fetch('/api/informativos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok||!d.success){show(d.error||'Erro ao salvar informativo.','error');return;}show('Informativo publicado com sucesso.','success');document.getElementById('titulo').value='';document.getElementById('conteudo').value='';carregar();}
+document.addEventListener('DOMContentLoaded',carregar);
+</script>
+</body></html>
