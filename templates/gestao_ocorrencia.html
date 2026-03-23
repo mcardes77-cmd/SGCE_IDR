@@ -1,150 +1,37 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Gestão de Ocorrências</title>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-
-<body class="bg-gray-900 text-white p-6">
-
-<div class="max-w-7xl mx-auto">
-
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-green-400">GESTÃO DE OCORRÊNCIAS</h1>
-
-        <div class="flex gap-3">
-            <button onclick="novaOcorrencia()" class="bg-green-600 px-4 py-2 rounded">
-                + Nova
-            </button>
-
-            <button onclick="gerarPDF()" class="bg-blue-600 px-4 py-2 rounded">
-                Gerar PDF
-            </button>
-        </div>
-    </div>
-
-    <table class="w-full text-sm bg-gray-800 rounded overflow-hidden">
-        <thead class="bg-gray-700">
-            <tr>
-                <th class="p-2">✔</th>
-                <th>Nº</th>
-                <th>Aluno</th>
-                <th>Professor</th>
-                <th>Pendência</th>
-                <th>Status</th>
-                <th>Ação</th>
-            </tr>
-        </thead>
-
-        <tbody id="tabela"></tbody>
-    </table>
-
-</div>
-
+<html lang='pt-BR'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Gestão de Ocorrências</title><script src='https://cdn.tailwindcss.com'></script></head>
+<body class='bg-slate-900 text-white min-h-screen p-6'>
+<div id='msg' class='hidden fixed top-4 right-4 z-50 px-4 py-3 rounded shadow'></div>
+<div class='max-w-7xl mx-auto'>
+<header class='mb-8 flex flex-col md:flex-row justify-between items-center gap-4'>
+<div><h1 class='text-3xl font-bold text-emerald-400'>Gestão de Ocorrências</h1><p class='text-slate-400'>Visual profissional com filtros, pendências e impressão.</p></div>
+<div class='flex gap-3'><button onclick="window.location.href='/gestao_ocorrencia_nova'" class='bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg font-semibold'>Nova ocorrência</button><button onclick="window.location.href='/gestao_relatorio_impressao'" class='bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold'>Relatório / PDF</button></div>
+</header>
+<section class='bg-slate-800 rounded-2xl shadow p-5 mb-6'><div class='grid grid-cols-1 md:grid-cols-4 gap-4'>
+<div><label class='block text-sm text-slate-300 mb-1'>Tutor</label><select id='filtro-tutor' class='w-full rounded-lg bg-slate-700 border border-slate-600 p-2'></select></div>
+<div><label class='block text-sm text-slate-300 mb-1'>Status</label><select id='filtro-status' class='w-full rounded-lg bg-slate-700 border border-slate-600 p-2'></select></div>
+<div><label class='block text-sm text-slate-300 mb-1'>Sala</label><select id='filtro-sala' class='w-full rounded-lg bg-slate-700 border border-slate-600 p-2'></select></div>
+<div><label class='block text-sm text-slate-300 mb-1'>Aluno</label><select id='filtro-aluno' class='w-full rounded-lg bg-slate-700 border border-slate-600 p-2'></select></div>
+</div></section>
+<section class='bg-slate-800 rounded-2xl shadow overflow-hidden'>
+<div class='px-5 py-4 border-b border-slate-700 flex justify-between items-center'><div class='font-semibold text-emerald-400'>Ocorrências</div><div class='text-sm text-slate-400' id='contador-selecao'>0/0 selecionadas</div></div>
+<div class='overflow-x-auto'><table class='w-full'><thead class='bg-slate-700 text-slate-300 text-sm'><tr><th class='p-3 text-left'>Sel.</th><th class='p-3 text-left'>Nº</th><th class='p-3 text-left'>Data</th><th class='p-3 text-left'>Aluno</th><th class='p-3 text-left'>Sala</th><th class='p-3 text-left'>Professor</th><th class='p-3 text-left'>Tutor</th><th class='p-3 text-left'>Pendência / Visualização</th><th class='p-3 text-left'>Status</th></tr></thead><tbody id='ocorrencias-body'><tr><td colspan='9' class='p-6 text-center text-slate-400'>Carregando ocorrências...</td></tr></tbody></table></div>
+<div class='p-5 border-t border-slate-700'><button onclick='gerarPDFSelecionadas()' class='bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold'>Gerar PDF das selecionadas</button></div>
+</section></div>
 <script>
-
-let selecionados = new Set();
-
-document.addEventListener("DOMContentLoaded", carregar);
-
-function novaOcorrencia(){
-    window.location.href = "/gestao_ocorrencia_nova";
-}
-
-async function carregar(){
-    const res = await fetch("/api/ocorrencias_todas");
-    const dados = await res.json();
-
-    const tabela = document.getElementById("tabela");
-    tabela.innerHTML = "";
-
-    dados.forEach(oc => {
-
-        let pendencia = "-";
-
-        if(oc.pendencia === "TUTOR") pendencia = "T";
-        if(oc.pendencia === "COORDENACAO") pendencia = "C";
-        if(oc.pendencia === "GESTAO") pendencia = "G";
-        if(oc.pendencia === "RESPONSAVEL") pendencia = "R";
-
-        tabela.innerHTML += `
-        <tr class="border-b border-gray-700 text-center">
-
-            <td>
-                <input type="checkbox"
-                    id="check_${oc.numero}"
-                    onchange="toggle(${oc.numero})">
-            </td>
-
-            <td>${oc.numero}</td>
-            <td>${oc.aluno_nome || ""}</td>
-            <td>${oc.professor_nome || ""}</td>
-
-            <td class="text-yellow-400 font-bold">${pendencia}</td>
-            <td>${oc.status || ""}</td>
-
-            <td>
-                <button onclick="editar(${oc.numero})"
-                    class="bg-yellow-500 px-2 py-1 rounded text-black">
-                    Editar
-                </button>
-            </td>
-
-        </tr>
-        `;
-    });
-}
-
-function toggle(numero){
-    if(selecionados.has(numero)){
-        selecionados.delete(numero);
-    }else{
-        selecionados.add(numero);
-    }
-}
-
-function editar(numero){
-    window.location.href = `/gestao_ocorrencia_editar?numero=${numero}`;
-}
-
-async function gerarPDF(){
-
-    if(selecionados.size === 0){
-        alert("Selecione ao menos uma ocorrência");
-        return;
-    }
-
-    const lista = Array.from(selecionados);
-
-    const res = await fetch("/api/gerar_pdf_ocorrencias", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({numeros: lista})
-    });
-
-    const blob = await res.blob();
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = "ocorrencias.pdf";
-    a.click();
-
-    // 🔥 DESABILITA CHECKBOX
-    lista.forEach(num=>{
-        const el = document.getElementById("check_"+num);
-        if(el){
-            el.disabled = true;
-            el.checked = false;
-        }
-    });
-
-    selecionados.clear();
-}
-
-</script>
-
-</body>
-</html>
+let todasOcorrencias=[];let ocorrencias=[];
+document.addEventListener('DOMContentLoaded',async()=>{await carregarFiltros();await carregarOcorrencias();['filtro-tutor','filtro-status','filtro-sala','filtro-aluno'].forEach(id=>document.getElementById(id).addEventListener('change',aplicarFiltros));});
+function mostrarMsg(msg,tipo='info'){const el=document.getElementById('msg');el.textContent=msg;el.className='fixed top-4 right-4 z-50 px-4 py-3 rounded shadow text-white';if(tipo==='error')el.classList.add('bg-red-600');else if(tipo==='success')el.classList.add('bg-green-600');else el.classList.add('bg-blue-600');el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),4000);}
+async function safeFetch(url){try{const r=await fetch(url);const data=await r.json();return Array.isArray(data)?data:[];}catch(e){console.error(e);return [];}}
+function extrairUnicos(lista,campo){return [...new Set(lista.map(i=>(i[campo]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));}
+function calcularStatus(oc){if((oc.status||'').toUpperCase()==='ASSINADA')return 'ASSINADA';const pend=(oc.pendencia||'').toUpperCase();if(pend==='FINALIZADA')return 'FINALIZADA';return (oc.status||'ATENDIMENTO').toUpperCase();}
+function siglaPendencia(oc){const pend=String(oc.pendencia||'').toUpperCase();if(pend==='TUTOR')return 'T';if(pend==='COORDENACAO')return 'C';if(pend==='GESTAO')return 'G';if(pend==='RESPONSAVEL')return 'R';if(pend==='FINALIZADA')return '';if(oc.solicitado_responsavel&&!(oc.atendimento_responsavel||'').trim())return 'R';if(oc.solicitado_gestao&&!(oc.atendimento_gestao||'').trim())return 'G';if(oc.solicitado_coordenacao&&!(oc.atendimento_coordenacao||'').trim())return 'C';if(oc.solicitado_tutor&&!(oc.atendimento_tutor||'').trim())return 'T';return '';}
+function classePendencia(sigla){if(sigla==='T')return 'bg-blue-600 text-white';if(sigla==='C')return 'bg-yellow-500 text-black';if(sigla==='G')return 'bg-red-600 text-white';if(sigla==='R')return 'bg-purple-600 text-white';return 'text-blue-400';}
+async function carregarFiltros(){todasOcorrencias=await safeFetch('/api/ocorrencias_todas');todasOcorrencias=todasOcorrencias.map(oc=>({...oc,status:calcularStatus(oc)}));const tutores=extrairUnicos(todasOcorrencias,'tutor_nome');const salas=extrairUnicos(todasOcorrencias,'sala_nome');const alunos=extrairUnicos(todasOcorrencias,'aluno_nome');document.getElementById('filtro-tutor').innerHTML='<option value="all">Todos os tutores</option>'+tutores.map(t=>`<option value="${t}">${t}</option>`).join('');document.getElementById('filtro-status').innerHTML='<option value="all">Todos os status</option><option value="ATENDIMENTO">ATENDIMENTO</option><option value="FINALIZADA">FINALIZADA</option><option value="ASSINADA">ASSINADA</option>';document.getElementById('filtro-sala').innerHTML='<option value="all">Todas as salas</option>'+salas.map(s=>`<option value="${s}">${s}</option>`).join('');document.getElementById('filtro-aluno').innerHTML='<option value="all">Todos os alunos</option>'+alunos.map(a=>`<option value="${a}">${a}</option>`).join('');}
+async function carregarOcorrencias(){ocorrencias=[...todasOcorrencias].sort((a,b)=>(b.numero||0)-(a.numero||0));renderizarOcorrencias();}
+function aplicarFiltros(){const tutor=document.getElementById('filtro-tutor').value;const status=document.getElementById('filtro-status').value;const sala=document.getElementById('filtro-sala').value;const aluno=document.getElementById('filtro-aluno').value;ocorrencias=todasOcorrencias.filter(oc=>{if(tutor!=='all'&&(oc.tutor_nome||'')!==tutor)return false;if(status!=='all'&&calcularStatus(oc)!==status)return false;if(sala!=='all'&&(oc.sala_nome||'')!==sala)return false;if(aluno!=='all'&&(oc.aluno_nome||'')!==aluno)return false;return true;}).sort((a,b)=>(b.numero||0)-(a.numero||0));renderizarOcorrencias();}
+function formatarData(v){if(!v)return '';try{return new Date(v).toLocaleDateString('pt-BR');}catch{return v;}}
+function renderizarOcorrencias(){const tbody=document.getElementById('ocorrencias-body');if(!ocorrencias.length){tbody.innerHTML='<tr><td colspan="9" class="p-6 text-center text-slate-400">Nenhuma ocorrência encontrada.</td></tr>';atualizarSelecao();return;}tbody.innerHTML=ocorrencias.map(oc=>{const sigla=siglaPendencia(oc);const jaImpresso=!!oc.impressao_pdf;const vis=sigla?`<a href="/gestao_ocorrencia_editar?numero=${oc.numero}" class="inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${classePendencia(sigla)}">${sigla}</a>`:`<a href="/gestao_ocorrencia_editar?numero=${oc.numero}" class="text-blue-400 hover:text-blue-300 text-lg" title="Visualizar">👁️</a>`;return `<tr class="border-b border-slate-800 hover:bg-slate-800/60"><td class="p-3"><input type="checkbox" value="${oc.numero}" class="h-4 w-4 accent-emerald-500" ${jaImpresso?'checked disabled':''} onchange="atualizarSelecao()"></td><td class="p-3">${oc.numero||''}</td><td class="p-3">${formatarData(oc.data_hora||oc.data)}</td><td class="p-3">${oc.aluno_nome||''}</td><td class="p-3">${oc.sala_nome||''}</td><td class="p-3">${oc.professor_nome||''}</td><td class="p-3">${oc.tutor_nome||''}</td><td class="p-3">${vis}</td><td class="p-3">${oc.status||''}</td></tr>`;}).join('');atualizarSelecao();}
+function atualizarSelecao(){const total=ocorrencias.length;const marcadas=document.querySelectorAll('#ocorrencias-body input:checked').length;document.getElementById('contador-selecao').textContent=`${marcadas}/${total} selecionadas`;}
+async function gerarPDFSelecionadas(){const numeros=[...document.querySelectorAll('#ocorrencias-body input:checked:not(:disabled)')].map(i=>parseInt(i.value)).filter(v=>!isNaN(v));if(!numeros.length){mostrarMsg('Selecione pelo menos uma ocorrência.','error');return;}const r=await fetch('/api/gerar_pdf_ocorrencias',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({numeros})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.success){mostrarMsg(data.error||'Erro ao preparar impressão.','error');return;}document.querySelectorAll('#ocorrencias-body input:checked').forEach(cb=>cb.disabled=true);mostrarMsg('Relatório preparado com sucesso.','success');if(data.print_url){window.open(data.print_url,'_blank');}setTimeout(async()=>{todasOcorrencias=await safeFetch('/api/ocorrencias_todas');todasOcorrencias=todasOcorrencias.map(oc=>({...oc,status:calcularStatus(oc)}));aplicarFiltros();},800);}
+</script></body></html>
