@@ -1,1 +1,4 @@
-flask\ngunicorn\nsupabase\npython-dotenv\n
+flask
+gunicorn
+supabase
+python-dotenv
