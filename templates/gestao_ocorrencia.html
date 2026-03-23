@@ -1,1 +1,150 @@
-<h1>Gestão funcionando</h1>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gestão de Ocorrências</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white p-6">
+
+<div class="max-w-7xl mx-auto">
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-green-400">GESTÃO DE OCORRÊNCIAS</h1>
+
+        <div class="flex gap-3">
+            <button onclick="novaOcorrencia()" class="bg-green-600 px-4 py-2 rounded">
+                + Nova
+            </button>
+
+            <button onclick="gerarPDF()" class="bg-blue-600 px-4 py-2 rounded">
+                Gerar PDF
+            </button>
+        </div>
+    </div>
+
+    <table class="w-full text-sm bg-gray-800 rounded overflow-hidden">
+        <thead class="bg-gray-700">
+            <tr>
+                <th class="p-2">✔</th>
+                <th>Nº</th>
+                <th>Aluno</th>
+                <th>Professor</th>
+                <th>Pendência</th>
+                <th>Status</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+
+        <tbody id="tabela"></tbody>
+    </table>
+
+</div>
+
+<script>
+
+let selecionados = new Set();
+
+document.addEventListener("DOMContentLoaded", carregar);
+
+function novaOcorrencia(){
+    window.location.href = "/gestao_ocorrencia_nova";
+}
+
+async function carregar(){
+    const res = await fetch("/api/ocorrencias_todas");
+    const dados = await res.json();
+
+    const tabela = document.getElementById("tabela");
+    tabela.innerHTML = "";
+
+    dados.forEach(oc => {
+
+        let pendencia = "-";
+
+        if(oc.pendencia === "TUTOR") pendencia = "T";
+        if(oc.pendencia === "COORDENACAO") pendencia = "C";
+        if(oc.pendencia === "GESTAO") pendencia = "G";
+        if(oc.pendencia === "RESPONSAVEL") pendencia = "R";
+
+        tabela.innerHTML += `
+        <tr class="border-b border-gray-700 text-center">
+
+            <td>
+                <input type="checkbox"
+                    id="check_${oc.numero}"
+                    onchange="toggle(${oc.numero})">
+            </td>
+
+            <td>${oc.numero}</td>
+            <td>${oc.aluno_nome || ""}</td>
+            <td>${oc.professor_nome || ""}</td>
+
+            <td class="text-yellow-400 font-bold">${pendencia}</td>
+            <td>${oc.status || ""}</td>
+
+            <td>
+                <button onclick="editar(${oc.numero})"
+                    class="bg-yellow-500 px-2 py-1 rounded text-black">
+                    Editar
+                </button>
+            </td>
+
+        </tr>
+        `;
+    });
+}
+
+function toggle(numero){
+    if(selecionados.has(numero)){
+        selecionados.delete(numero);
+    }else{
+        selecionados.add(numero);
+    }
+}
+
+function editar(numero){
+    window.location.href = `/gestao_ocorrencia_editar?numero=${numero}`;
+}
+
+async function gerarPDF(){
+
+    if(selecionados.size === 0){
+        alert("Selecione ao menos uma ocorrência");
+        return;
+    }
+
+    const lista = Array.from(selecionados);
+
+    const res = await fetch("/api/gerar_pdf_ocorrencias", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({numeros: lista})
+    });
+
+    const blob = await res.blob();
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = "ocorrencias.pdf";
+    a.click();
+
+    // 🔥 DESABILITA CHECKBOX
+    lista.forEach(num=>{
+        const el = document.getElementById("check_"+num);
+        if(el){
+            el.disabled = true;
+            el.checked = false;
+        }
+    });
+
+    selecionados.clear();
+}
+
+</script>
+
+</body>
+</html>
