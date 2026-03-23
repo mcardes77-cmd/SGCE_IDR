@@ -1,9 +1,9 @@
 from flask import render_template, request, jsonify
 
 def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
-    # =========================================================
+    # =========================
     # TELAS
-    # =========================================================
+    # =========================
     @app.route("/dashboard_geral")
     def dashboard_geral():
         return render_template("dashboard_geral.html")
@@ -40,9 +40,9 @@ def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
     def gestao_relatorio_frequencia_avancado():
         return render_template("gestao_relatorio_frequencia_avancado.html")
 
-    # =========================================================
+    # =========================
     # DASHBOARD
-    # =========================================================
+    # =========================
     @app.route("/api/dashboard_geral")
     def api_dashboard_geral():
         try:
@@ -69,47 +69,117 @@ def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
         except Exception as e:
             return json_error(e)
 
-    # =========================================================
+    # =========================
     # CADASTRO
-    # =========================================================
+    # =========================
     @app.route("/api/cadastro/alunos")
     def api_cadastro_alunos():
         try:
-            resp = supabase.table("d_alunos").select("*").order("nome").execute()
-            return jsonify(resp.data or [])
+            resp = supabase.table("d_alunos").select("*").execute()
+            dados = resp.data or []
+
+            alunos = []
+            for a in dados:
+                alunos.append({
+                    "id": a.get("id"),
+                    "nome": a.get("nome") or a.get("aluno_nome") or "",
+                    "sala_nome": a.get("sala_nome") or "",
+                    "tutor_nome": a.get("tutor_nome") or ""
+                })
+
+            alunos.sort(key=lambda x: x["nome"])
+            return jsonify(alunos)
         except Exception as e:
             return json_error(e)
 
     @app.route("/api/cadastro/salas")
+    @app.route("/api/salas")
     def api_cadastro_salas():
         try:
-            resp = supabase.table("d_salas").select("*").order("nome").execute()
-            return jsonify(resp.data or [])
+            resp = supabase.table("d_salas").select("*").execute()
+            dados = resp.data or []
+
+            salas = []
+            for s in dados:
+                salas.append({
+                    "id": s.get("id"),
+                    "nome": s.get("nome") or s.get("sala") or ""
+                })
+
+            salas.sort(key=lambda x: x["nome"])
+            return jsonify(salas)
         except Exception as e:
             return json_error(e)
 
     @app.route("/api/cadastro/funcionarios")
     def api_cadastro_funcionarios():
         try:
-            resp = supabase.table("d_funcionarios").select("*").order("nome").execute()
-            return jsonify(resp.data or [])
+            resp = supabase.table("d_funcionarios").select("*").execute()
+            dados = resp.data or []
+
+            funcionarios = []
+            for f in dados:
+                funcionarios.append({
+                    "id": f.get("id"),
+                    "nome": f.get("nome") or "",
+                    "funcao": f.get("funcao") or "",
+                    "email": f.get("email") or "",
+                    "tipo": f.get("tipo") or ""
+                })
+
+            funcionarios.sort(key=lambda x: x["nome"])
+            return jsonify(funcionarios)
         except Exception as e:
             return json_error(e)
 
-    # =========================================================
+    # =========================
+    # APOIO PARA FREQUÊNCIA E TUTORIA
+    # =========================
+    @app.route("/api/alunos_por_sala/<int:sala_id>")
+    def api_alunos_por_sala(sala_id):
+        try:
+            resp = supabase.table("d_alunos").select("*").eq("sala_id", sala_id).execute()
+            dados = resp.data or []
+
+            alunos = []
+            for a in dados:
+                alunos.append({
+                    "id": a.get("id"),
+                    "nome": a.get("nome") or a.get("aluno_nome") or "",
+                    "sala_id": a.get("sala_id"),
+                    "sala_nome": a.get("sala_nome") or "",
+                    "tutor_id": a.get("tutor_id"),
+                    "tutor_nome": a.get("tutor_nome") or ""
+                })
+
+            alunos.sort(key=lambda x: x["nome"])
+            return jsonify(alunos)
+        except Exception as e:
+            return json_error(e)
+
+    # =========================
     # TUTORIA
-    # =========================================================
+    # =========================
     @app.route("/api/tutores")
     def api_tutores():
         try:
-            resp = (
-                supabase.table("d_funcionarios")
-                .select("id,nome,funcao,email,is_tutor")
-                .or_("funcao.ilike.%TUTOR%,is_tutor.eq.true")
-                .order("nome")
-                .execute()
-            )
-            return jsonify(resp.data or [])
+            resp = supabase.table("d_funcionarios").select("*").execute()
+            dados = resp.data or []
+
+            tutores = []
+            for f in dados:
+                funcao = (f.get("funcao") or "").upper()
+                tipo = (f.get("tipo") or "").upper()
+                if "TUTOR" in funcao or tipo == "TUTOR":
+                    tutores.append({
+                        "id": f.get("id"),
+                        "nome": f.get("nome") or "",
+                        "funcao": f.get("funcao") or "",
+                        "email": f.get("email") or ""
+                    })
+
+            tutores.sort(key=lambda x: x["nome"])
+            return jsonify(tutores)
         except Exception as e:
             return json_error(e)
 
@@ -117,24 +187,39 @@ def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
     def api_alunos_tutoria():
         try:
             tutor_id = request.args.get("tutor_id")
-            db = supabase.table("d_alunos").select("*").order("nome")
-            if tutor_id:
-                db = db.eq("tutor_id", tutor_id)
-            resp = db.execute()
-            return jsonify(resp.data or [])
+            resp = supabase.table("d_alunos").select("*").execute()
+            dados = resp.data or []
+
+            alunos = []
+            for a in dados:
+                if tutor_id and str(a.get("tutor_id")) != str(tutor_id):
+                    continue
+
+                alunos.append({
+                    "id": a.get("id"),
+                    "nome": a.get("nome") or a.get("aluno_nome") or "",
+                    "sala_nome": a.get("sala_nome") or "",
+                    "tutor_id": a.get("tutor_id"),
+                    "tutor_nome": a.get("tutor_nome") or ""
+                })
+
+            alunos.sort(key=lambda x: x["nome"])
+            return jsonify(alunos)
         except Exception as e:
             return json_error(e)
 
     @app.route("/api/dashboard_tutoria")
     def api_dashboard_tutoria():
         try:
-            tutores = supabase.table("d_funcionarios").select("id", count="exact").or_("funcao.ilike.%TUTOR%,is_tutor.eq.true").execute()
+            tutores_resp = api_tutores().get_json()
             agend = supabase.table("agendamentos_tutoria").select("id,status", count="exact").execute()
             atend = supabase.table("atendimentos_tutoria").select("id", count="exact").execute()
+
             agendados = len([x for x in (agend.data or []) if (x.get("status") or "").upper() == "AGENDADO"])
             concluidos = len([x for x in (agend.data or []) if (x.get("status") or "").upper() == "CONCLUIDO"])
+
             return jsonify({
-                "total_tutores": tutores.count or 0,
+                "total_tutores": len(tutores_resp or []),
                 "total_agendamentos": agend.count or 0,
                 "agendados": agendados,
                 "concluidos": concluidos,
@@ -232,7 +317,14 @@ def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
             agend_resp = supabase.table("agendamentos_tutoria").select("*").eq("aluno_id", aluno_id).order("data_agendamento", desc=True).limit(50).execute()
             freq_resp = supabase.table("f_frequencia").select("*").eq("aluno_id", aluno_id).order("data", desc=True).limit(100).execute()
             notas_resp = supabase.table("notas_aluno").select("*").eq("aluno_id", aluno_id).execute()
-            return jsonify({"aluno": aluno, "ocorrencias": ocorr_resp.data or [], "atendimentos": atend_resp.data or [], "agendamentos": agend_resp.data or [], "frequencia": freq_resp.data or [], "notas": notas_resp.data or []})
+            return jsonify({
+                "aluno": aluno,
+                "ocorrencias": ocorr_resp.data or [],
+                "atendimentos": atend_resp.data or [],
+                "agendamentos": agend_resp.data or [],
+                "frequencia": freq_resp.data or [],
+                "notas": notas_resp.data or []
+            })
         except Exception as e:
             return json_error(e)
 
@@ -254,9 +346,9 @@ def registrar_modulos_profissionais(app, supabase, json_error, now_iso):
         except Exception as e:
             return json_error(e)
 
-    # =========================================================
+    # =========================
     # FREQUÊNCIA AVANÇADA
-    # =========================================================
+    # =========================
     @app.route("/api/frequencia/listar")
     def api_frequencia_listar():
         try:
