@@ -19,7 +19,7 @@ def db():
 
 @app.route("/")
 def home():
-    return render_template("gestao_ocorrencia.html")
+    return render_template("index.html")
 
 @app.route("/gestao_ocorrencia")
 def gestao():
