@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 import os
 
-# 👇 IMPORT DOS MÓDULOS NOVOS
 from modulos_profissionais import registrar_modulos_profissionais
 
 load_dotenv()
@@ -15,29 +14,44 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("SUPABASE não configurado")
+    raise RuntimeError("SUPABASE_URL ou SUPABASE_KEY não configurados.")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# =========================================================
-# FUNÇÕES BASE
-# =========================================================
 
+# =========================================================
+# FUNÇÕES AUXILIARES
+# =========================================================
 def now_iso():
     return datetime.utcnow().isoformat()
+
 
 def json_error(message, status=500):
     return jsonify({"success": False, "error": str(message)}), status
 
 
-# 👇 REGISTRA OS MÓDULOS NOVOS (DASHBOARD, CADASTRO, TUTORIA, FREQUÊNCIA)
+def get_next_numero_ocorrencia():
+    resp = (
+        supabase.table("ocorrencias")
+        .select("numero")
+        .order("numero", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if resp.data:
+        return int(resp.data[0]["numero"]) + 1
+    return 1
+
+
+# =========================================================
+# REGISTRA MÓDULOS PROFISSIONAIS
+# =========================================================
 registrar_modulos_profissionais(app, supabase, json_error, now_iso)
 
 
 # =========================================================
 # ROTAS PRINCIPAIS
 # =========================================================
-
 @app.route("/")
 def home():
     return redirect("/dashboard_geral")
@@ -49,9 +63,8 @@ def health():
 
 
 # =========================================================
-# OCORRÊNCIAS (SEU MÓDULO ORIGINAL)
+# OCORRÊNCIAS - TELAS
 # =========================================================
-
 @app.route("/gestao_ocorrencia")
 def gestao_ocorrencia():
     return render_template("gestao_ocorrencia.html")
@@ -67,14 +80,18 @@ def gestao_ocorrencia_editar():
     return render_template("gestao_ocorrencia_editar.html")
 
 
-# =========================================================
-# APIs BÁSICAS
-# =========================================================
+@app.route("/gestao_relatorio_impressao")
+def gestao_relatorio_impressao():
+    return render_template("gestao_relatorio_impressao.html")
 
+
+# =========================================================
+# APIS BÁSICAS
+# =========================================================
 @app.route("/api/professores")
 def api_professores():
     try:
-        resp = supabase.table("d_funcionarios").select("*").order("nome").execute()
+        resp = supabase.table("d_funcionarios").select("*").execute()
         dados = resp.data or []
 
         professores = []
@@ -85,8 +102,8 @@ def api_professores():
             if "PROFESSOR" in funcao or tipo == "DOCENTE":
                 professores.append(item)
 
+        professores.sort(key=lambda x: (x.get("nome") or ""))
         return jsonify(professores)
-
     except Exception as e:
         return json_error(e)
 
@@ -94,8 +111,18 @@ def api_professores():
 @app.route("/api/salas_por_professor/<int:professor_id>")
 def api_salas_por_professor(professor_id):
     try:
-        resp = supabase.table("d_salas").select("*").order("nome").execute()
-        return jsonify(resp.data or [])
+        resp = supabase.table("d_salas").select("*").execute()
+        dados = resp.data or []
+
+        salas = []
+        for s in dados:
+            salas.append({
+                "id": s.get("id"),
+                "nome": s.get("nome") or s.get("sala") or ""
+            })
+
+        salas.sort(key=lambda x: x["nome"])
+        return jsonify(salas)
     except Exception as e:
         return json_error(e)
 
@@ -103,11 +130,37 @@ def api_salas_por_professor(professor_id):
 @app.route("/api/alunos_por_sala/<int:sala_id>")
 def api_alunos_por_sala(sala_id):
     try:
+        resp = supabase.table("d_alunos").select("*").eq("sala_id", sala_id).execute()
+        dados = resp.data or []
+
+        alunos = []
+        for a in dados:
+            alunos.append({
+                "id": a.get("id"),
+                "nome": a.get("nome") or a.get("aluno_nome") or "",
+                "sala_id": a.get("sala_id"),
+                "sala_nome": a.get("sala_nome") or "",
+                "tutor_id": a.get("tutor_id"),
+                "tutor_nome": a.get("tutor_nome") or ""
+            })
+
+        alunos.sort(key=lambda x: x["nome"])
+        return jsonify(alunos)
+    except Exception as e:
+        return json_error(e)
+
+
+# =========================================================
+# OCORRÊNCIAS - APIS
+# =========================================================
+@app.route("/api/ocorrencias")
+@app.route("/api/ocorrencias_todas")
+def listar_ocorrencias():
+    try:
         resp = (
-            supabase.table("d_alunos")
+            supabase.table("ocorrencias")
             .select("*")
-            .eq("sala_id", sala_id)
-            .order("nome")
+            .order("numero", desc=True)
             .execute()
         )
         return jsonify(resp.data or [])
@@ -115,30 +168,122 @@ def api_alunos_por_sala(sala_id):
         return json_error(e)
 
 
-# =========================================================
-# REGISTRAR OCORRÊNCIA
-# =========================================================
+@app.route("/api/ocorrencia/<int:numero>")
+def detalhe_ocorrencia(numero):
+    try:
+        resp = (
+            supabase.table("ocorrencias")
+            .select("*")
+            .eq("numero", numero)
+            .limit(1)
+            .execute()
+        )
+        return jsonify(resp.data[0] if resp.data else {})
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/ocorrencia_detalhes")
+def api_ocorrencia_detalhes():
+    numero = request.args.get("numero")
+    if not numero:
+        return json_error("Número não informado", 400)
+
+    try:
+        resp = (
+            supabase.table("ocorrencias")
+            .select("*")
+            .eq("numero", numero)
+            .limit(1)
+            .execute()
+        )
+        if not resp.data:
+            return json_error("Ocorrência não encontrada", 404)
+        return jsonify(resp.data[0])
+    except Exception as e:
+        return json_error(e)
+
 
 @app.route("/api/registrar_ocorrencia", methods=["POST"])
 def registrar_ocorrencia():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
 
-        numero = int(datetime.now().timestamp())
+        aluno_id = data.get("aluno_id")
+        professor_id = data.get("professor_id")
+        professor_nome = data.get("professor_nome")
+        descricao = data.get("descricao")
+        atendimento_professor = data.get("atendimento_professor")
+        destino = (data.get("destino") or "nenhum").lower().strip()
+
+        if not aluno_id:
+            return json_error("Aluno não informado", 400)
+        if not professor_id:
+            return json_error("Professor não informado", 400)
+        if not professor_nome:
+            return json_error("Professor não informado", 400)
+        if not descricao:
+            return json_error("Descrição não informada", 400)
+        if not atendimento_professor:
+            return json_error("Atendimento do professor não informado", 400)
+
+        aluno_resp = (
+            supabase.table("d_alunos")
+            .select("*")
+            .eq("id", aluno_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not aluno_resp.data:
+            return json_error("Aluno não encontrado", 404)
+
+        aluno = aluno_resp.data[0]
+
+        pendencia = "FINALIZADA"
+        status = "FINALIZADA"
+        solicitado_tutor = False
+        solicitado_coordenacao = False
+        solicitado_gestao = False
+        solicitado_responsavel = False
+
+        if destino == "tutor":
+            pendencia = "TUTOR"
+            status = "ATENDIMENTO"
+            solicitado_tutor = True
+        elif destino == "coordenacao":
+            pendencia = "COORDENACAO"
+            status = "ATENDIMENTO"
+            solicitado_coordenacao = True
+        elif destino == "gestao":
+            pendencia = "GESTAO"
+            status = "ATENDIMENTO"
+            solicitado_gestao = True
 
         payload = {
-            "numero": numero,
+            "numero": get_next_numero_ocorrencia(),
             "data_hora": now_iso(),
-            "aluno_id": data.get("aluno_id"),
-            "professor_id": data.get("professor_id"),
-            "professor_nome": data.get("professor_nome"),
-            "descricao": data.get("descricao"),
-            "atendimento_professor": data.get("atendimento_professor"),
-            "status": "ATENDIMENTO",
-            "pendencia": "TUTOR",
+            "aluno_id": aluno.get("id"),
+            "aluno_nome": aluno.get("nome") or aluno.get("aluno_nome"),
+            "sala_id": aluno.get("sala_id"),
+            "sala_nome": aluno.get("sala_nome"),
+            "professor_id": professor_id,
+            "professor_nome": professor_nome,
+            "tutor_id": aluno.get("tutor_id"),
+            "tutor_nome": aluno.get("tutor_nome"),
+            "descricao": descricao,
+            "atendimento_professor": atendimento_professor,
+            "pendencia": pendencia,
+            "status": status,
+            "solicitado_tutor": solicitado_tutor,
+            "solicitado_coordenacao": solicitado_coordenacao,
+            "solicitado_gestao": solicitado_gestao,
+            "solicitado_responsavel": solicitado_responsavel,
+            "impressao_pdf": False
         }
 
-        supabase.table("ocorrencias").insert(payload).execute()
+        resp = supabase.table("ocorrencias").insert(payload).execute()
+        numero = resp.data[0]["numero"] if resp.data else None
 
         return jsonify({"success": True, "numero": numero})
 
@@ -146,51 +291,32 @@ def registrar_ocorrencia():
         return json_error(e)
 
 
-# =========================================================
-# LISTAR OCORRÊNCIAS
-# =========================================================
-
-@app.route("/api/ocorrencias")
-def listar_ocorrencias():
-    try:
-        resp = supabase.table("ocorrencias").select("*").order("numero", desc=True).execute()
-        return jsonify(resp.data or [])
-    except Exception as e:
-        return json_error(e)
-
-
-# =========================================================
-# DETALHE OCORRÊNCIA
-# =========================================================
-
-@app.route("/api/ocorrencia/<int:numero>")
-def detalhe_ocorrencia(numero):
-    try:
-        resp = supabase.table("ocorrencias").select("*").eq("numero", numero).execute()
-        return jsonify(resp.data[0] if resp.data else {})
-    except Exception as e:
-        return json_error(e)
-
-
-# =========================================================
-# SALVAR ATENDIMENTO (COM RESPONSÁVEL)
-# =========================================================
-
 @app.route("/api/salvar_atendimento", methods=["POST"])
 def salvar_atendimento():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
 
         numero = data.get("numero")
-        tipo = data.get("tipo")
+        tipo = (data.get("tipo") or "").strip().lower()
         texto = data.get("texto")
+
+        if not numero:
+            return json_error("Número da ocorrência não informado", 400)
+        if not tipo:
+            return json_error("Tipo não informado", 400)
+        if not texto:
+            return json_error("Texto do atendimento não informado", 400)
 
         campo = f"atendimento_{tipo}"
 
         update = {
             campo: texto,
             "status": "FINALIZADA",
-            "pendencia": None
+            "pendencia": "FINALIZADA",
+            "solicitado_tutor": False,
+            "solicitado_coordenacao": False,
+            "solicitado_gestao": False,
+            "solicitado_responsavel": False
         }
 
         supabase.table("ocorrencias").update(update).eq("numero", numero).execute()
@@ -201,22 +327,20 @@ def salvar_atendimento():
         return json_error(e)
 
 
-# =========================================================
-# PDF (MARCAR COMO IMPRESSO)
-# =========================================================
-
 @app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
-def gerar_pdf():
+def gerar_pdf_ocorrencias():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         numeros = data.get("numeros", [])
+
+        if not numeros:
+            return json_error("Nenhuma ocorrência selecionada", 400)
 
         supabase.table("ocorrencias").update({
             "impressao_pdf": True
         }).in_("numero", numeros).execute()
 
         return jsonify({"success": True})
-
     except Exception as e:
         return json_error(e)
 
@@ -224,7 +348,6 @@ def gerar_pdf():
 # =========================================================
 # RUN
 # =========================================================
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
