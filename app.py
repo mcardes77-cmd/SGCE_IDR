@@ -127,28 +127,6 @@ def api_salas_por_professor(professor_id):
         return json_error(e)
 
 
-@app.route("/api/alunos_por_sala/<int:sala_id>")
-def api_alunos_por_sala(sala_id):
-    try:
-        resp = supabase.table("d_alunos").select("*").eq("sala_id", sala_id).execute()
-        dados = resp.data or []
-
-        alunos = []
-        for a in dados:
-            alunos.append({
-                "id": a.get("id"),
-                "nome": a.get("nome") or a.get("aluno_nome") or "",
-                "sala_id": a.get("sala_id"),
-                "sala_nome": a.get("sala_nome") or "",
-                "tutor_id": a.get("tutor_id"),
-                "tutor_nome": a.get("tutor_nome") or ""
-            })
-
-        alunos.sort(key=lambda x: x["nome"])
-        return jsonify(alunos)
-    except Exception as e:
-        return json_error(e)
-
 
 # =========================================================
 # OCORRÊNCIAS - APIS
