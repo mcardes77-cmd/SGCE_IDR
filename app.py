@@ -8,7 +8,7 @@ from modulos_profissionais import registrar_modulos_profissionais
 
 load_dotenv()
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
