@@ -8,7 +8,7 @@ from modulos_profissionais import registrar_modulos_profissionais
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(_name_)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -96,14 +96,38 @@ def api_professores():
 
         professores = []
         for item in dados:
+            nome = item.get("nome") or ""
             funcao = (item.get("funcao") or "").upper()
             tipo = (item.get("tipo") or "").upper()
 
-            if "PROFESSOR" in funcao or tipo == "DOCENTE":
-                professores.append(item)
+            if (
+                "PROFESSOR" in funcao
+                or "DOCENTE" in funcao
+                or tipo == "DOCENTE"
+                or tipo == "PROFESSOR"
+            ):
+                professores.append({
+                    "id": item.get("id"),
+                    "nome": nome,
+                    "funcao": item.get("funcao") or "",
+                    "tipo": item.get("tipo") or ""
+                })
 
-        professores.sort(key=lambda x: (x.get("nome") or ""))
+        if not professores:
+            professores = [
+                {
+                    "id": item.get("id"),
+                    "nome": item.get("nome") or "",
+                    "funcao": item.get("funcao") or "",
+                    "tipo": item.get("tipo") or ""
+                }
+                for item in dados
+                if item.get("nome")
+            ]
+
+        professores.sort(key=lambda x: x["nome"])
         return jsonify(professores)
+
     except Exception as e:
         return json_error(e)
 
@@ -125,7 +149,6 @@ def api_salas_por_professor(professor_id):
         return jsonify(salas)
     except Exception as e:
         return json_error(e)
-
 
 
 # =========================================================
@@ -326,6 +349,6 @@ def gerar_pdf_ocorrencias():
 # =========================================================
 # RUN
 # =========================================================
-if __name__ == "__main__":
+if _name_ == "_main_":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
