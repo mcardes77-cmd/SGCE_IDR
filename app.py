@@ -34,6 +34,9 @@ def get_next_numero_ocorrencia():
 def home():
     return redirect("/dashboard_ocorrencias")
 
+@app.route("/dashboard_ocorrencias")
+def dashboard_ocorrencias():
+    return render_template("dashboard_ocorrencias.html")
 
 @app.route("/dashboard")
 def dashboard():
