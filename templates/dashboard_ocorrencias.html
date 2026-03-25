@@ -30,7 +30,10 @@ tailwind.config = { theme:{ extend:{ colors:{ 'dark-primary':'#0F172A','dark-sec
 <div class="bg-green-800 p-5 rounded-lg"><p class="text-sm">Finalizadas</p><p id="cardFinalizadas" class="text-3xl font-bold">0</p></div>
 </div>
 
-
+<div id="alertaGestao" class="hidden mb-6 rounded-lg border border-red-500 bg-red-950/70 p-4 text-red-100">
+<div class="font-bold text-lg">⚠️ Atenção: existem pendências de gestão aguardando atendimento.</div>
+<div class="text-sm text-red-200 mt-1">O painel emite um alerta sonoro quando novas pendências de gestão são detectadas.</div>
+</div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 <div class="bg-dark-secondary p-6 rounded-lg">
