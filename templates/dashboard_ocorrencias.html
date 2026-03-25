@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -7,178 +6,146 @@
 <title>Dashboard - Gestão de Convivência Escolar</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-tailwind.config = {
-theme:{
-extend:{
-colors:{
-'dark-primary':'#0F172A',
-'dark-secondary':'#1E293B',
-'accent':'#10B981',
-'text-light':'#F8FAFC'
-}
-}
-}
-}
+tailwind.config = { theme:{ extend:{ colors:{ 'dark-primary':'#0F172A','dark-secondary':'#1E293B','accent':'#10B981','text-light':'#F8FAFC' }}}}
 </script>
 </head>
-
 <body class="bg-dark-primary text-text-light min-h-screen p-6">
-
 <div class="max-w-7xl mx-auto">
-
 <header class="mb-8">
 <h1 class="text-3xl font-bold text-accent">PAINEL DE GESTÃO DE OCORRÊNCIAS</h1>
 <p class="text-gray-400">Sistema de Convivência Escolar</p>
-
-<div class="mt-4 flex gap-3">
+<div class="mt-4 flex flex-wrap gap-3">
 <button onclick="window.location.href='/gestao_ocorrencia'" class="bg-accent px-4 py-2 rounded">Gestão de Ocorrências</button>
 <button onclick="window.location.href='/gestao_ocorrencia_nova'" class="bg-gray-700 px-4 py-2 rounded">Nova Ocorrência</button>
 </div>
 </header>
 
-
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-
-<div class="bg-blue-900 p-5 rounded-lg">
-<p class="text-sm">Pendentes Tutor</p>
-<p id="cardTutor" class="text-3xl font-bold">0</p>
+<div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+<div class="bg-blue-900 p-5 rounded-lg"><p class="text-sm">Pendentes Tutor</p><p id="cardTutor" class="text-3xl font-bold">0</p></div>
+<div class="bg-yellow-800 p-5 rounded-lg"><p class="text-sm">Pendentes Coordenação</p><p id="cardCoord" class="text-3xl font-bold">0</p></div>
+<div class="bg-red-800 p-5 rounded-lg"><p class="text-sm">Pendentes Gestão</p><p id="cardGestao" class="text-3xl font-bold">0</p></div>
+<div class="bg-purple-800 p-5 rounded-lg"><p class="text-sm">Pendentes Responsável</p><p id="cardResponsavel" class="text-3xl font-bold">0</p></div>
+<div class="bg-orange-700 p-5 rounded-lg"><p class="text-sm">Total sem atendimento</p><p id="cardEmAtendimento" class="text-3xl font-bold">0</p></div>
+<div class="bg-green-800 p-5 rounded-lg"><p class="text-sm">Finalizadas</p><p id="cardFinalizadas" class="text-3xl font-bold">0</p></div>
 </div>
 
-<div class="bg-yellow-800 p-5 rounded-lg">
-<p class="text-sm">Pendentes Coordenação</p>
-<p id="cardCoord" class="text-3xl font-bold">0</p>
+<div id="alertaGestao" class="hidden mb-6 rounded-lg border border-red-500 bg-red-950/70 p-4 text-red-100">
+<div class="font-bold text-lg">⚠️ Atenção: existem pendências de gestão aguardando atendimento.</div>
+<div class="text-sm text-red-200 mt-1">O painel emite um alerta sonoro quando novas pendências de gestão são detectadas.</div>
 </div>
-
-<div class="bg-red-800 p-5 rounded-lg">
-<p class="text-sm">Pendentes Gestão</p>
-<p id="cardGestao" class="text-3xl font-bold">0</p>
-</div>
-
-<div class="bg-green-800 p-5 rounded-lg">
-<p class="text-sm">Finalizadas</p>
-<p id="cardFinalizadas" class="text-3xl font-bold">0</p>
-</div>
-
-</div>
-
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-
 <div class="bg-dark-secondary p-6 rounded-lg">
 <h3 class="text-lg mb-4">Ocorrências por Status</h3>
 <canvas id="graficoStatus"></canvas>
 </div>
-
 <div class="bg-dark-secondary p-6 rounded-lg">
 <h3 class="text-lg mb-4">Ocorrências por Sala</h3>
 <canvas id="graficoSala"></canvas>
 </div>
-
 </div>
-
 </div>
-
 
 <script>
+let ocorrencias = [];
+let graficoStatus = null;
+let graficoSala = null;
 
-let ocorrencias = []
+function temTexto(valor){return String(valor || '').trim().length > 0;}
 
-async function carregarDados(){
-
-const res = await fetch('/api/ocorrencias_todas')
-ocorrencias = await res.json()
-
-atualizarCards()
-gerarGraficoStatus()
-gerarGraficoSala()
-
+function resumoOcorrencias(lista){
+let tutor=0, coord=0, gestao=0, responsavel=0, finalizadas=0;
+lista.forEach(o => {
+const pend = String(o.pendencia || '').toUpperCase();
+if (pend === 'TUTOR' || (o.solicitado_tutor && !temTexto(o.atendimento_tutor))) tutor++;
+else if (pend === 'COORDENACAO' || (o.solicitado_coordenacao && !temTexto(o.atendimento_coordenacao))) coord++;
+else if (pend === 'GESTAO' || (o.solicitado_gestao && !temTexto(o.atendimento_gestao))) gestao++;
+else if (pend === 'RESPONSAVEL' || (o.solicitado_responsavel && !temTexto(o.atendimento_responsavel))) responsavel++;
+else finalizadas++;
+});
+return { tutor, coord, gestao, responsavel, finalizadas, emAtendimento: tutor + coord + gestao + responsavel };
 }
 
-function atualizarCards(){
-
-let tutor=0
-let coord=0
-let gestao=0
-let finalizadas=0
-
-ocorrencias.forEach(o=>{
-
-if(o.solicitado_tutor && !o.atendimento_tutor) tutor++
-if(o.solicitado_coordenacao && !o.atendimento_coordenacao) coord++
-if(o.solicitado_gestao && !o.atendimento_gestao) gestao++
-
-if(!o.solicitado_tutor && !o.solicitado_coordenacao && !o.solicitado_gestao){
-finalizadas++
+function tocarAlertaGestao(){
+try{
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+if(!AudioCtx) return;
+const ctx = new AudioCtx();
+const osc = ctx.createOscillator();
+const gain = ctx.createGain();
+osc.type = 'sine';
+osc.frequency.setValueAtTime(880, ctx.currentTime);
+gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+osc.connect(gain);
+gain.connect(ctx.destination);
+osc.start();
+osc.stop(ctx.currentTime + 0.36);
+}catch(e){console.error('Falha no alerta sonoro', e);}
 }
 
-})
-
-document.getElementById("cardTutor").textContent=tutor
-document.getElementById("cardCoord").textContent=coord
-document.getElementById("cardGestao").textContent=gestao
-document.getElementById("cardFinalizadas").textContent=finalizadas
-
+function atualizarCards(resumo){
+document.getElementById('cardTutor').textContent = resumo.tutor;
+document.getElementById('cardCoord').textContent = resumo.coord;
+document.getElementById('cardGestao').textContent = resumo.gestao;
+document.getElementById('cardResponsavel').textContent = resumo.responsavel;
+document.getElementById('cardEmAtendimento').textContent = resumo.emAtendimento;
+document.getElementById('cardFinalizadas').textContent = resumo.finalizadas;
+const alerta = document.getElementById('alertaGestao');
+if(resumo.gestao > 0) alerta.classList.remove('hidden');
+else alerta.classList.add('hidden');
 }
 
-
-function gerarGraficoStatus(){
-
-let tutor=0
-let coord=0
-let gestao=0
-let finalizadas=0
-
-ocorrencias.forEach(o=>{
-
-if(o.solicitado_tutor && !o.atendimento_tutor) tutor++
-else if(o.solicitado_coordenacao && !o.atendimento_coordenacao) coord++
-else if(o.solicitado_gestao && !o.atendimento_gestao) gestao++
-else finalizadas++
-
-})
-
-new Chart(document.getElementById('graficoStatus'),{
+function gerarGraficoStatus(resumo){
+if(graficoStatus) graficoStatus.destroy();
+graficoStatus = new Chart(document.getElementById('graficoStatus'), {
 type:'doughnut',
-data:{
-labels:['Tutor','Coordenação','Gestão','Finalizadas'],
-datasets:[{
-data:[tutor,coord,gestao,finalizadas]
-}]
+data:{ labels:['Tutor','Coordenação','Gestão','Responsável','Finalizadas'], datasets:[{ data:[resumo.tutor,resumo.coord,resumo.gestao,resumo.responsavel,resumo.finalizadas] }] }
+});
 }
-})
-
-}
-
 
 function gerarGraficoSala(){
-
-let salas={}
-
-ocorrencias.forEach(o=>{
-
-if(!salas[o.sala_nome]) salas[o.sala_nome]=0
-salas[o.sala_nome]++
-
-})
-
-new Chart(document.getElementById('graficoSala'),{
+let salas = {};
+ocorrencias.forEach(o => {
+const sala = o.sala_nome || 'Sem sala';
+salas[sala] = (salas[sala] || 0) + 1;
+});
+if(graficoSala) graficoSala.destroy();
+graficoSala = new Chart(document.getElementById('graficoSala'), {
 type:'bar',
-data:{
-labels:Object.keys(salas),
-datasets:[{
-label:'Ocorrências',
-data:Object.values(salas)
-}]
-}
-})
-
+data:{ labels:Object.keys(salas), datasets:[{ label:'Ocorrências', data:Object.values(salas) }] }
+});
 }
 
-window.onload=carregarDados
+function controlarAlertaGestao(quantidadeGestao){
+const chave = 'sgce_gestao_pendente_count';
+const ultimo = Number(localStorage.getItem(chave) || '0');
+if (quantidadeGestao > 0 && quantidadeGestao > ultimo) {
+    tocarAlertaGestao();
+}
+localStorage.setItem(chave, String(quantidadeGestao));
+}
 
+async function carregarDados(){
+try{
+const res = await fetch('/api/ocorrencias_todas');
+ocorrencias = await res.json();
+const resumo = resumoOcorrencias(ocorrencias);
+atualizarCards(resumo);
+gerarGraficoStatus(resumo);
+gerarGraficoSala();
+controlarAlertaGestao(resumo.gestao);
+}catch(e){
+console.error(e);
+}
+}
+
+window.onload = () => {
+carregarDados();
+setInterval(carregarDados, 30000);
+};
 </script>
-
 </body>
 </html>
