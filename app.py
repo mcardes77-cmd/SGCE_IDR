@@ -32,7 +32,7 @@ def get_next_numero_ocorrencia():
 
 @app.route("/")
 def home():
-    return redirect("/dashboard_ocorrencias.html")
+    return redirect("/dashboard_ocorrencias")
 
 
 @app.route("/dashboard")
