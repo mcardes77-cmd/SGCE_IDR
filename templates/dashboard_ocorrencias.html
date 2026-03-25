@@ -1,151 +1,194 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard - Gestão de Convivência Escolar</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-tailwind.config = { theme:{ extend:{ colors:{ 'dark-primary':'#0F172A','dark-secondary':'#1E293B','accent':'#10B981','text-light':'#F8FAFC' }}}}
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Ocorrências</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkPrimary: '#0F172A',
+                        darkSecondary: '#1E293B',
+                        accent: '#10B981',
+                        textLight: '#F8FAFC'
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="bg-dark-primary text-text-light min-h-screen p-6">
-<div class="max-w-7xl mx-auto">
-<header class="mb-8">
-<h1 class="text-3xl font-bold text-accent">PAINEL DE GESTÃO DE OCORRÊNCIAS</h1>
-<p class="text-gray-400">Sistema de Convivência Escolar</p>
-<div class="mt-4 flex flex-wrap gap-3">
-<button onclick="window.location.href='/gestao_ocorrencia'" class="bg-accent px-4 py-2 rounded">Gestão de Ocorrências</button>
-<button onclick="window.location.href='/gestao_ocorrencia_nova'" class="bg-gray-700 px-4 py-2 rounded">Nova Ocorrência</button>
-</div>
-</header>
+<body class="bg-darkPrimary text-textLight min-h-screen p-4 md:p-6 text-sm">
+<div class="max-w-7xl mx-auto space-y-5">
+    <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-accent">PAINEL DE GESTÃO DE OCORRÊNCIAS</h1>
+            <p class="text-slate-400 text-sm">Sistema de Convivência Escolar</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="/gestao_ocorrencia" class="bg-accent hover:bg-emerald-600 px-3 py-2 rounded-lg font-semibold text-sm">Gestão de Ocorrências</a>
+            <a href="/gestao_ocorrencia_nova" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold text-sm">Nova Ocorrência</a>
+            <a href="/gestao_relatorio_impressao" class="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-lg font-semibold text-sm">Relatório / Impressão</a>
+        </div>
+    </header>
 
-<div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
-<div class="bg-blue-900 p-5 rounded-lg"><p class="text-sm">Pendentes Tutor</p><p id="cardTutor" class="text-3xl font-bold">0</p></div>
-<div class="bg-yellow-800 p-5 rounded-lg"><p class="text-sm">Pendentes Coordenação</p><p id="cardCoord" class="text-3xl font-bold">0</p></div>
-<div class="bg-red-800 p-5 rounded-lg"><p class="text-sm">Pendentes Gestão</p><p id="cardGestao" class="text-3xl font-bold">0</p></div>
-<div class="bg-purple-800 p-5 rounded-lg"><p class="text-sm">Pendentes Responsável</p><p id="cardResponsavel" class="text-3xl font-bold">0</p></div>
-<div class="bg-orange-700 p-5 rounded-lg"><p class="text-sm">Total sem atendimento</p><p id="cardEmAtendimento" class="text-3xl font-bold">0</p></div>
-<div class="bg-green-800 p-5 rounded-lg"><p class="text-sm">Finalizadas</p><p id="cardFinalizadas" class="text-3xl font-bold">0</p></div>
-</div>
+    <section class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-accent text-base">Resumo diário</h2>
+                <span id="data-hoje" class="text-xs text-slate-400"></span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Tutor</div><div id="d_tutor" class="text-lg font-bold text-blue-400">0</div></div>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Coordenação</div><div id="d_coord" class="text-lg font-bold text-yellow-400">0</div></div>
+                <a href="/gestao_ocorrencia?pendencia=GESTAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Gestão</div><div id="d_gestao" class="text-lg font-bold text-red-400">0</div></a>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Responsável</div><div id="d_resp" class="text-lg font-bold text-purple-400">0</div></div>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Finalizadas</div><div id="d_final" class="text-lg font-bold text-emerald-400">0</div></div>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Total do dia</div><div id="d_total" class="text-lg font-bold">0</div></div>
+            </div>
+        </div>
 
-<div id="alertaGestao" class="hidden mb-6 rounded-lg border border-red-500 bg-red-950/70 p-4 text-red-100">
-<div class="font-bold text-lg">⚠️ Atenção: existem pendências de gestão aguardando atendimento.</div>
-<div class="text-sm text-red-200 mt-1">O painel emite um alerta sonoro quando novas pendências de gestão são detectadas.</div>
-</div>
+        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+            <h2 class="font-semibold text-accent text-base mb-3">Resumo acumulado</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Tutor</div><div id="a_tutor" class="text-lg font-bold text-blue-400">0</div></div>
+                <a href="/gestao_ocorrencia?pendencia=COORDENACAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Coordenação</div><div id="a_coord" class="text-lg font-bold text-yellow-400">0</div></a>
+                <a href="/gestao_ocorrencia?pendencia=GESTAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Gestão</div><div id="a_gestao" class="text-lg font-bold text-red-400">0</div></a>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Responsável</div><div id="a_resp" class="text-lg font-bold text-purple-400">0</div></div>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Finalizadas</div><div id="a_final" class="text-lg font-bold text-emerald-400">0</div></div>
+                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Total geral</div><div id="a_total" class="text-lg font-bold">0</div></div>
+            </div>
+            <div id="alerta-gestao" class="hidden mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-red-300 text-sm font-semibold">
+                Existem pendências de gestão. Clique no card vermelho para abrir a lista filtrada.
+            </div>
+        </div>
+    </section>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-<div class="bg-dark-secondary p-6 rounded-lg">
-<h3 class="text-lg mb-4">Ocorrências por Status</h3>
-<canvas id="graficoStatus"></canvas>
-</div>
-<div class="bg-dark-secondary p-6 rounded-lg">
-<h3 class="text-lg mb-4">Ocorrências por Sala</h3>
-<canvas id="graficoSala"></canvas>
-</div>
-</div>
+    <section class="grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-5">
+        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+            <h2 class="font-semibold text-accent text-base mb-3">Evolução semanal por sala</h2>
+            <canvas id="graficoSemanalSalas" height="120"></canvas>
+        </div>
+
+        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+            <h2 class="font-semibold text-accent text-base mb-3">Ocorrências por status</h2>
+            <canvas id="graficoStatus" height="120"></canvas>
+        </div>
+    </section>
+
+    <section class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+        <h2 class="font-semibold text-accent text-base mb-3">Ranking de salas por ocorrências</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs md:text-sm">
+                <thead>
+                    <tr class="text-slate-300 border-b border-slate-700">
+                        <th class="text-left py-2 px-2">Posição</th>
+                        <th class="text-left py-2 px-2">Sala</th>
+                        <th class="text-left py-2 px-2">Quantidade</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingSalasBody"></tbody>
+            </table>
+        </div>
+    </section>
 </div>
 
 <script>
-let ocorrencias = [];
 let graficoStatus = null;
-let graficoSala = null;
+let graficoSemanalSalas = null;
 
-function temTexto(valor){return String(valor || '').trim().length > 0;}
-
-function resumoOcorrencias(lista){
-let tutor=0, coord=0, gestao=0, responsavel=0, finalizadas=0;
-lista.forEach(o => {
-const pend = String(o.pendencia || '').toUpperCase();
-if (pend === 'TUTOR' || (o.solicitado_tutor && !temTexto(o.atendimento_tutor))) tutor++;
-else if (pend === 'COORDENACAO' || (o.solicitado_coordenacao && !temTexto(o.atendimento_coordenacao))) coord++;
-else if (pend === 'GESTAO' || (o.solicitado_gestao && !temTexto(o.atendimento_gestao))) gestao++;
-else if (pend === 'RESPONSAVEL' || (o.solicitado_responsavel && !temTexto(o.atendimento_responsavel))) responsavel++;
-else finalizadas++;
-});
-return { tutor, coord, gestao, responsavel, finalizadas, emAtendimento: tutor + coord + gestao + responsavel };
+function setText(id, value) {
+    document.getElementById(id).textContent = value ?? 0;
 }
 
-function tocarAlertaGestao(){
-try{
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-if(!AudioCtx) return;
-const ctx = new AudioCtx();
-const osc = ctx.createOscillator();
-const gain = ctx.createGain();
-osc.type = 'sine';
-osc.frequency.setValueAtTime(880, ctx.currentTime);
-gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
-gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
-osc.connect(gain);
-gain.connect(ctx.destination);
-osc.start();
-osc.stop(ctx.currentTime + 0.36);
-}catch(e){console.error('Falha no alerta sonoro', e);}
+function renderRanking(ranking) {
+    const body = document.getElementById('rankingSalasBody');
+    if (!ranking.length) {
+        body.innerHTML = '<tr><td colspan="3" class="py-4 px-2 text-slate-400">Nenhuma ocorrência encontrada.</td></tr>';
+        return;
+    }
+    body.innerHTML = ranking.map((item, idx) => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+            <td class="py-2 px-2 font-semibold">${idx + 1}</td>
+            <td class="py-2 px-2">${item.sala}</td>
+            <td class="py-2 px-2">${item.total}</td>
+        </tr>
+    `).join('');
 }
 
-function atualizarCards(resumo){
-document.getElementById('cardTutor').textContent = resumo.tutor;
-document.getElementById('cardCoord').textContent = resumo.coord;
-document.getElementById('cardGestao').textContent = resumo.gestao;
-document.getElementById('cardResponsavel').textContent = resumo.responsavel;
-document.getElementById('cardEmAtendimento').textContent = resumo.emAtendimento;
-document.getElementById('cardFinalizadas').textContent = resumo.finalizadas;
-const alerta = document.getElementById('alertaGestao');
-if(resumo.gestao > 0) alerta.classList.remove('hidden');
-else alerta.classList.add('hidden');
+function renderStatusChart(payload) {
+    const ctx = document.getElementById('graficoStatus');
+    if (graficoStatus) graficoStatus.destroy();
+    graficoStatus = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: payload.labels,
+            datasets: [{ data: payload.data }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#F8FAFC', font: { size: 11 } } }
+            }
+        }
+    });
 }
 
-function gerarGraficoStatus(resumo){
-if(graficoStatus) graficoStatus.destroy();
-graficoStatus = new Chart(document.getElementById('graficoStatus'), {
-type:'doughnut',
-data:{ labels:['Tutor','Coordenação','Gestão','Responsável','Finalizadas'], datasets:[{ data:[resumo.tutor,resumo.coord,resumo.gestao,resumo.responsavel,resumo.finalizadas] }] }
-});
+function renderWeeklyChart(payload) {
+    const ctx = document.getElementById('graficoSemanalSalas');
+    if (graficoSemanalSalas) graficoSemanalSalas.destroy();
+    graficoSemanalSalas = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: payload.labels,
+            datasets: payload.datasets.map(ds => ({ ...ds, tension: 0.35, fill: false }))
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: '#F8FAFC', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#CBD5E1', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                y: { beginAtZero: true, ticks: { color: '#CBD5E1', precision: 0, font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
+            }
+        }
+    });
 }
 
-function gerarGraficoSala(){
-let salas = {};
-ocorrencias.forEach(o => {
-const sala = o.sala_nome || 'Sem sala';
-salas[sala] = (salas[sala] || 0) + 1;
-});
-if(graficoSala) graficoSala.destroy();
-graficoSala = new Chart(document.getElementById('graficoSala'), {
-type:'bar',
-data:{ labels:Object.keys(salas), datasets:[{ label:'Ocorrências', data:Object.values(salas) }] }
-});
+async function carregarDashboard() {
+    const response = await fetch('/api/dashboard_ocorrencias');
+    const json = await response.json();
+    if (!response.ok || !json.success) throw new Error(json.error || 'Erro ao carregar dashboard');
+
+    const data = json.data;
+    document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR');
+
+    setText('d_tutor', data.diario.tutor);
+    setText('d_coord', data.diario.coordenacao);
+    setText('d_gestao', data.diario.gestao);
+    setText('d_resp', data.diario.responsavel);
+    setText('d_final', data.diario.finalizadas);
+    setText('d_total', data.diario.total);
+
+    setText('a_tutor', data.acumulado.tutor);
+    setText('a_coord', data.acumulado.coordenacao);
+    setText('a_gestao', data.acumulado.gestao);
+    setText('a_resp', data.acumulado.responsavel);
+    setText('a_final', data.acumulado.finalizadas);
+    setText('a_total', data.acumulado.total);
+
+    document.getElementById('alerta-gestao').classList.toggle('hidden', !(data.acumulado.gestao > 0));
+
+    renderRanking(data.ranking_salas || []);
+    renderStatusChart(data.status_chart || {labels: [], data: []});
+    renderWeeklyChart(data.semanal_salas || {labels: [], datasets: []});
 }
 
-function controlarAlertaGestao(quantidadeGestao){
-const chave = 'sgce_gestao_pendente_count';
-const ultimo = Number(localStorage.getItem(chave) || '0');
-if (quantidadeGestao > 0 && quantidadeGestao > ultimo) {
-    tocarAlertaGestao();
-}
-localStorage.setItem(chave, String(quantidadeGestao));
-}
-
-async function carregarDados(){
-try{
-const res = await fetch('/api/ocorrencias_todas');
-ocorrencias = await res.json();
-const resumo = resumoOcorrencias(ocorrencias);
-atualizarCards(resumo);
-gerarGraficoStatus(resumo);
-gerarGraficoSala();
-controlarAlertaGestao(resumo.gestao);
-}catch(e){
-console.error(e);
-}
-}
-
-window.onload = () => {
-carregarDados();
-setInterval(carregarDados, 30000);
-};
+carregarDashboard().catch(err => console.error(err));
 </script>
 </body>
 </html>
