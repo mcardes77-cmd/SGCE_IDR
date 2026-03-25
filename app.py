@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, jsonify, redirect
 from supabase import create_client
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import Counter, defaultdict
 import os
 
 load_dotenv()
@@ -22,6 +23,51 @@ def now_iso():
     return datetime.utcnow().isoformat()
 
 
+def safe_str(value):
+    return "" if value is None else str(value).strip()
+
+
+def parse_dt(value):
+    if not value:
+        return None
+    text = str(value).strip().replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(text)
+    except Exception:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(text, fmt)
+            except Exception:
+                pass
+    return None
+
+
+def normalize_occurrence(row):
+    item = dict(row or {})
+    pendencia = safe_str(item.get("pendencia")).upper()
+    status = safe_str(item.get("status")).upper()
+
+    if pendencia == "":
+        if item.get("solicitado_responsavel") and not safe_str(item.get("atendimento_responsavel")):
+            pendencia = "RESPONSAVEL"
+        elif item.get("solicitado_gestao") and not safe_str(item.get("atendimento_gestao")):
+            pendencia = "GESTAO"
+        elif item.get("solicitado_coordenacao") and not safe_str(item.get("atendimento_coordenacao")):
+            pendencia = "COORDENACAO"
+        elif item.get("solicitado_tutor") and not safe_str(item.get("atendimento_tutor")):
+            pendencia = "TUTOR"
+        else:
+            pendencia = "FINALIZADA"
+
+    if status == "":
+        status = "FINALIZADA" if pendencia == "FINALIZADA" else "ATENDIMENTO"
+
+    item["pendencia"] = pendencia
+    item["status"] = status
+    item["id"] = item.get("numero")
+    return item
+
+
 def get_next_numero_ocorrencia():
     db = get_supabase()
     resp = db.table("ocorrencias").select("numero").order("numero", desc=True).limit(1).execute()
@@ -30,17 +76,98 @@ def get_next_numero_ocorrencia():
     return 1
 
 
+def fetch_all_occurrences():
+    db = get_supabase()
+    resp = db.table("ocorrencias").select("*").order("numero", desc=True).execute()
+    return [normalize_occurrence(item) for item in (resp.data or [])]
+
+
+def compute_dashboard_data(rows):
+    today = datetime.now().date()
+    daily_counts = Counter()
+    total_counts = Counter()
+    room_counts = Counter()
+    weekly_by_room = defaultdict(Counter)
+    weekly_total = Counter()
+
+    for row in rows:
+        pendencia = safe_str(row.get("pendencia")).upper() or "FINALIZADA"
+        total_counts[pendencia] += 1
+
+        dt = parse_dt(row.get("data_hora") or row.get("data"))
+        if dt and dt.date() == today:
+            daily_counts[pendencia] += 1
+
+        sala = safe_str(row.get("sala_nome")) or "Não informada"
+        room_counts[sala] += 1
+
+        if dt:
+            monday = (dt.date() - timedelta(days=dt.weekday())).strftime("%d/%m")
+            weekly_by_room[sala][monday] += 1
+            weekly_total[monday] += 1
+
+    ranking = [
+        {"sala": sala, "total": total}
+        for sala, total in room_counts.most_common()
+    ]
+
+    top_rooms = [name for name, _ in room_counts.most_common(5)]
+    week_labels = sorted(
+        weekly_total.keys(),
+        key=lambda x: datetime.strptime(x + f"/{datetime.now().year}", "%d/%m/%Y")
+    )
+    week_labels = week_labels[-8:]
+
+    weekly_series = []
+    for room in top_rooms:
+        weekly_series.append({
+            "label": room,
+            "data": [weekly_by_room[room].get(label, 0) for label in week_labels]
+        })
+
+    return {
+        "diario": {
+            "tutor": daily_counts.get("TUTOR", 0),
+            "coordenacao": daily_counts.get("COORDENACAO", 0),
+            "gestao": daily_counts.get("GESTAO", 0),
+            "responsavel": daily_counts.get("RESPONSAVEL", 0),
+            "finalizadas": daily_counts.get("FINALIZADA", 0),
+            "total": sum(daily_counts.values())
+        },
+        "acumulado": {
+            "tutor": total_counts.get("TUTOR", 0),
+            "coordenacao": total_counts.get("COORDENACAO", 0),
+            "gestao": total_counts.get("GESTAO", 0),
+            "responsavel": total_counts.get("RESPONSAVEL", 0),
+            "finalizadas": total_counts.get("FINALIZADA", 0),
+            "total": sum(total_counts.values())
+        },
+        "ranking_salas": ranking,
+        "semanal_salas": {
+            "labels": week_labels,
+            "datasets": weekly_series
+        },
+        "status_chart": {
+            "labels": ["Tutor", "Coordenação", "Gestão", "Responsável", "Finalizadas"],
+            "data": [
+                total_counts.get("TUTOR", 0),
+                total_counts.get("COORDENACAO", 0),
+                total_counts.get("GESTAO", 0),
+                total_counts.get("RESPONSAVEL", 0),
+                total_counts.get("FINALIZADA", 0),
+            ]
+        }
+    }
+
+
 @app.route("/")
 def home():
-    return redirect("/dashboard_ocorrencias")
+    return redirect("/dashboard")
 
-@app.route("/dashboard_ocorrencias")
-def dashboard_ocorrencias():
-    return render_template("dashboard_ocorrencias.html")
 
 @app.route("/dashboard")
 def dashboard():
-    return render_template("")
+    return render_template("dashboard_ocorrencias.html")
 
 
 @app.route("/health")
@@ -84,7 +211,7 @@ def relatorio_ocorrencias_pdf():
             "relatorio_ocorrencias_pdf.html",
             ocorrencias=ocorrencias,
             nome_aluno=nome_aluno,
-            data_geracao=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            data_geracao=datetime.now().strftime("%d/%m/%Y %H:%M")
         )
     except Exception as e:
         return f"Erro ao abrir relatório: {e}", 500
@@ -133,9 +260,16 @@ def api_alunos_por_sala(sala_id):
 @app.route("/api/ocorrencias_todas")
 def api_ocorrencias_todas():
     try:
-        db = get_supabase()
-        resp = db.table("ocorrencias").select("*").order("numero", desc=True).execute()
-        return jsonify(resp.data or [])
+        return jsonify(fetch_all_occurrences())
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/dashboard_ocorrencias")
+def api_dashboard_ocorrencias():
+    try:
+        rows = fetch_all_occurrences()
+        return jsonify({"success": True, "data": compute_dashboard_data(rows)})
     except Exception as e:
         return json_error(e)
 
@@ -145,7 +279,42 @@ def api_ocorrencias_por_aluno(aluno_id):
     try:
         db = get_supabase()
         resp = db.table("ocorrencias").select("*").eq("aluno_id", aluno_id).order("numero", desc=True).execute()
-        return jsonify(resp.data or [])
+        return jsonify([normalize_occurrence(item) for item in (resp.data or [])])
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/filtros_ocorrencias")
+def api_filtros_ocorrencias():
+    try:
+        rows = fetch_all_occurrences()
+        tutores = sorted({safe_str(i.get("tutor_nome")) for i in rows if safe_str(i.get("tutor_nome"))})
+        salas = sorted({safe_str(i.get("sala_nome")) for i in rows if safe_str(i.get("sala_nome"))})
+        alunos = sorted({safe_str(i.get("aluno_nome")) for i in rows if safe_str(i.get("aluno_nome"))})
+        return jsonify({"success": True, "tutores": tutores, "salas": salas, "alunos": alunos})
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/salas_com_ocorrencias")
+def api_salas_com_ocorrencias():
+    try:
+        rows = fetch_all_occurrences()
+        salas = sorted({safe_str(i.get("sala_nome")) for i in rows if safe_str(i.get("sala_nome"))})
+        return jsonify(salas)
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/alunos_com_ocorrencias")
+def api_alunos_com_ocorrencias():
+    try:
+        sala_nome = safe_str(request.args.get("sala_nome"))
+        rows = fetch_all_occurrences()
+        if sala_nome:
+            rows = [row for row in rows if safe_str(row.get("sala_nome")) == sala_nome]
+        alunos = sorted({safe_str(i.get("aluno_nome")) for i in rows if safe_str(i.get("aluno_nome"))})
+        return jsonify(alunos)
     except Exception as e:
         return json_error(e)
 
@@ -160,9 +329,7 @@ def api_ocorrencia_detalhes():
         resp = db.table("ocorrencias").select("*").eq("numero", numero).limit(1).execute()
         if not resp.data:
             return json_error("Ocorrência não encontrada", 404)
-        item = resp.data[0]
-        item["id"] = item.get("numero")
-        return jsonify(item)
+        return jsonify(normalize_occurrence(resp.data[0]))
     except Exception as e:
         return json_error(e)
 
@@ -177,7 +344,7 @@ def api_registrar_ocorrencia():
         professor_nome = data.get("professor_nome")
         descricao = data.get("descricao")
         atendimento_professor = data.get("atendimento_professor")
-        destino = (data.get("destino") or "nenhum").lower().strip()
+        destino = safe_str(data.get("destino") or "nenhum").lower()
 
         if not aluno_id:
             return json_error("Aluno não informado", 400)
@@ -201,7 +368,6 @@ def api_registrar_ocorrencia():
         solicitado_responsavel = False
         pendencia = "FINALIZADA"
         status = "FINALIZADA"
-
         if destino == "tutor":
             solicitado_tutor = True
             pendencia = "TUTOR"
@@ -234,7 +400,7 @@ def api_registrar_ocorrencia():
             "solicitado_responsavel": solicitado_responsavel,
             "pendencia": pendencia,
             "status": status,
-            "impressao_pdf": False,
+            "impressao_pdf": False
         }
         resp = db.table("ocorrencias").insert(payload).execute()
         numero = resp.data[0].get("numero") if resp.data else None
@@ -247,11 +413,10 @@ def api_registrar_ocorrencia():
 def api_salvar_atendimento(numero):
     try:
         db = get_supabase()
-        data = request.get_json(silent=True) or {}
-        tipo = (data.get("tipo") or "").strip().lower()
-        texto = (data.get("texto") or "").strip()
-        acao = (data.get("acao") or "").strip().lower()
-
+        data = request.get_json() or {}
+        tipo = safe_str(data.get("tipo")).lower()
+        texto = safe_str(data.get("texto"))
+        acao = safe_str(data.get("acao")).lower()
         if not texto:
             return json_error("Texto do atendimento é obrigatório", 400)
 
@@ -259,28 +424,20 @@ def api_salvar_atendimento(numero):
         if not resp_atual.data:
             return json_error("Ocorrência não encontrada", 404)
 
-        ocorrencia = resp_atual.data[0]
-        pendencia_atual = (ocorrencia.get("pendencia") or "FINALIZADA").strip().upper()
-
+        ocorrencia = normalize_occurrence(resp_atual.data[0])
+        pendencia_atual = safe_str(ocorrencia.get("pendencia")).upper() or "FINALIZADA"
         updates = {}
-        campo_por_tipo = {
-            "tutor": "atendimento_tutor",
-            "coordenacao": "atendimento_coordenacao",
-            "gestao": "atendimento_gestao",
-            "responsavel": "atendimento_responsavel",
-        }
-        campo_dt_por_tipo = {
-            "tutor": "dt_atendimento_tutor",
-            "coordenacao": "dt_atendimento_coordenacao",
-            "gestao": "dt_atendimento_gestao",
-        }
 
-        if tipo not in campo_por_tipo:
+        if tipo == "tutor":
+            updates["atendimento_tutor"] = texto
+        elif tipo == "coordenacao":
+            updates["atendimento_coordenacao"] = texto
+        elif tipo == "gestao":
+            updates["atendimento_gestao"] = texto
+        elif tipo == "responsavel":
+            updates["atendimento_responsavel"] = texto
+        else:
             return json_error("Tipo inválido", 400)
-
-        updates[campo_por_tipo[tipo]] = texto
-        if tipo in campo_dt_por_tipo:
-            updates[campo_dt_por_tipo[tipo]] = now_iso()
 
         fluxo_permitido = {
             "TUTOR": {"finalizar", "encaminhar_coordenacao", "encaminhar_gestao"},
@@ -289,10 +446,8 @@ def api_salvar_atendimento(numero):
             "RESPONSAVEL": {"finalizar"},
             "FINALIZADA": set(),
         }
-
         if pendencia_atual not in fluxo_permitido:
             pendencia_atual = "FINALIZADA"
-
         if acao not in fluxo_permitido[pendencia_atual]:
             return json_error(f"Ação '{acao}' não permitida para pendência atual '{pendencia_atual}'", 400)
 
@@ -304,45 +459,25 @@ def api_salvar_atendimento(numero):
         if acao == "finalizar":
             updates["pendencia"] = "FINALIZADA"
             updates["status"] = "FINALIZADA"
-            updates["dt_finalizacao"] = now_iso()
-
         elif acao == "encaminhar_tutor":
             updates["pendencia"] = "TUTOR"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_tutor"] = True
-            updates["dt_finalizacao"] = None
-
         elif acao == "encaminhar_coordenacao":
             updates["pendencia"] = "COORDENACAO"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_coordenacao"] = True
-            updates["dt_finalizacao"] = None
-
         elif acao == "encaminhar_gestao":
             updates["pendencia"] = "GESTAO"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_gestao"] = True
-            updates["dt_finalizacao"] = None
-
         elif acao == "convocar_responsavel":
             updates["pendencia"] = "RESPONSAVEL"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_responsavel"] = True
-            updates["responsavel_convocado"] = True
-            updates["dt_convocacao_responsavel"] = now_iso()
-            updates["dt_finalizacao"] = None
 
-        db.table("ocorrencias").update(updates).eq("numero", numero).execute()
-
-        resp_final = db.table("ocorrencias").select("*").eq("numero", numero).limit(1).execute()
-        data_final = resp_final.data[0] if resp_final.data else {}
-        data_final["id"] = data_final.get("numero")
-
-        return jsonify({
-            "success": True,
-            "message": "Atendimento salvo com sucesso",
-            "data": data_final,
-        })
+        resp = db.table("ocorrencias").update(updates).eq("numero", numero).execute()
+        return jsonify({"success": True, "data": resp.data})
     except Exception as e:
         return json_error(e)
 
