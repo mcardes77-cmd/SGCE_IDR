@@ -1,72 +1,34 @@
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from supabase import create_client
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from collections import Counter, defaultdict
+from datetime import datetime, timedelta, date
 import os
 
+# =========================================================
+# CONFIG
+# =========================================================
 load_dotenv()
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "sgce_secret_change_me")
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 
 def get_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
 def json_error(message, status=500):
     return jsonify({"success": False, "error": str(message)}), status
-
 
 def now_iso():
     return datetime.utcnow().isoformat()
 
+def normalize_aluno_nome(aluno):
+    return aluno.get("nome") or aluno.get("aluno_nome") or ""
 
-def safe_str(value):
-    return "" if value is None else str(value).strip()
-
-
-def parse_dt(value):
-    if not value:
-        return None
-    text = str(value).strip().replace("Z", "+00:00")
-    try:
-        return datetime.fromisoformat(text)
-    except Exception:
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
-            try:
-                return datetime.strptime(text, fmt)
-            except Exception:
-                pass
-    return None
-
-
-def normalize_occurrence(row):
-    item = dict(row or {})
-    pendencia = safe_str(item.get("pendencia")).upper()
-    status = safe_str(item.get("status")).upper()
-
-    if pendencia == "":
-        if item.get("solicitado_responsavel") and not safe_str(item.get("atendimento_responsavel")):
-            pendencia = "RESPONSAVEL"
-        elif item.get("solicitado_gestao") and not safe_str(item.get("atendimento_gestao")):
-            pendencia = "GESTAO"
-        elif item.get("solicitado_coordenacao") and not safe_str(item.get("atendimento_coordenacao")):
-            pendencia = "COORDENACAO"
-        elif item.get("solicitado_tutor") and not safe_str(item.get("atendimento_tutor")):
-            pendencia = "TUTOR"
-        else:
-            pendencia = "FINALIZADA"
-
-    if status == "":
-        status = "FINALIZADA" if pendencia == "FINALIZADA" else "ATENDIMENTO"
-
-    item["pendencia"] = pendencia
-    item["status"] = status
-    item["id"] = item.get("numero")
-    return item
-
+def normalize_sala_nome(item):
+    return item.get("sala_nome") or item.get("nome") or item.get("sala") or ""
 
 def get_next_numero_ocorrencia():
     db = get_supabase()
@@ -76,107 +38,309 @@ def get_next_numero_ocorrencia():
     return 1
 
 
-def fetch_all_occurrences():
-    db = get_supabase()
-    resp = db.table("ocorrencias").select("*").order("numero", desc=True).execute()
-    return [normalize_occurrence(item) for item in (resp.data or [])]
 
+USUARIOS_ACESSO_TOTAL = {
+    "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+    "MARCELO ANDRE NOGUEIRA CARDES",
+    "GRAZIELLE DA SILVA FEIJO VIANA",
+    "MARCILENE MANTOVANI COSSENZO PUPIM",
+    "MARCOS DE BRITO BORTOLOSSI",
+}
 
-def compute_dashboard_data(rows):
-    today = datetime.now().date()
-    daily_counts = Counter()
-    total_counts = Counter()
-    room_counts = Counter()
-    weekly_by_room = defaultdict(Counter)
-    weekly_total = Counter()
+def normalizar_texto(txt):
+    return (txt or "").strip().upper()
 
-    for row in rows:
-        pendencia = safe_str(row.get("pendencia")).upper() or "FINALIZADA"
-        total_counts[pendencia] += 1
+def usuario_logado_nome():
+    user = session.get("user") or {}
+    return normalizar_texto(user.get("nome"))
 
-        dt = parse_dt(row.get("data_hora") or row.get("data"))
-        if dt and dt.date() == today:
-            daily_counts[pendencia] += 1
+def usuario_tem_acesso_total():
+    return usuario_logado_nome() in USUARIOS_ACESSO_TOTAL
 
-        sala = safe_str(row.get("sala_nome")) or "Não informada"
-        room_counts[sala] += 1
-
-        if dt:
-            monday = (dt.date() - timedelta(days=dt.weekday())).strftime("%d/%m")
-            weekly_by_room[sala][monday] += 1
-            weekly_total[monday] += 1
-
-    ranking = [
-        {"sala": sala, "total": total}
-        for sala, total in room_counts.most_common()
-    ]
-
-    top_rooms = [name for name, _ in room_counts.most_common(5)]
-    week_labels = sorted(
-        weekly_total.keys(),
-        key=lambda x: datetime.strptime(x + f"/{datetime.now().year}", "%d/%m/%Y")
-    )
-    week_labels = week_labels[-8:]
-
-    weekly_series = []
-    for room in top_rooms:
-        weekly_series.append({
-            "label": room,
-            "data": [weekly_by_room[room].get(label, 0) for label in week_labels]
-        })
-
-    return {
-        "diario": {
-            "tutor": daily_counts.get("TUTOR", 0),
-            "coordenacao": daily_counts.get("COORDENACAO", 0),
-            "gestao": daily_counts.get("GESTAO", 0),
-            "responsavel": daily_counts.get("RESPONSAVEL", 0),
-            "finalizadas": daily_counts.get("FINALIZADA", 0),
-            "total": sum(daily_counts.values())
-        },
-        "acumulado": {
-            "tutor": total_counts.get("TUTOR", 0),
-            "coordenacao": total_counts.get("COORDENACAO", 0),
-            "gestao": total_counts.get("GESTAO", 0),
-            "responsavel": total_counts.get("RESPONSAVEL", 0),
-            "finalizadas": total_counts.get("FINALIZADA", 0),
-            "total": sum(total_counts.values())
-        },
-        "ranking_salas": ranking,
-        "semanal_salas": {
-            "labels": week_labels,
-            "datasets": weekly_series
-        },
-        "status_chart": {
-            "labels": ["Tutor", "Coordenação", "Gestão", "Responsável", "Finalizadas"],
-            "data": [
-                total_counts.get("TUTOR", 0),
-                total_counts.get("COORDENACAO", 0),
-                total_counts.get("GESTAO", 0),
-                total_counts.get("RESPONSAVEL", 0),
-                total_counts.get("FINALIZADA", 0),
-            ]
-        }
+def usuario_pode_ver_gestao():
+    return usuario_logado_nome() in {
+        "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+        "MARCELO ANDRE NOGUEIRA CARDES",
+        "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
 
+def usuario_pode_ver_coordenacao():
+    return usuario_logado_nome() in {
+        "MARCELO ANDRE NOGUEIRA CARDES",
+        "GRAZIELLE DA SILVA FEIJO VIANA",
+        "MARCOS DE BRITO BORTOLOSSI",
+    }
 
+def usuario_pode_ver_responsavel():
+    return usuario_logado_nome() in {
+        "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+        "MARCELO ANDRE NOGUEIRA CARDES",
+        "MARCILENE MANTOVANI COSSENZO PUPIM",
+    }
+
+def sala_para_serie(sala_nome):
+    sala = normalizar_texto(sala_nome)
+    if sala.startswith("6º") or sala.startswith("6°"):
+        return "6º ANO"
+    if sala.startswith("7º") or sala.startswith("7°"):
+        return "7º ANO"
+    if sala.startswith("8º") or sala.startswith("8°"):
+        return "8º ANO"
+    if sala.startswith("9º") or sala.startswith("9°"):
+        return "9º ANO"
+    if sala.startswith("1ª") or sala.startswith("1A") or sala.startswith("1º"):
+        return "1ª SÉRIE"
+    if sala.startswith("2ª") or sala.startswith("2A") or sala.startswith("2º"):
+        return "2ª SÉRIE"
+    if sala.startswith("3ª") or sala.startswith("3A") or sala.startswith("3º"):
+        return "3ª SÉRIE"
+    return sala_nome or ""
+
+# =========================================================
+# LOGIN / SEGURANÇA
+# =========================================================
+ROTAS_LIVRES = {
+    "/login",
+    "/primeiro_acesso",
+    "/api/login",
+    "/api/funcionarios_primeiro_acesso",
+    "/api/primeiro_acesso",
+    "/health",
+    "/logout",
+}
+
+@app.before_request
+def proteger_rotas():
+    caminho = request.path or "/"
+    if caminho.startswith("/static/"):
+        return
+    if caminho in ROTAS_LIVRES:
+        return
+    if "user" not in session:
+        return redirect("/login")
+
+@app.route("/login")
+def login():
+    return render_template("login.html")
+
+@app.route("/primeiro_acesso")
+def primeiro_acesso():
+    return render_template("primeiro_acesso.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+@app.route("/api/funcionarios_primeiro_acesso")
+def api_funcionarios_primeiro_acesso():
+    try:
+        db = get_supabase()
+        resp = (
+            db.table("d_funcionarios")
+            .select("id,nome,funcao,tipo")
+            .eq("conta_ativada", False)
+            .order("nome")
+            .execute()
+        )
+        return jsonify({"success": True, "data": resp.data or []})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/primeiro_acesso", methods=["POST"])
+def api_primeiro_acesso():
+    try:
+        db = get_supabase()
+        data = request.get_json(silent=True) or {}
+        funcionario_id = data.get("funcionario_id")
+        username = (data.get("username") or "").strip().lower()
+        senha = (data.get("senha") or "").strip()
+        confirmar = (data.get("confirmar_senha") or "").strip()
+
+        if not funcionario_id:
+            return json_error("Selecione o funcionário.", 400)
+        if not username or len(username) < 3:
+            return json_error("O nome de usuário deve ter pelo menos 3 caracteres.", 400)
+        if not senha or len(senha) < 6:
+            return json_error("A senha deve ter pelo menos 6 caracteres.", 400)
+        if senha != confirmar:
+            return json_error("As senhas não conferem.", 400)
+
+        existente = (
+            db.table("d_funcionarios")
+            .select("id")
+            .eq("username", username)
+            .limit(1)
+            .execute()
+        )
+        if existente.data:
+            return json_error("Esse nome de usuário já está em uso.", 409)
+
+        funcionario = (
+            db.table("d_funcionarios")
+            .select("id,nome,conta_ativada")
+            .eq("id", funcionario_id)
+            .limit(1)
+            .execute()
+        )
+        if not funcionario.data:
+            return json_error("Funcionário não encontrado.", 404)
+        if funcionario.data[0].get("conta_ativada") is True:
+            return json_error("Essa conta já foi ativada.", 409)
+
+        db.table("d_funcionarios").update({
+            "username": username,
+            "senha": senha,
+            "conta_ativada": True,
+            "primeiro_login": False,
+            "updated_at": now_iso()
+        }).eq("id", funcionario_id).execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Conta criada com sucesso.",
+            "redirect": "/login"
+        })
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    try:
+        db = get_supabase()
+        data = request.get_json(silent=True) or {}
+        username = (data.get("username") or "").strip().lower()
+        senha = (data.get("senha") or "").strip()
+
+        if not username or not senha:
+            return json_error("Informe usuário e senha.", 400)
+
+        resp = (
+            db.table("d_funcionarios")
+            .select("*")
+            .eq("username", username)
+            .eq("senha", senha)
+            .eq("conta_ativada", True)
+            .limit(1)
+            .execute()
+        )
+
+        if not resp.data:
+            return json_error("Usuário ou senha inválidos.", 401)
+
+        user = resp.data[0]
+        session["user"] = {
+            "id": user.get("id"),
+            "nome": user.get("nome"),
+            "username": user.get("username"),
+            "funcao": user.get("funcao"),
+            "tipo": user.get("tipo"),
+            "is_tutor": user.get("is_tutor", False),
+        }
+
+        return jsonify({"success": True, "redirect": "/dashboard_geral"})
+    except Exception as e:
+        return json_error(e)
+
+# =========================================================
+# HOME
+# =========================================================
 @app.route("/")
 def home():
-    return redirect("/dashboard")
-
-
-@app.route("/dashboard")
-def dashboard():
-    return render_template("dashboard_ocorrencias.html")
-
+    if "user" not in session:
+        return redirect("/login")
+    return redirect("/dashboard_geral")
 
 @app.route("/health")
 def health():
     return "OK"
 
+@app.route("/gestao_notas")
+def gestao_notas():
+    return render_template("gestao_notas.html")
 
+@app.route("/api/disciplinas_todas")
+def disciplinas():
+    db = get_supabase()
+    r = db.table("d_disciplinas").select("nome").execute()
+    nomes = sorted({x['nome'] for x in (r.data or [])})
+    return jsonify([{"nome":n} for n in nomes])
+# =========================================================
+# TELAS PRINCIPAIS
+# =========================================================
+@app.route("/dashboard_ocorrencias")
+def dashboard_ocorrencias():
+    return render_template("dashboard_ocorrencias.html")
+
+@app.route("/dashboard_geral")
+def dashboard_geral():
+    return render_template("dashboard_geral.html")
+
+@app.route("/dashboard_frequencia")
+def dashboard_frequencia():
+    return render_template("dashboard_frequencia.html")
+
+@app.route("/gestao_relatorios")
+def gestao_relatorios():
+    return render_template("gestao_relatorios_profissional.html")
+
+@app.route("/gestao_cadastro")
+def gestao_cadastro():
+    return render_template("gestao_cadastro.html")
+
+@app.route("/gestao_frequencia_avancada")
+def gestao_frequencia_avancada():
+    return render_template("gestao_frequencia_avancada.html")
+
+@app.route("/gestao_frequencia_lancamento")
+def gestao_frequencia_lancamento():
+    return render_template("gestao_frequencia_lancamento.html")
+
+@app.route("/gestao_frequencia_atraso")
+def gestao_frequencia_atraso():
+    return render_template("gestao_frequencia_atraso.html")
+
+@app.route("/gestao_frequencia_saida")
+def gestao_frequencia_saida():
+    return render_template("gestao_frequencia_saida.html")
+
+
+@app.route("/gestao_relatorio_frequencia_avancado")
+def gestao_relatorio_frequencia_avancado():
+    return render_template("gestao_relatorio_frequencia_avancado.html")
+
+@app.route("/gestao_tutoria")
+def gestao_tutoria():
+    return render_template("gestao_tutoria.html")
+
+@app.route("/gestao_tutoria_agendamento")
+def gestao_tutoria_agendamento():
+    return render_template("gestao_tutoria_agendamento.html")
+
+@app.route("/gestao_tutoria_atendimento")
+def gestao_tutoria_atendimento():
+    return render_template("gestao_tutoria_atendimento.html")
+
+@app.route("/gestao_tutoria_ficha")
+def gestao_tutoria_ficha():
+    return render_template("gestao_tutoria_ficha.html")
+
+@app.route("/gestao_tutoria_evolucao")
+def gestao_tutoria_evolucao():
+    return render_template("gestao_tutoria_evolucao.html")
+
+# =========================================================
+# OCORRÊNCIAS - TELAS E PDF
+# =========================================================
 @app.route("/gestao_ocorrencia")
 def gestao_ocorrencia():
+    pendencia = normalizar_texto(request.args.get("pendencia"))
+    if pendencia == "GESTAO" and not usuario_pode_ver_gestao():
+        return redirect("/dashboard_geral")
+    if pendencia == "COORDENACAO" and not usuario_pode_ver_coordenacao():
+        return redirect("/dashboard_geral")
+    if pendencia == "RESPONSAVEL" and not usuario_pode_ver_responsavel():
+        return redirect("/dashboard_geral")
     return render_template("gestao_ocorrencia.html")
 
 
@@ -184,17 +348,14 @@ def gestao_ocorrencia():
 def gestao_ocorrencia_nova():
     return render_template("gestao_ocorrencia_nova.html")
 
-
 @app.route("/gestao_ocorrencia_editar")
 @app.route("/gestao_ocorrencia_editar/<int:ocorrencia_id>")
 def gestao_ocorrencia_editar(ocorrencia_id=None):
     return render_template("gestao_ocorrencia_editar.html", ocorrencia_id=ocorrencia_id)
 
-
 @app.route("/gestao_relatorio_impressao")
 def gestao_relatorio_impressao():
     return render_template("gestao_relatorio_impressao.html")
-
 
 @app.route("/relatorio_ocorrencias_pdf")
 def relatorio_ocorrencias_pdf():
@@ -211,65 +372,109 @@ def relatorio_ocorrencias_pdf():
             "relatorio_ocorrencias_pdf.html",
             ocorrencias=ocorrencias,
             nome_aluno=nome_aluno,
-            data_geracao=datetime.now().strftime("%d/%m/%Y %H:%M")
+            data_geracao=datetime.now().strftime("%d/%m/%Y %H:%M"),
         )
     except Exception as e:
         return f"Erro ao abrir relatório: {e}", 500
 
+# =========================================================
+# APIs BÁSICAS / CADASTRO
+# =========================================================
+@app.route("/api/me")
+def api_me():
+    return jsonify({"success": True, "user": session.get("user")})
 
 @app.route("/api/professores")
 def api_professores():
     try:
         db = get_supabase()
-        resp = db.table("d_funcionarios").select("id,nome,tipo,funcao,ativo").order("nome").execute()
+        resp = db.table("d_funcionarios").select("id,nome,tipo,funcao,ativo,email").order("nome").execute()
         return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
 
-
 @app.route("/api/salas")
+@app.route("/api/cadastro/salas")
 def api_salas():
     try:
         db = get_supabase()
         resp = db.table("d_salas").select("*").order("nome").execute()
-        return jsonify(resp.data or [])
+        dados = resp.data or []
+        for item in dados:
+            item["nome"] = normalize_sala_nome(item)
+        return jsonify(dados)
     except Exception as e:
         return json_error(e)
 
+@app.route("/api/cadastro/alunos")
+@app.route("/api/alunos")
+def api_alunos():
+    try:
+        db = get_supabase()
+        resp = db.table("d_alunos").select("*").order("nome").execute()
+        dados = resp.data or []
+        for item in dados:
+            item["nome"] = normalize_aluno_nome(item)
+        return jsonify(dados)
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/funcionarios")
+def api_cadastro_funcionarios():
+    try:
+        db = get_supabase()
+        resp = db.table("d_funcionarios").select("*").order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
 
 @app.route("/api/salas_por_professor/<int:professor_id>")
 def api_salas_por_professor(professor_id):
     try:
         db = get_supabase()
         resp = db.table("d_salas").select("*").order("nome").execute()
-        return jsonify(resp.data or [])
+        dados = resp.data or []
+        for item in dados:
+            item["nome"] = normalize_sala_nome(item)
+        return jsonify(dados)
     except Exception as e:
         return json_error(e)
-
 
 @app.route("/api/alunos_por_sala/<int:sala_id>")
 def api_alunos_por_sala(sala_id):
     try:
         db = get_supabase()
         resp = db.table("d_alunos").select("*").eq("sala_id", sala_id).order("nome").execute()
-        return jsonify(resp.data or [])
+        dados = resp.data or []
+        for item in dados:
+            item["nome"] = normalize_aluno_nome(item)
+        return jsonify(dados)
     except Exception as e:
         return json_error(e)
 
-
+# =========================================================
+# APIs DE OCORRÊNCIAS
+# =========================================================
 @app.route("/api/ocorrencias_todas")
 def api_ocorrencias_todas():
     try:
-        return jsonify(fetch_all_occurrences())
-    except Exception as e:
-        return json_error(e)
+        db = get_supabase()
+        resp = db.table("ocorrencias").select("*").order("numero", desc=True).execute()
+        dados = resp.data or []
 
+        pendencia = normalizar_texto(request.args.get("pendencia"))
+        status = normalizar_texto(request.args.get("status"))
 
-@app.route("/api/dashboard_ocorrencias")
-def api_dashboard_ocorrencias():
-    try:
-        rows = fetch_all_occurrences()
-        return jsonify({"success": True, "data": compute_dashboard_data(rows)})
+        if not usuario_tem_acesso_total():
+            nome = usuario_logado_nome()
+            dados = [x for x in dados if normalizar_texto(x.get("tutor_nome")) == nome]
+
+        if pendencia:
+            dados = [x for x in dados if normalizar_texto(x.get("pendencia")) == pendencia]
+        if status:
+            dados = [x for x in dados if normalizar_texto(x.get("status")) == status]
+
+        return jsonify(dados)
     except Exception as e:
         return json_error(e)
 
@@ -279,45 +484,9 @@ def api_ocorrencias_por_aluno(aluno_id):
     try:
         db = get_supabase()
         resp = db.table("ocorrencias").select("*").eq("aluno_id", aluno_id).order("numero", desc=True).execute()
-        return jsonify([normalize_occurrence(item) for item in (resp.data or [])])
+        return jsonify(resp.data or [])
     except Exception as e:
         return json_error(e)
-
-
-@app.route("/api/filtros_ocorrencias")
-def api_filtros_ocorrencias():
-    try:
-        rows = fetch_all_occurrences()
-        tutores = sorted({safe_str(i.get("tutor_nome")) for i in rows if safe_str(i.get("tutor_nome"))})
-        salas = sorted({safe_str(i.get("sala_nome")) for i in rows if safe_str(i.get("sala_nome"))})
-        alunos = sorted({safe_str(i.get("aluno_nome")) for i in rows if safe_str(i.get("aluno_nome"))})
-        return jsonify({"success": True, "tutores": tutores, "salas": salas, "alunos": alunos})
-    except Exception as e:
-        return json_error(e)
-
-
-@app.route("/api/salas_com_ocorrencias")
-def api_salas_com_ocorrencias():
-    try:
-        rows = fetch_all_occurrences()
-        salas = sorted({safe_str(i.get("sala_nome")) for i in rows if safe_str(i.get("sala_nome"))})
-        return jsonify(salas)
-    except Exception as e:
-        return json_error(e)
-
-
-@app.route("/api/alunos_com_ocorrencias")
-def api_alunos_com_ocorrencias():
-    try:
-        sala_nome = safe_str(request.args.get("sala_nome"))
-        rows = fetch_all_occurrences()
-        if sala_nome:
-            rows = [row for row in rows if safe_str(row.get("sala_nome")) == sala_nome]
-        alunos = sorted({safe_str(i.get("aluno_nome")) for i in rows if safe_str(i.get("aluno_nome"))})
-        return jsonify(alunos)
-    except Exception as e:
-        return json_error(e)
-
 
 @app.route("/api/ocorrencia_detalhes")
 def api_ocorrencia_detalhes():
@@ -329,10 +498,11 @@ def api_ocorrencia_detalhes():
         resp = db.table("ocorrencias").select("*").eq("numero", numero).limit(1).execute()
         if not resp.data:
             return json_error("Ocorrência não encontrada", 404)
-        return jsonify(normalize_occurrence(resp.data[0]))
+        item = resp.data[0]
+        item["id"] = item.get("numero")
+        return jsonify(item)
     except Exception as e:
         return json_error(e)
-
 
 @app.route("/api/registrar_ocorrencia", methods=["POST"])
 def api_registrar_ocorrencia():
@@ -344,7 +514,7 @@ def api_registrar_ocorrencia():
         professor_nome = data.get("professor_nome")
         descricao = data.get("descricao")
         atendimento_professor = data.get("atendimento_professor")
-        destino = safe_str(data.get("destino") or "nenhum").lower()
+        destino = (data.get("destino") or "nenhum").lower().strip()
 
         if not aluno_id:
             return json_error("Aluno não informado", 400)
@@ -368,6 +538,7 @@ def api_registrar_ocorrencia():
         solicitado_responsavel = False
         pendencia = "FINALIZADA"
         status = "FINALIZADA"
+
         if destino == "tutor":
             solicitado_tutor = True
             pendencia = "TUTOR"
@@ -385,7 +556,7 @@ def api_registrar_ocorrencia():
             "numero": get_next_numero_ocorrencia(),
             "data_hora": now_iso(),
             "aluno_id": aluno.get("id"),
-            "aluno_nome": aluno.get("nome") or aluno.get("aluno_nome"),
+            "aluno_nome": normalize_aluno_nome(aluno),
             "sala_id": aluno.get("sala_id"),
             "sala_nome": aluno.get("sala_nome"),
             "professor_id": professor_id,
@@ -400,7 +571,7 @@ def api_registrar_ocorrencia():
             "solicitado_responsavel": solicitado_responsavel,
             "pendencia": pendencia,
             "status": status,
-            "impressao_pdf": False
+            "impressao_pdf": False,
         }
         resp = db.table("ocorrencias").insert(payload).execute()
         numero = resp.data[0].get("numero") if resp.data else None
@@ -408,15 +579,15 @@ def api_registrar_ocorrencia():
     except Exception as e:
         return json_error(e)
 
-
 @app.route("/api/ocorrencias/<int:numero>/atendimento", methods=["PUT"])
 def api_salvar_atendimento(numero):
     try:
         db = get_supabase()
-        data = request.get_json() or {}
-        tipo = safe_str(data.get("tipo")).lower()
-        texto = safe_str(data.get("texto"))
-        acao = safe_str(data.get("acao")).lower()
+        data = request.get_json(silent=True) or {}
+        tipo = (data.get("tipo") or "").strip().lower()
+        texto = (data.get("texto") or "").strip()
+        acao = (data.get("acao") or "").strip().lower()
+
         if not texto:
             return json_error("Texto do atendimento é obrigatório", 400)
 
@@ -424,20 +595,28 @@ def api_salvar_atendimento(numero):
         if not resp_atual.data:
             return json_error("Ocorrência não encontrada", 404)
 
-        ocorrencia = normalize_occurrence(resp_atual.data[0])
-        pendencia_atual = safe_str(ocorrencia.get("pendencia")).upper() or "FINALIZADA"
-        updates = {}
+        ocorrencia = resp_atual.data[0]
+        pendencia_atual = (ocorrencia.get("pendencia") or "FINALIZADA").strip().upper()
 
-        if tipo == "tutor":
-            updates["atendimento_tutor"] = texto
-        elif tipo == "coordenacao":
-            updates["atendimento_coordenacao"] = texto
-        elif tipo == "gestao":
-            updates["atendimento_gestao"] = texto
-        elif tipo == "responsavel":
-            updates["atendimento_responsavel"] = texto
-        else:
+        updates = {}
+        campo_por_tipo = {
+            "tutor": "atendimento_tutor",
+            "coordenacao": "atendimento_coordenacao",
+            "gestao": "atendimento_gestao",
+            "responsavel": "atendimento_responsavel",
+        }
+        campo_dt_por_tipo = {
+            "tutor": "dt_atendimento_tutor",
+            "coordenacao": "dt_atendimento_coordenacao",
+            "gestao": "dt_atendimento_gestao",
+        }
+
+        if tipo not in campo_por_tipo:
             return json_error("Tipo inválido", 400)
+
+        updates[campo_por_tipo[tipo]] = texto
+        if tipo in campo_dt_por_tipo:
+            updates[campo_dt_por_tipo[tipo]] = now_iso()
 
         fluxo_permitido = {
             "TUTOR": {"finalizar", "encaminhar_coordenacao", "encaminhar_gestao"},
@@ -446,8 +625,10 @@ def api_salvar_atendimento(numero):
             "RESPONSAVEL": {"finalizar"},
             "FINALIZADA": set(),
         }
+
         if pendencia_atual not in fluxo_permitido:
             pendencia_atual = "FINALIZADA"
+
         if acao not in fluxo_permitido[pendencia_atual]:
             return json_error(f"Ação '{acao}' não permitida para pendência atual '{pendencia_atual}'", 400)
 
@@ -459,28 +640,43 @@ def api_salvar_atendimento(numero):
         if acao == "finalizar":
             updates["pendencia"] = "FINALIZADA"
             updates["status"] = "FINALIZADA"
+            updates["dt_finalizacao"] = now_iso()
         elif acao == "encaminhar_tutor":
             updates["pendencia"] = "TUTOR"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_tutor"] = True
+            updates["dt_finalizacao"] = None
         elif acao == "encaminhar_coordenacao":
             updates["pendencia"] = "COORDENACAO"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_coordenacao"] = True
+            updates["dt_finalizacao"] = None
         elif acao == "encaminhar_gestao":
             updates["pendencia"] = "GESTAO"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_gestao"] = True
+            updates["dt_finalizacao"] = None
         elif acao == "convocar_responsavel":
             updates["pendencia"] = "RESPONSAVEL"
             updates["status"] = "ATENDIMENTO"
             updates["solicitado_responsavel"] = True
+            updates["responsavel_convocado"] = True
+            updates["dt_convocacao_responsavel"] = now_iso()
+            updates["dt_finalizacao"] = None
 
-        resp = db.table("ocorrencias").update(updates).eq("numero", numero).execute()
-        return jsonify({"success": True, "data": resp.data})
+        db.table("ocorrencias").update(updates).eq("numero", numero).execute()
+
+        resp_final = db.table("ocorrencias").select("*").eq("numero", numero).limit(1).execute()
+        data_final = resp_final.data[0] if resp_final.data else {}
+        data_final["id"] = data_final.get("numero")
+
+        return jsonify({
+            "success": True,
+            "message": "Atendimento salvo com sucesso",
+            "data": data_final,
+        })
     except Exception as e:
         return json_error(e)
-
 
 @app.route("/api/gerar_pdf_ocorrencias", methods=["POST"])
 def api_gerar_pdf_ocorrencias():
@@ -497,6 +693,1318 @@ def api_gerar_pdf_ocorrencias():
         return json_error(e)
 
 
+# =========================================================
+# DASHBOARD DE OCORRÊNCIAS
+# =========================================================
+@app.route("/api/dashboard_ocorrencias")
+def api_dashboard_ocorrencias():
+    try:
+        db = get_supabase()
+        dados = db.table("ocorrencias").select("*").order("numero", desc=True).execute().data or []
+
+        def semana_seg_sex(ref_date):
+            inicio = ref_date - timedelta(days=ref_date.weekday())
+            fim = inicio + timedelta(days=4)
+            return inicio, fim
+
+        datas_validas = []
+        for item in dados:
+            data_hora = str(item.get("data_hora") or "")[:10]
+            try:
+                if data_hora:
+                    datas_validas.append(datetime.strptime(data_hora, "%Y-%m-%d").date())
+            except Exception:
+                pass
+
+        referencia = max(datas_validas) if datas_validas else datetime.now().date()
+        ultima_segunda = referencia - timedelta(days=referencia.weekday())
+
+        semanas = []
+        for i in range(3, -1, -1):
+            ini = ultima_segunda - timedelta(days=i * 7)
+            fim = ini + timedelta(days=4)
+            semanas.append((ini, fim))
+
+        pizza = {
+            "finalizadas": 0,
+            "tutor": 0,
+            "gestao": 0,
+            "coordenacao": 0,
+            "responsavel": 0
+        }
+
+        ranking_salas = {}
+
+        for item in dados:
+            status = (item.get("status") or "").upper().strip()
+            pendencia = (item.get("pendencia") or "").upper().strip()
+            sala = (item.get("sala_nome") or "SEM SALA").strip()
+            data_hora = str(item.get("data_hora") or "")[:10]
+
+            if sala not in ranking_salas:
+                ranking_salas[sala] = {
+                    "semana_1": 0,
+                    "semana_2": 0,
+                    "semana_3": 0,
+                    "semana_4": 0,
+                    "acumulado": 0
+                }
+
+            ranking_salas[sala]["acumulado"] += 1
+
+            if status == "FINALIZADA":
+                pizza["finalizadas"] += 1
+            elif pendencia == "TUTOR" and status == "ATENDIMENTO":
+                pizza["tutor"] += 1
+            elif pendencia == "GESTAO" and status == "ATENDIMENTO":
+                pizza["gestao"] += 1
+            elif pendencia == "COORDENACAO" and status == "ATENDIMENTO":
+                pizza["coordenacao"] += 1
+            elif pendencia == "RESPONSAVEL" and status == "ATENDIMENTO":
+                pizza["responsavel"] += 1
+
+            try:
+                if data_hora:
+                    dt = datetime.strptime(data_hora, "%Y-%m-%d").date()
+                    for idx, (ini, fim) in enumerate(semanas, start=1):
+                        if ini <= dt <= fim:
+                            ranking_salas[sala][f"semana_{idx}"] += 1
+                            break
+            except Exception:
+                pass
+
+        ranking_lista = sorted(
+            [
+                {
+                    "sala": sala,
+                    "semana_1": vals["semana_1"],
+                    "semana_2": vals["semana_2"],
+                    "semana_3": vals["semana_3"],
+                    "semana_4": vals["semana_4"],
+                    "acumulado": vals["acumulado"]
+                }
+                for sala, vals in ranking_salas.items()
+            ],
+            key=lambda x: (-x["acumulado"], x["sala"])
+        )
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "pizza": pizza,
+                "ranking_salas_semanal": ranking_lista,
+                "semanas_legenda": [
+                    f"{ini.strftime('%d/%m')} a {fim.strftime('%d/%m')}"
+                    for ini, fim in semanas
+                ]
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+
+
+# =========================================================
+# DASHBOARD GERAL
+# =========================================================
+@app.route("/api/dashboard_geral")
+def api_dashboard_geral():
+    try:
+        db = get_supabase()
+
+        ocorr_data = db.table("ocorrencias").select("*").execute().data or []
+        freq_data = db.table("f_frequencia").select("*").execute().data or []
+        atend_data = db.table("atendimentos_tutoria").select("*").execute().data or []
+        alunos_data = db.table("d_alunos").select("*").execute().data or []
+        salas_data = db.table("d_salas").select("*").execute().data or []
+
+        alunos_total = len(alunos_data)
+        hoje = datetime.now().strftime("%Y-%m-%d")
+
+        ocorrencias_dia = len([
+            x for x in ocorr_data
+            if str(x.get("data_hora") or "").startswith(hoje)
+        ])
+        ocorrencias_gerais = len(ocorr_data)
+
+        freq_hoje = [
+            x for x in freq_data
+            if str(x.get("data") or "")[:10] == hoje
+        ]
+
+        presentes_hoje = len([
+            x for x in freq_hoje
+            if (x.get("status") or "").upper() != "F"
+        ])
+
+        frequencia_percentual = round((presentes_hoje / alunos_total) * 100, 2) if alunos_total > 0 else 0
+        atendimento_tutoria = len(atend_data)
+
+        pend_tutor = len([
+            x for x in ocorr_data
+            if (x.get("pendencia") or "").upper() == "TUTOR"
+            and (x.get("status") or "").upper() == "ATENDIMENTO"
+        ])
+        pend_coord = len([
+            x for x in ocorr_data
+            if (x.get("pendencia") or "").upper() == "COORDENACAO"
+            and (x.get("status") or "").upper() == "ATENDIMENTO"
+        ])
+        pend_gestao = len([
+            x for x in ocorr_data
+            if (x.get("pendencia") or "").upper() == "GESTAO"
+            and (x.get("status") or "").upper() == "ATENDIMENTO"
+        ])
+        pend_responsavel = len([
+            x for x in ocorr_data
+            if (x.get("pendencia") or "").upper() == "RESPONSAVEL"
+            and (x.get("status") or "").upper() == "ATENDIMENTO"
+        ])
+
+        nomes_salas = []
+        for s in salas_data:
+            nome = s.get("nome") or s.get("sala") or s.get("sala_nome") or ""
+            nome = str(nome).strip()
+            if nome:
+                nomes_salas.append(nome)
+
+        mapa_ocorr = {nome: 0 for nome in nomes_salas}
+        for x in ocorr_data:
+            sala = str(x.get("sala_nome") or "").strip()
+            if sala:
+                mapa_ocorr[sala] = mapa_ocorr.get(sala, 0) + 1
+
+        ranking_ocorrencias = sorted(
+            [{"sala": sala, "total": total} for sala, total in mapa_ocorr.items()],
+            key=lambda x: (-x["total"], x["sala"])
+        )
+
+        mapa_presenca = {}
+        for sala in nomes_salas:
+            mapa_presenca[sala] = {"presentes": 0, "total": 0, "percentual": 0}
+
+        for x in freq_hoje:
+            sala = str(x.get("sala_nome") or "").strip()
+            if not sala:
+                continue
+            if sala not in mapa_presenca:
+                mapa_presenca[sala] = {"presentes": 0, "total": 0, "percentual": 0}
+
+            mapa_presenca[sala]["total"] += 1
+            if (x.get("status") or "").upper() != "F":
+                mapa_presenca[sala]["presentes"] += 1
+
+        ranking_presenca = []
+        for sala, dados in mapa_presenca.items():
+            total = dados["total"]
+            presentes = dados["presentes"]
+            percentual = round((presentes / total) * 100, 2) if total > 0 else 0
+            ranking_presenca.append({
+                "sala": sala,
+                "presentes": presentes,
+                "total": total,
+                "percentual": percentual
+            })
+
+        ranking_presenca.sort(key=lambda x: (-x["percentual"], x["sala"]))
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "cards": {
+                    "ocorrencias_dia": ocorrencias_dia,
+                    "ocorrencias_gerais": ocorrencias_gerais,
+                    "presentes_hoje": presentes_hoje,
+                    "alunos_cadastrados": alunos_total,
+                    "frequencia_percentual": frequencia_percentual,
+                    "atendimento_tutoria": atendimento_tutoria,
+                    "pend_tutor": pend_tutor,
+                    "pend_coord": pend_coord,
+                    "pend_gestao": pend_gestao,
+                    "pend_responsavel": pend_responsavel
+                },
+                "ranking_ocorrencias": ranking_ocorrencias,
+                "ranking_presenca": ranking_presenca
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+
+# =========================================================
+# RELATÓRIOS DE OCORRÊNCIAS
+# =========================================================
+@app.route("/api/relatorios_ocorrencias")
+def api_relatorios_ocorrencias():
+    try:
+        db = get_supabase()
+
+        inicio = (request.args.get("inicio") or "").strip()
+        fim = (request.args.get("fim") or "").strip()
+        sala = (request.args.get("sala") or "").strip()
+        status = (request.args.get("status") or "").strip().upper()
+        pendencia = (request.args.get("pendencia") or "").strip().upper()
+
+        query = db.table("ocorrencias").select("*").order("numero", desc=True)
+
+        if inicio:
+            query = query.gte("data_hora", f"{inicio}T00:00:00")
+        if fim:
+            query = query.lte("data_hora", f"{fim}T23:59:59")
+        if sala:
+            query = query.eq("sala_nome", sala)
+        if status:
+            query = query.eq("status", status)
+        if pendencia:
+            query = query.eq("pendencia", pendencia)
+
+        resp = query.execute()
+        dados = resp.data or []
+
+        total = len(dados)
+        atendimento = len([x for x in dados if (x.get("status") or "").upper() == "ATENDIMENTO"])
+        finalizadas = len([x for x in dados if (x.get("status") or "").upper() == "FINALIZADA"])
+        assinadas = len([x for x in dados if (x.get("status") or "").upper() == "ASSINADA"])
+
+        tutor = len([x for x in dados if (x.get("pendencia") or "").upper() == "TUTOR"])
+        coordenacao = len([x for x in dados if (x.get("pendencia") or "").upper() == "COORDENACAO"])
+        gestao = len([x for x in dados if (x.get("pendencia") or "").upper() == "GESTAO"])
+        responsavel = len([x for x in dados if (x.get("pendencia") or "").upper() == "RESPONSAVEL"])
+
+        por_sala = {}
+        por_aluno = {}
+        por_dia = {}
+
+        for item in dados:
+            sala_nome = item.get("sala_nome") or "SEM SALA"
+            aluno_nome = item.get("aluno_nome") or "SEM ALUNO"
+            data_hora = str(item.get("data_hora") or "")
+            dia = data_hora[:10] if len(data_hora) >= 10 else "SEM DATA"
+
+            por_sala[sala_nome] = por_sala.get(sala_nome, 0) + 1
+            por_aluno[aluno_nome] = por_aluno.get(aluno_nome, 0) + 1
+            por_dia[dia] = por_dia.get(dia, 0) + 1
+
+        ranking_salas = sorted(
+            [{"nome": k, "total": v} for k, v in por_sala.items()],
+            key=lambda x: x["total"],
+            reverse=True
+        )[:10]
+
+        ranking_alunos = sorted(
+            [{"nome": k, "total": v} for k, v in por_aluno.items()],
+            key=lambda x: x["total"],
+            reverse=True
+        )[:10]
+
+        dias_ordenados = sorted([k for k in por_dia.keys() if k != "SEM DATA"])
+        serie_diaria = [por_dia[d] for d in dias_ordenados]
+
+        salas_resp = db.table("d_salas").select("*").order("nome").execute()
+        salas = []
+        for s in (salas_resp.data or []):
+            nome = normalize_sala_nome(s)
+            if nome:
+                salas.append(nome)
+
+        ultimas = []
+        for x in dados[:20]:
+            ultimas.append({
+                "numero": x.get("numero"),
+                "data_hora": x.get("data_hora"),
+                "aluno_nome": x.get("aluno_nome"),
+                "sala_nome": x.get("sala_nome"),
+                "professor_nome": x.get("professor_nome"),
+                "status": x.get("status"),
+                "pendencia": x.get("pendencia"),
+            })
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "cards": {
+                    "total": total,
+                    "atendimento": atendimento,
+                    "finalizadas": finalizadas,
+                    "assinadas": assinadas,
+                    "tutor": tutor,
+                    "coordenacao": coordenacao,
+                    "gestao": gestao,
+                    "responsavel": responsavel
+                },
+                "filtros": {
+                    "salas": salas
+                },
+                "graficos": {
+                    "status": {
+                        "labels": ["ATENDIMENTO", "FINALIZADA", "ASSINADA"],
+                        "data": [atendimento, finalizadas, assinadas]
+                    },
+                    "pendencias": {
+                        "labels": ["TUTOR", "COORDENAÇÃO", "GESTÃO", "RESPONSÁVEL"],
+                        "data": [tutor, coordenacao, gestao, responsavel]
+                    },
+                    "diario": {
+                        "labels": dias_ordenados,
+                        "data": serie_diaria
+                    }
+                },
+                "ranking_salas": ranking_salas,
+                "ranking_alunos": ranking_alunos,
+                "ultimas": ultimas
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+# =========================================================
+# FREQUÊNCIA
+# =========================================================
+@app.route("/api/frequencia/listar")
+def api_frequencia_listar():
+    try:
+        db = get_supabase()
+        sala_id = request.args.get("sala_id")
+        data_ref = request.args.get("data")
+        query = db.table("f_frequencia").select("*")
+        if sala_id:
+            query = query.eq("sala_id", sala_id)
+        if data_ref:
+            query = query.eq("data", data_ref)
+        resp = query.execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/frequencia/salvar", methods=["POST"])
+def api_frequencia_salvar():
+    try:
+        db = get_supabase()
+        registros = request.get_json() or []
+        resp = db.table("f_frequencia").upsert(registros, on_conflict="aluno_id,data").execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/frequencia/relatorio")
+def api_frequencia_relatorio():
+    try:
+        db = get_supabase()
+        sala_id = request.args.get("sala_id")
+        resp = db.table("f_frequencia").select("*").eq("sala_id", sala_id).execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/frequencia_premium")
+def api_frequencia_premium():
+    try:
+        db = get_supabase()
+        sala_id = request.args.get("sala_id")
+        data_ref = request.args.get("data")
+
+        salas_resp = db.table("d_salas").select("*").order("nome").execute()
+        salas = []
+        for s in (salas_resp.data or []):
+            salas.append({
+                "id": s.get("id"),
+                "nome": normalize_sala_nome(s)
+            })
+
+        query = db.table("f_frequencia").select("*")
+        if sala_id:
+            query = query.eq("sala_id", sala_id)
+        if data_ref:
+            query = query.eq("data", data_ref)
+
+        resp = query.execute()
+        dados = resp.data or []
+
+        resumo = {
+            "P": len([x for x in dados if (x.get("status") or "").upper() == "P"]),
+            "F": len([x for x in dados if (x.get("status") or "").upper() == "F"]),
+            "PA": len([x for x in dados if (x.get("status") or "").upper() == "PA"]),
+            "PS": len([x for x in dados if (x.get("status") or "").upper() == "PS"]),
+            "PSA": len([x for x in dados if (x.get("status") or "").upper() == "PSA"])
+        }
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "salas": salas,
+                "resumo": resumo,
+                "registros": dados
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+@app.route("/gestao_relatorio_frequencia")
+def gestao_relatorio_frequencia():
+    return render_template("gestao_relatorio_frequencia.html")
+
+@app.route("/api/dashboard_frequencia_mensal")
+def api_dashboard_frequencia_mensal():
+    try:
+        db = get_supabase()
+        mes = (request.args.get("mes") or datetime.now().strftime("%Y-%m")).strip()
+        inicio = datetime.strptime(mes + "-01", "%Y-%m-%d").date()
+        if inicio.month == 12:
+            fim = date(inicio.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            fim = date(inicio.year, inicio.month + 1, 1) - timedelta(days=1)
+
+        dados = db.table("f_frequencia").select("*").gte("data", str(inicio)).lte("data", str(fim)).execute().data or []
+
+        def cstatus(items, key):
+            return len([x for x in items if (x.get("status") or "").upper() == key])
+
+        cards = {
+            "p_total": cstatus(dados, "P"),
+            "f_total": cstatus(dados, "F"),
+            "pa_total": cstatus(dados, "PA"),
+            "ps_total": cstatus(dados, "PS"),
+            "psa_total": cstatus(dados, "PSA"),
+        }
+
+        por_dia_total = {}
+        por_dia_presentes = {}
+        dia = inicio
+        while dia <= fim:
+            key = dia.strftime("%Y-%m-%d")
+            por_dia_total[key] = 0
+            por_dia_presentes[key] = 0
+            dia += timedelta(days=1)
+
+        for item in dados:
+            d = str(item.get("data") or "")[:10]
+            if d in por_dia_total:
+                por_dia_total[d] += 1
+                if (item.get("status") or "").upper() != "F":
+                    por_dia_presentes[d] += 1
+
+        labels = []
+        percentuais = []
+        for d in sorted(por_dia_total.keys()):
+            labels.append(datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m"))
+            total = por_dia_total[d]
+            presentes = por_dia_presentes[d]
+            percentual = round((presentes / total) * 100, 2) if total > 0 else 0
+            percentuais.append(percentual)
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "cards": cards,
+                "grafico_presenca": {
+                    "labels": labels,
+                    "data": percentuais
+                }
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/relatorio_frequencia")
+def api_relatorio_frequencia():
+    try:
+        db = get_supabase()
+        sala_id = request.args.get("sala_id")
+        mes = (request.args.get("mes") or datetime.now().strftime("%Y-%m")).strip()
+        if not sala_id:
+            return json_error("Sala não informada.", 400)
+
+        inicio = datetime.strptime(mes + "-01", "%Y-%m-%d").date()
+        if inicio.month == 12:
+            fim = date(inicio.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            fim = date(inicio.year, inicio.month + 1, 1) - timedelta(days=1)
+
+        alunos = db.table("d_alunos").select("*").eq("sala_id", sala_id).order("nome").execute().data or []
+        frequencias = db.table("f_frequencia").select("*").eq("sala_id", sala_id).gte("data", str(inicio)).lte("data", str(fim)).execute().data or []
+
+        dias = []
+        d = inicio
+        while d <= fim:
+            dias.append(d.strftime("%d"))
+            d += timedelta(days=1)
+
+        mapa = {}
+        for f in frequencias:
+            aluno_id = f.get("aluno_id")
+            data_ref = str(f.get("data") or "")[:10]
+            dia_ref = data_ref[-2:] if len(data_ref) >= 10 else ""
+            mapa[(aluno_id, dia_ref)] = f.get("status") or ""
+
+        linhas = []
+        for a in alunos:
+            nome = a.get("nome") or a.get("aluno_nome") or ""
+            registros = []
+            for dia_num in dias:
+                registros.append(mapa.get((a.get("id"), dia_num), ""))
+            linhas.append({"nome": nome, "registros": registros})
+
+        sala_resp = db.table("d_salas").select("*").eq("id", sala_id).limit(1).execute().data or []
+        sala_nome = ""
+        if sala_resp:
+            sala_nome = sala_resp[0].get("nome") or sala_resp[0].get("sala") or sala_resp[0].get("sala_nome") or ""
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "sala_nome": sala_nome,
+                "mes": mes,
+                "dias": dias,
+                "alunos": linhas
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/relatorio_frequencia_pdf", methods=["POST"])
+def api_relatorio_frequencia_pdf():
+    try:
+        data = request.get_json() or {}
+        sala_id = data.get("sala_id")
+        mes = data.get("mes")
+        if not sala_id or not mes:
+            return json_error("Sala e mês são obrigatórios.", 400)
+        return jsonify({
+            "success": True,
+            "pdf_url": f"/relatorio_frequencia_pdf?sala_id={sala_id}&mes={mes}"
+        })
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/relatorio_frequencia_pdf")
+def relatorio_frequencia_pdf():
+    try:
+        db = get_supabase()
+        sala_id = request.args.get("sala_id")
+        mes = (request.args.get("mes") or datetime.now().strftime("%Y-%m")).strip()
+        if not sala_id:
+            return "Sala não informada.", 400
+
+        inicio = datetime.strptime(mes + "-01", "%Y-%m-%d").date()
+        if inicio.month == 12:
+            fim = date(inicio.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            fim = date(inicio.year, inicio.month + 1, 1) - timedelta(days=1)
+
+        alunos = db.table("d_alunos").select("*").eq("sala_id", sala_id).order("nome").execute().data or []
+        frequencias = db.table("f_frequencia").select("*").eq("sala_id", sala_id).gte("data", str(inicio)).lte("data", str(fim)).execute().data or []
+        sala_resp = db.table("d_salas").select("*").eq("id", sala_id).limit(1).execute().data or []
+
+        sala_nome = ""
+        if sala_resp:
+            sala_nome = sala_resp[0].get("nome") or sala_resp[0].get("sala") or sala_resp[0].get("sala_nome") or ""
+
+        dias = []
+        d = inicio
+        while d <= fim:
+            dias.append(d.strftime("%d"))
+            d += timedelta(days=1)
+
+        mapa = {}
+        for f in frequencias:
+            aluno_id = f.get("aluno_id")
+            data_ref = str(f.get("data") or "")[:10]
+            dia_ref = data_ref[-2:] if len(data_ref) >= 10 else ""
+            mapa[(aluno_id, dia_ref)] = f.get("status") or ""
+
+        linhas = []
+        for a in alunos:
+            nome = a.get("nome") or a.get("aluno_nome") or ""
+            registros = []
+            for dia_num in dias:
+                registros.append(mapa.get((a.get("id"), dia_num), ""))
+            linhas.append({"nome": nome, "registros": registros})
+
+        return render_template(
+            "relatorio_frequencia_pdf.html",
+            sala_nome=sala_nome,
+            mes=mes,
+            dias=dias,
+            alunos=linhas
+        )
+    except Exception as e:
+        return f"Erro ao gerar PDF: {e}", 500
+
+
+
+# =========================================================
+# DASHBOARD FREQUÊNCIA
+# =========================================================
+@app.route("/api/dashboard_frequencia")
+def api_dashboard_frequencia():
+    try:
+        db = get_supabase()
+        dados = db.table("f_frequencia").select("*").execute().data or []
+
+        def cstatus(items, key):
+            return len([x for x in items if normalizar_texto(x.get("status")) == key])
+
+        hoje = datetime.now().strftime("%Y-%m-%d")
+        hoje_registros = [x for x in dados if str(x.get("data") or "")[:10] == hoje]
+
+        cards = {
+            "p_total": cstatus(dados, "P"),
+            "f_total": cstatus(dados, "F"),
+            "pa_total": cstatus(dados, "PA"),
+            "ps_total": cstatus(dados, "PS"),
+            "psa_total": cstatus(dados, "PSA"),
+            "p_hoje": cstatus(hoje_registros, "P"),
+            "f_hoje": cstatus(hoje_registros, "F"),
+            "pa_hoje": cstatus(hoje_registros, "PA"),
+            "ps_hoje": cstatus(hoje_registros, "PS"),
+            "psa_hoje": cstatus(hoje_registros, "PSA"),
+        }
+        return jsonify({"success": True, "data": {"cards": cards}})
+    except Exception as e:
+        return json_error(e)
+
+
+# =========================================================
+# TUTORIA
+# =========================================================
+@app.route("/api/tutores")
+def api_tutores():
+    try:
+        db = get_supabase()
+        resp = (
+            db.table("d_funcionarios")
+            .select("id,nome,funcao,email,is_tutor")
+            .or_("funcao.ilike.%TUTOR%,is_tutor.eq.true")
+            .order("nome")
+            .execute()
+        )
+        dados = resp.data or []
+        if usuario_tem_acesso_total():
+            return jsonify(dados)
+        nome = usuario_logado_nome()
+        return jsonify([x for x in dados if normalizar_texto(x.get("nome")) == nome])
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/alunos_tutoria")
+def api_alunos_tutoria():
+    try:
+        db = get_supabase()
+        tutor_id = request.args.get("tutor_id")
+        query = db.table("d_alunos").select("*").order("nome")
+        if tutor_id:
+            query = query.eq("tutor_id", tutor_id)
+        resp = query.execute()
+        dados = resp.data or []
+        for item in dados:
+            item["nome"] = normalize_aluno_nome(item)
+        return jsonify(dados)
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/dashboard_tutoria")
+def api_dashboard_tutoria():
+    try:
+        db = get_supabase()
+
+        tutores_resp = (
+            db.table("d_funcionarios")
+            .select("id,nome,funcao,is_tutor")
+            .or_("funcao.ilike.%TUTOR%,is_tutor.eq.true")
+            .execute()
+        )
+
+        alunos_resp = db.table("d_alunos").select("id,tutor_id,tutor_nome").execute()
+        agend_resp = db.table("agendamentos_tutoria").select("id,status", count="exact").execute()
+        atend_resp = db.table("atendimentos_tutoria").select("id", count="exact").execute()
+
+        tutores = tutores_resp.data or []
+        alunos = alunos_resp.data or []
+        agendamentos = agend_resp.data or []
+
+        alunos_com_tutor = len([
+            a for a in alunos
+            if a.get("tutor_id") or (a.get("tutor_nome") or "").strip()
+        ])
+
+        agendados = len([
+            x for x in agendamentos
+            if (x.get("status") or "").upper() == "AGENDADO"
+        ])
+
+        concluidos = len([
+            x for x in agendamentos
+            if (x.get("status") or "").upper() == "CONCLUIDO"
+        ])
+
+        return jsonify({
+            "total_tutores": len(tutores),
+            "total_alunos": len(alunos),
+            "alunos_com_tutor": alunos_com_tutor,
+            "total_agendamentos": agend_resp.count or 0,
+            "agendados": agendados,
+            "concluidos": concluidos,
+            "total_atendimentos": atend_resp.count or 0
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/agendamentos_tutoria")
+def api_agendamentos_tutoria():
+    try:
+        db = get_supabase()
+        tutor_id = request.args.get("tutor_id")
+        aluno_id = request.args.get("aluno_id")
+        query = db.table("agendamentos_tutoria").select("*").order("data_agendamento").order("hora_agendamento")
+        if tutor_id:
+            query = query.eq("tutor_id", tutor_id)
+        if aluno_id:
+            query = query.eq("aluno_id", aluno_id)
+        resp = query.execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/agendar_tutoria", methods=["POST"])
+def api_agendar_tutoria():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        payload = {
+            "tutor_id": data.get("tutor_id"),
+            "tutor_nome": data.get("tutor_nome"),
+            "aluno_id": data.get("aluno_id"),
+            "aluno_nome": data.get("aluno_nome"),
+            "sala_nome": data.get("sala_nome"),
+            "tema": data.get("tema"),
+            "observacao": data.get("observacao"),
+            "status": data.get("status") or "AGENDADO",
+            "data_agendamento": data.get("data"),
+            "hora_agendamento": data.get("hora"),
+            "created_at": now_iso()
+        }
+        if not payload["tutor_id"] or not payload["aluno_id"] or not payload["data_agendamento"] or not payload["hora_agendamento"]:
+            return json_error("Preencha tutor, aluno, data e hora.", 400)
+        resp = db.table("agendamentos_tutoria").insert(payload).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/atendimentos_tutoria")
+def api_atendimentos_tutoria():
+    try:
+        db = get_supabase()
+        tutor_id = request.args.get("tutor_id")
+        aluno_id = request.args.get("aluno_id")
+        query = db.table("atendimentos_tutoria").select("*").order("data_registro", desc=True)
+        if tutor_id:
+            query = query.eq("tutor_id", tutor_id)
+        if aluno_id:
+            query = query.eq("aluno_id", aluno_id)
+        resp = query.execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salvar_atendimento_tutoria", methods=["POST"])
+def api_salvar_atendimento_tutoria():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        payload = {
+            "tutor_id": data.get("tutor_id"),
+            "tutor_nome": data.get("tutor_nome"),
+            "aluno_id": data.get("aluno_id"),
+            "aluno_nome": data.get("aluno_nome"),
+            "sala_nome": data.get("sala_nome"),
+            "tipo_atendimento": data.get("tipo_atendimento"),
+            "encaminhamento": data.get("encaminhamento"),
+            "registro": data.get("registro"),
+            "proximos_passos": data.get("proximos_passos"),
+            "data_registro": now_iso()
+        }
+        if not payload["tutor_id"] or not payload["aluno_id"] or not payload["registro"]:
+            return json_error("Preencha tutor, aluno e registro.", 400)
+        resp = db.table("atendimentos_tutoria").insert(payload).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+@app.route("/api/alunos_do_tutor/<int:tutor_id>")
+def api_alunos_do_tutor(tutor_id):
+    try:
+        db = get_supabase()
+
+        tutor_resp = (
+            db.table("d_funcionarios")
+            .select("id,nome")
+            .eq("id", tutor_id)
+            .limit(1)
+            .execute()
+        )
+
+        if not tutor_resp.data:
+            return json_error("Tutor não encontrado.", 404)
+
+        tutor = tutor_resp.data[0]
+        tutor_nome = (tutor.get("nome") or "").strip()
+
+        # usuário comum só pode ver os próprios alunos
+        if not usuario_tem_acesso_total() and normalizar_texto(tutor_nome) != usuario_logado_nome():
+            return jsonify([])
+
+        # busca por tutor_id
+        resp_id = (
+            db.table("d_alunos")
+            .select("*")
+            .eq("tutor_id", tutor_id)
+            .order("nome")
+            .execute()
+        )
+        dados_id = resp_id.data or []
+
+        # busca por tutor_nome
+        resp_nome = (
+            db.table("d_alunos")
+            .select("*")
+            .eq("tutor_nome", tutor_nome)
+            .order("nome")
+            .execute()
+        )
+        dados_nome = resp_nome.data or []
+
+        # junta sem duplicar
+        mapa = {}
+        for item in dados_id + dados_nome:
+            aluno_id = item.get("id")
+            if aluno_id is not None:
+                mapa[aluno_id] = item
+
+        dados = list(mapa.values())
+
+        for item in dados:
+            item["nome"] = item.get("nome") or item.get("aluno_nome") or ""
+
+        dados.sort(key=lambda x: (x.get("nome") or "").upper())
+        return jsonify(dados)
+
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/ficha_tutoria/<int:aluno_id>")
+def api_ficha_tutoria(aluno_id):
+    try:
+        db = get_supabase()
+        aluno_resp = db.table("d_alunos").select("*").eq("id", aluno_id).limit(1).execute()
+        if not aluno_resp.data:
+            return json_error("Aluno não encontrado", 404)
+        aluno = aluno_resp.data[0]
+        ocorr_resp = db.table("ocorrencias").select("numero,data_hora,descricao,status,pendencia").eq("aluno_id", aluno_id).order("numero", desc=True).limit(50).execute()
+        atend_resp = db.table("atendimentos_tutoria").select("*").eq("aluno_id", aluno_id).order("data_registro", desc=True).limit(50).execute()
+        agend_resp = db.table("agendamentos_tutoria").select("*").eq("aluno_id", aluno_id).order("data_agendamento", desc=True).limit(50).execute()
+        freq_resp = db.table("f_frequencia").select("*").eq("aluno_id", aluno_id).order("data", desc=True).limit(100).execute()
+        notas_resp = db.table("notas_aluno").select("*").eq("aluno_id", aluno_id).execute()
+        return jsonify({
+            "aluno": aluno,
+            "ocorrencias": ocorr_resp.data or [],
+            "atendimentos": atend_resp.data or [],
+            "agendamentos": agend_resp.data or [],
+            "frequencia": freq_resp.data or [],
+            "notas": notas_resp.data or []
+        })
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/evolucao_aluno/<int:aluno_id>")
+def api_evolucao_aluno(aluno_id):
+    try:
+        db = get_supabase()
+        freq_resp = db.table("f_frequencia").select("*").eq("aluno_id", aluno_id).order("data", desc=False).execute()
+        ocorr_resp = db.table("ocorrencias").select("numero,data_hora,descricao,status").eq("aluno_id", aluno_id).order("data_hora", desc=False).execute()
+        freq = freq_resp.data or []
+        ocorr = ocorr_resp.data or []
+        resumo = {
+            "presencas": len([x for x in freq if x.get("status") == "P"]),
+            "faltas": len([x for x in freq if x.get("status") == "F"]),
+            "atrasos": len([x for x in freq if x.get("status") in ["PA", "PSA"]]),
+            "saidas": len([x for x in freq if x.get("status") in ["PS", "PSA"]]),
+            "ocorrencias": len(ocorr)
+        }
+        return jsonify({"resumo": resumo, "frequencia": freq, "ocorrencias": ocorr})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/tutoria_premium")
+def api_tutoria_premium():
+    try:
+        db = get_supabase()
+        tutor_id = request.args.get("tutor_id")
+        aluno_id = request.args.get("aluno_id")
+
+        tutores_resp = db.table("d_funcionarios").select("id,nome,funcao,email,is_tutor").or_("funcao.ilike.%TUTOR%,is_tutor.eq.true").order("nome").execute()
+
+        alunos_query = db.table("d_alunos").select("*").order("nome")
+        if tutor_id:
+            alunos_query = alunos_query.eq("tutor_id", tutor_id)
+        alunos_resp = alunos_query.execute()
+
+        ag_query = db.table("agendamentos_tutoria").select("*").order("data_agendamento", desc=True)
+        at_query = db.table("atendimentos_tutoria").select("*").order("data_registro", desc=True)
+
+        if tutor_id:
+            ag_query = ag_query.eq("tutor_id", tutor_id)
+            at_query = at_query.eq("tutor_id", tutor_id)
+        if aluno_id:
+            ag_query = ag_query.eq("aluno_id", aluno_id)
+            at_query = at_query.eq("aluno_id", aluno_id)
+
+        ag_resp = ag_query.execute()
+        at_resp = at_query.execute()
+        ag_data = ag_resp.data or []
+        at_data = at_resp.data or []
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "tutores": tutores_resp.data or [],
+                "alunos": alunos_resp.data or [],
+                "cards": {
+                    "tutores": len(tutores_resp.data or []),
+                    "alunos": len(alunos_resp.data or []),
+                    "agendamentos": len(ag_data),
+                    "atendimentos": len(at_data),
+                    "agendados": len([x for x in ag_data if (x.get("status") or "").upper() == "AGENDADO"]),
+                    "concluidos": len([x for x in ag_data if (x.get("status") or "").upper() == "CONCLUIDO"])
+                },
+                "agendamentos": ag_data[:20],
+                "atendimentos": at_data[:20]
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/clubes_juvenis")
+def api_clubes_juvenis():
+    try:
+        db = get_supabase()
+        semestre = request.args.get("semestre")
+        query = db.table("d_clubes_juvenis").select("*").eq("ativo", True).order("nome")
+        if semestre:
+            query = query.eq("semestre", int(semestre))
+        return jsonify(query.execute().data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/eletivas")
+def api_eletivas():
+    try:
+        db = get_supabase()
+        semestre = request.args.get("semestre")
+        query = db.table("d_eletivas").select("*").eq("ativo", True).order("nome")
+        if semestre:
+            query = query.eq("semestre", int(semestre))
+        return jsonify(query.execute().data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/aluno_detalhe/<int:aluno_id>")
+def api_aluno_detalhe(aluno_id):
+    try:
+        db = get_supabase()
+        resp = db.table("d_alunos").select("*").eq("id", aluno_id).limit(1).execute()
+        if not resp.data:
+            return json_error("Aluno não encontrado.", 404)
+        return jsonify(resp.data[0])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salvar_tutoria_ficha", methods=["POST"])
+def api_salvar_tutoria_ficha():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        aluno_id = data.get("aluno_id")
+        if not aluno_id:
+            return json_error("Aluno não informado.", 400)
+        update = {
+            "clube_1_semestre": data.get("clube_1_semestre"),
+            "clube_2_semestre": data.get("clube_2_semestre"),
+            "eletiva_1_semestre": data.get("eletiva_1_semestre"),
+            "eletiva_2_semestre": data.get("eletiva_2_semestre"),
+        }
+        db.table("d_alunos").update(update).eq("id", aluno_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/disciplinas_por_sala")
+def api_disciplinas_por_sala():
+    try:
+        db = get_supabase()
+        sala = request.args.get("sala")
+        serie = sala_para_serie(sala)
+        resp = db.table("d_disciplinas").select("*").eq("serie", serie).order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salas_do_professor/<int:professor_id>")
+def api_salas_do_professor(professor_id):
+    try:
+        db = get_supabase()
+        resp = db.table("d_professor_disciplina").select("sala_nome").eq("professor_id", professor_id).execute()
+        salas = sorted({(x.get("sala_nome") or "").strip() for x in (resp.data or []) if (x.get("sala_nome") or "").strip()})
+        return jsonify([{"nome": s} for s in salas])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/disciplinas_do_professor")
+def api_disciplinas_do_professor():
+    try:
+        db = get_supabase()
+        professor_id = request.args.get("professor_id")
+        sala_nome = request.args.get("sala_nome")
+        query = db.table("d_professor_disciplina").select("disciplina")
+        if professor_id:
+            query = query.eq("professor_id", professor_id)
+        if sala_nome:
+            query = query.eq("sala_nome", sala_nome)
+        resp = query.execute()
+        disciplinas = sorted({(x.get("disciplina") or "").strip() for x in (resp.data or []) if (x.get("disciplina") or "").strip()})
+        return jsonify([{"nome": d} for d in disciplinas])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/notas_turma")
+def api_notas_turma():
+    try:
+        db = get_supabase()
+        sala = request.args.get("sala")
+        disciplina = request.args.get("disciplina")
+        alunos = db.table("d_alunos").select("*").eq("sala_nome", sala).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("sala_nome", sala).eq("disciplina", disciplina).execute().data or []
+        mapa = {n.get("aluno_id"): n for n in notas}
+        resultado = []
+        for a in alunos:
+            n = mapa.get(a.get("id"), {})
+            resultado.append({
+                "aluno_id": a.get("id"),
+                "aluno_nome": a.get("nome") or a.get("aluno_nome") or "",
+                "sala_nome": a.get("sala_nome"),
+                "disciplina": disciplina,
+                "nota_1b": n.get("nota_1b"),
+                "nota_2b": n.get("nota_2b"),
+                "nota_3b": n.get("nota_3b"),
+                "nota_4b": n.get("nota_4b")
+            })
+        return jsonify(resultado)
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/salvar_notas", methods=["POST"])
+def api_salvar_notas():
+    try:
+        db = get_supabase()
+        dados = request.get_json() or []
+        for item in dados:
+            existente = db.table("f_notas").select("id").eq("aluno_id", item.get("aluno_id")).eq("disciplina", item.get("disciplina")).limit(1).execute()
+            payload = {
+                "aluno_id": item.get("aluno_id"),
+                "aluno_nome": item.get("aluno_nome"),
+                "sala_nome": item.get("sala_nome"),
+                "disciplina": item.get("disciplina"),
+                "nota_1b": item.get("nota_1b"),
+                "nota_2b": item.get("nota_2b"),
+                "nota_3b": item.get("nota_3b"),
+                "nota_4b": item.get("nota_4b"),
+                "updated_at": now_iso()
+            }
+            if existente.data:
+                db.table("f_notas").update(payload).eq("id", existente.data[0]["id"]).execute()
+            else:
+                payload["created_at"] = now_iso()
+                db.table("f_notas").insert(payload).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/boletim/<int:aluno_id>")
+def api_boletim(aluno_id):
+    try:
+        db = get_supabase()
+        aluno_resp = db.table("d_alunos").select("id,nome,aluno_nome,sala_nome").eq("id", aluno_id).limit(1).execute()
+        if not aluno_resp.data:
+            return json_error("Aluno não encontrado.", 404)
+        aluno = aluno_resp.data[0]
+        serie = sala_para_serie(aluno.get("sala_nome"))
+        disciplinas = db.table("d_disciplinas").select("*").eq("serie", serie).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("aluno_id", aluno_id).execute().data or []
+        mapa = {n.get("disciplina"): n for n in notas}
+        result = []
+        for d in disciplinas:
+            nome = d.get("nome")
+            nota_reg = mapa.get(nome, {})
+            vals = [nota_reg.get("nota_1b"), nota_reg.get("nota_2b"), nota_reg.get("nota_3b"), nota_reg.get("nota_4b")]
+            nums = [float(x) for x in vals if x not in (None, "", "null")]
+            media = round(sum(nums)/len(nums), 2) if nums else None
+            status = "-"
+            if media is not None:
+                status = "APROVADO" if media >= 5 else "REPROVADO"
+            result.append({
+                "disciplina": nome,
+                "nota_1b": nota_reg.get("nota_1b"),
+                "nota_2b": nota_reg.get("nota_2b"),
+                "nota_3b": nota_reg.get("nota_3b"),
+                "nota_4b": nota_reg.get("nota_4b"),
+                "media": media,
+                "status": status
+            })
+        return jsonify(result)
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/relatorio_aluno_pdf")
+def relatorio_aluno_pdf():
+    try:
+        db = get_supabase()
+        aluno_id = request.args.get("aluno_id")
+        if not aluno_id:
+            return "Aluno não informado.", 400
+
+        aluno_resp = db.table("d_alunos").select("*").eq("id", aluno_id).limit(1).execute()
+        if not aluno_resp.data:
+            return "Aluno não encontrado.", 404
+
+        aluno = aluno_resp.data[0]
+        aluno_nome = aluno.get("nome") or aluno.get("aluno_nome") or ""
+        sala_nome = aluno.get("sala_nome") or ""
+        tutor_nome = aluno.get("tutor_nome") or ""
+        projeto_vida = aluno.get("projeto_de_vida") or aluno.get("projeto_vida") or aluno.get("eletiva_1_semestre") or ""
+
+        ocorrencias = db.table("ocorrencias").select("*").eq("aluno_id", aluno_id).order("numero", desc=True).execute().data or []
+        if not ocorrencias and aluno_nome:
+            todas_oc = db.table("ocorrencias").select("*").execute().data or []
+            ocorrencias = [x for x in todas_oc if (x.get("aluno_nome") or "").strip() == aluno_nome.strip()]
+
+        atendimentos = db.table("atendimentos_tutoria").select("*").eq("aluno_id", aluno_id).order("data_registro", desc=True).execute().data or []
+        frequencia = db.table("f_frequencia").select("*").eq("aluno_id", aluno_id).order("data", desc=True).execute().data or []
+        if not frequencia and aluno_nome:
+            todas_freq = db.table("f_frequencia").select("*").execute().data or []
+            frequencia = [x for x in todas_freq if (x.get("aluno_nome") or "").strip() == aluno_nome.strip()]
+
+        faltas = len([x for x in frequencia if (x.get("status") or "").upper() == "F"])
+        atrasos = len([x for x in frequencia if (x.get("status") or "").upper() == "PA"])
+        saidas = len([x for x in frequencia if (x.get("status") or "").upper() in ["PS", "PSA"]])
+        total_freq = len(frequencia)
+        presencas = total_freq - faltas
+        frequencia_percentual = round((presencas / total_freq) * 100, 2) if total_freq > 0 else 0
+
+        boletim_resp = db.table("f_notas").select("*").eq("aluno_id", aluno_id).execute().data or []
+        boletim = []
+        for n in boletim_resp:
+            vals = [n.get("nota_1b"), n.get("nota_2b"), n.get("nota_3b"), n.get("nota_4b")]
+            nums = [float(v) for v in vals if v not in (None, "", "null")]
+            media = round(sum(nums) / len(nums), 2) if nums else None
+            status = "-"
+            if media is not None:
+                status = "APROVADO" if media >= 5 else "REPROVADO"
+            boletim.append({
+                "disciplina": n.get("disciplina"),
+                "nota_1b": n.get("nota_1b"),
+                "nota_2b": n.get("nota_2b"),
+                "nota_3b": n.get("nota_3b"),
+                "nota_4b": n.get("nota_4b"),
+                "media": media,
+                "status": status
+            })
+
+        boletim.sort(key=lambda x: (x.get("disciplina") or "").upper())
+
+        return render_template(
+            "relatorio_aluno_profissional.html",
+            aluno_nome=aluno_nome,
+            sala_nome=sala_nome,
+            tutor_nome=tutor_nome,
+            projeto_vida=projeto_vida,
+            data_emissao=datetime.now().strftime("%d/%m/%Y"),
+            frequencia_percentual=frequencia_percentual,
+            faltas=faltas,
+            atrasos=atrasos,
+            saidas=saidas,
+            ocorrencias=ocorrencias,
+            atendimentos=atendimentos,
+            boletim=boletim
+        )
+    except Exception as e:
+        return f"Erro ao gerar relatório: {e}", 500
+
+@app.route("/gestao_relatorios_profissional")
+def gestao_relatorios_profissional():
+    return render_template("gestao_relatorios_profissional.html")
+
+
+@app.route("/api/relatorios_geral")
+def api_relatorios_geral():
+    try:
+        db = get_supabase()
+
+        ocorr = db.table("ocorrencias").select("*").execute().data or []
+        freq = db.table("f_frequencia").select("*").execute().data or []
+        atend = db.table("atendimentos_tutoria").select("*").execute().data or []
+
+        total_oc = len(ocorr)
+        total_freq = len(freq)
+        faltas = len([x for x in freq if x.get("status") == "F"])
+        presencas = total_freq - faltas
+        perc = round((presencas/total_freq)*100,2) if total_freq else 0
+
+        por_sala = {}
+        freq_sala = {}
+
+        for o in ocorr:
+            s = o.get("sala_nome") or "SEM"
+            por_sala[s] = por_sala.get(s,0)+1
+
+        for f in freq:
+            s = f.get("sala_nome") or "SEM"
+            freq_sala.setdefault(s,{"p":0,"t":0})
+            freq_sala[s]["t"] +=1
+            if f.get("status")!="F":
+                freq_sala[s]["p"] +=1
+
+        ranking=[]
+        for s in por_sala:
+            p = freq_sala.get(s,{"p":0,"t":1})
+            pr = round((p["p"]/p["t"])*100,2) if p["t"] else 0
+            ranking.append({"sala":s,"ocorrencias":por_sala[s],"frequencia":pr})
+
+        ranking = sorted(ranking,key=lambda x:-x["ocorrencias"])
+
+        return jsonify({
+            "ocorrencias": total_oc,
+            "frequencia": perc,
+            "atendimentos": len(atend),
+            "ocorrencias_por_sala":{
+                "labels":[x["sala"] for x in ranking],
+                "data":[x["ocorrencias"] for x in ranking]
+            },
+            "frequencia_dias":{
+                "labels":["Geral"],
+                "data":[perc]
+            },
+            "ranking": ranking
+        })
+    except Exception as e:
+        return json_error(e)
+# =========================================================
+# START
+# =========================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
+
+
