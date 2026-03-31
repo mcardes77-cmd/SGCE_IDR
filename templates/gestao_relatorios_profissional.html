@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatórios Gerais</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-slate-900 text-white p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+
+<h1 class="text-3xl font-bold text-emerald-400">RELATÓRIOS GERAIS</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="bg-slate-800 p-4 rounded">Ocorrências: <span id="oc">0</span></div>
+<div class="bg-slate-800 p-4 rounded">Frequência %: <span id="fr">0</span></div>
+<div class="bg-slate-800 p-4 rounded">Atendimentos: <span id="at">0</span></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+<div class="bg-slate-800 p-4 rounded">
+<canvas id="graficoOcorrencias"></canvas>
+</div>
+
+<div class="bg-slate-800 p-4 rounded">
+<canvas id="graficoFrequencia"></canvas>
+</div>
+
+</div>
+
+<div class="bg-slate-800 p-4 rounded">
+<h2 class="text-lg mb-2">Ranking de Salas</h2>
+<table class="w-full text-sm">
+<thead>
+<tr>
+<th>Sala</th>
+<th>Ocorrências</th>
+<th>Frequência %</th>
+</tr>
+</thead>
+<tbody id="tbRanking"></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+async function carregar(){
+const r = await fetch('/api/relatorios_geral');
+const j = await r.json();
+
+document.getElementById('oc').textContent = j.ocorrencias;
+document.getElementById('fr').textContent = j.frequencia + '%';
+document.getElementById('at').textContent = j.atendimentos;
+
+new Chart(document.getElementById('graficoOcorrencias'),{
+type:'bar',
+data:{
+labels:j.ocorrencias_por_sala.labels,
+datasets:[{data:j.ocorrencias_por_sala.data}]
+}
+});
+
+new Chart(document.getElementById('graficoFrequencia'),{
+type:'line',
+data:{
+labels:j.frequencia_dias.labels,
+datasets:[{data:j.frequencia_dias.data}]
+}
+});
+
+document.getElementById('tbRanking').innerHTML =
+j.ranking.map(x=>`
+<tr>
+<td>${x.sala}</td>
+<td>${x.ocorrencias}</td>
+<td>${x.frequencia}%</td>
+</tr>
+`).join('');
+}
+
+carregar();
+</script>
+
+</body>
+</html>

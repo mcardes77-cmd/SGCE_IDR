@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alterar senha</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-8">
+    <h1 class="text-2xl font-bold text-emerald-400 text-center">Primeiro acesso</h1>
+    <p class="text-slate-400 text-center mt-2">Defina sua nova senha para continuar.</p>
+
+    <div class="mt-6 space-y-4">
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Nova senha</label>
+        <input id="senha" type="password" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none" placeholder="mínimo 6 caracteres">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Confirmar senha</label>
+        <input id="confirmar" type="password" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none" placeholder="repita a senha">
+      </div>
+      <button onclick="salvar()" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-semibold">Salvar senha</button>
+      <div id="erro" class="hidden rounded-xl bg-red-950/40 border border-red-500/30 px-4 py-3 text-sm text-red-300"></div>
+    </div>
+  </div>
+
+<script>
+async function salvar() {
+  const erro = document.getElementById('erro');
+  erro.classList.add('hidden');
+  erro.textContent = '';
+
+  const response = await fetch('/api/alterar_senha', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      senha: document.getElementById('senha').value,
+      confirmar_senha: document.getElementById('confirmar').value
+    })
+  });
+
+  const json = await response.json();
+  if (!response.ok || !json.success) {
+    erro.textContent = json.error || 'Falha ao alterar a senha.';
+    erro.classList.remove('hidden');
+    return;
+  }
+
+  window.location.href = json.redirect || '/dashboard_ocorrencias';
+}
+</script>
+</body>
+</html>

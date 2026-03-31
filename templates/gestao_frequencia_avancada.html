@@ -1,1 +1,124 @@
-<html><body class='bg-slate-900 text-white p-6'><h1>Frequência Avançada</h1></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Frequência</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+  <div class="max-w-7xl mx-auto space-y-5">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-emerald-400">GESTÃO DE FREQUÊNCIA</h1>
+        <p class="text-slate-400">Lançamento diário de presença, falta, atraso e saída antecipada.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="/dashboard_frequencia" class="bg-violet-700 hover:bg-violet-600 px-3 py-2 rounded-lg font-semibold">Dashboard Frequência</a>
+        <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+      </div>
+    </header>
+
+    <section class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Sala</label><select id="sala_id" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"><option value="">Selecione...</option></select></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Data</label><input id="data_ref" type="date" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"></div>
+        <div class="md:col-span-2 flex items-end gap-2">
+          <button onclick="carregarAlunos()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar alunos</button>
+          <button onclick="salvarFrequencia()" class="flex-1 bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg font-semibold">Salvar frequência</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <div class="text-sm text-slate-400 mb-3">P = Presença | F = Falta | PA = Presença com atraso | PS = Presença com saída antecipada | PAS = Presença com atraso e saída</div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-700 text-slate-300"><th class="text-left py-2 px-2">Aluno</th><th class="text-left py-2 px-2">Sala</th><th class="text-left py-2 px-2">Status</th><th class="text-left py-2 px-2">Entrada</th><th class="text-left py-2 px-2">Saída</th><th class="text-left py-2 px-2">Motivo atraso</th><th class="text-left py-2 px-2">Motivo saída</th></tr></thead>
+          <tbody id="tbodyAlunos"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+<script>
+let salas = [];
+let alunos = [];
+let registrosExistentes = [];
+let estadoPorAluno = {};
+const ordemStatus = ['P', 'F', 'PA', 'PS', 'PAS'];
+function hojeISO(){const a=new Date();return `${a.getFullYear()}-${String(a.getMonth()+1).padStart(2,'0')}-${String(a.getDate()).padStart(2,'0')}`;}
+function horaAgora(){const a=new Date();return `${String(a.getHours()).padStart(2,'0')}:${String(a.getMinutes()).padStart(2,'0')}`;}
+function corStatus(status){switch(status){case 'P':return 'bg-emerald-600 hover:bg-emerald-500';case 'F':return 'bg-red-600 hover:bg-red-500';case 'PA':return 'bg-amber-500 hover:bg-amber-400 text-slate-900';case 'PS':return 'bg-blue-600 hover:bg-blue-500';case 'PAS':return 'bg-fuchsia-600 hover:bg-fuchsia-500';default:return 'bg-slate-700 hover:bg-slate-600';}}
+async function carregarSalas(){const r=await fetch('/api/salas');salas=await r.json();const select=document.getElementById('sala_id');select.innerHTML='<option value="">Selecione...</option>'; (salas||[]).forEach(s=>{select.innerHTML += `<option value="${s.id}">${s.nome||s.sala||''}</option>`;});}
+async function carregarRegistrosExistentes(salaId,dataRef){const r=await fetch(`/api/frequencia/listar?sala_id=${salaId}&data=${dataRef}`);registrosExistentes=await r.json();}
+async function carregarAlunos(){
+  const salaId=document.getElementById('sala_id').value;
+  const dataRef=document.getElementById('data_ref').value;
+  if(!salaId){alert('Selecione a sala.');return;}
+  await carregarRegistrosExistentes(salaId,dataRef);
+  const r=await fetch(`/api/alunos_por_sala/${salaId}`);
+  alunos=await r.json();
+  estadoPorAluno={};
+  (alunos||[]).forEach(a=>{
+    const existente=registrosExistentes.find(x=>String(x.aluno_id)===String(a.id));
+    const statusBackend=(existente?.status||'P').toUpperCase();
+    const statusTela=statusBackend==='PSA'?'PAS':statusBackend;
+    estadoPorAluno[a.id]={
+      aluno_id:a.id,
+      aluno_nome:a.nome||a.aluno_nome||'',
+      sala_id:salaId,
+      sala_nome:a.sala_nome||(salas.find(s=>String(s.id)===String(salaId))?.nome||''),
+      data:dataRef,
+      status:statusTela,
+      hora_entrada:existente?.hora_entrada||((statusTela==='PA'||statusTela==='PAS')?horaAgora():''),
+      hora_saida:existente?.hora_saida||((statusTela==='PS'||statusTela==='PAS')?horaAgora():''),
+      motivo_atraso:existente?.motivo_atraso||'',
+      motivo_saida:existente?.motivo_saida||''
+    };
+  });
+  renderTabela();
+}
+function proximoStatus(statusAtual){const idx=ordemStatus.indexOf(statusAtual);return idx===-1?'P':ordemStatus[(idx+1)%ordemStatus.length];}
+function alternarStatus(alunoId){
+  const registro=estadoPorAluno[alunoId];
+  registro.status=proximoStatus(registro.status);
+  if(registro.status==='PA'){registro.hora_entrada=registro.hora_entrada||horaAgora();registro.hora_saida='';}
+  else if(registro.status==='PS'){registro.hora_saida=registro.hora_saida||horaAgora();registro.hora_entrada='';}
+  else if(registro.status==='PAS'){registro.hora_entrada=registro.hora_entrada||horaAgora();registro.hora_saida=registro.hora_saida||horaAgora();}
+  else if(registro.status==='P'||registro.status==='F'){registro.hora_entrada='';registro.hora_saida='';registro.motivo_atraso='';registro.motivo_saida='';}
+  renderTabela();
+}
+function atualizarCampo(alunoId,campo,valor){estadoPorAluno[alunoId][campo]=valor;}
+function renderTabela(){
+  const body=document.getElementById('tbodyAlunos');
+  if(!(alunos||[]).length){body.innerHTML='<tr><td colspan="7" class="py-4 px-2 text-slate-400">Nenhum aluno encontrado para esta sala.</td></tr>';return;}
+  body.innerHTML=alunos.map(a=>{
+    const r=estadoPorAluno[a.id];
+    return `<tr class="border-b border-slate-800 align-top">
+      <td class="py-2 px-2">${r.aluno_nome}</td>
+      <td class="py-2 px-2">${r.sala_nome}</td>
+      <td class="py-2 px-2"><button onclick="alternarStatus(${a.id})" class="${corStatus(r.status)} px-3 py-2 rounded-lg font-bold min-w-[70px]">${r.status}</button></td>
+      <td class="py-2 px-2"><input type="time" value="${r.hora_entrada||''}" ${!(r.status==='PA'||r.status==='PAS')?'disabled':''} onchange="atualizarCampo(${a.id}, 'hora_entrada', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1"></td>
+      <td class="py-2 px-2"><input type="time" value="${r.hora_saida||''}" ${!(r.status==='PS'||r.status==='PAS')?'disabled':''} onchange="atualizarCampo(${a.id}, 'hora_saida', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1"></td>
+      <td class="py-2 px-2"><input type="text" value="${r.motivo_atraso||''}" ${!(r.status==='PA'||r.status==='PAS')?'disabled':''} onchange="atualizarCampo(${a.id}, 'motivo_atraso', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" placeholder="Motivo do atraso"></td>
+      <td class="py-2 px-2"><input type="text" value="${r.motivo_saida||''}" ${!(r.status==='PS'||r.status==='PAS')?'disabled':''} onchange="atualizarCampo(${a.id}, 'motivo_saida', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1" placeholder="Motivo da saída"></td>
+    </tr>`;
+  }).join('');
+}
+async function salvarFrequencia(){
+  const registros=Object.values(estadoPorAluno).map(r=>({
+    aluno_id:r.aluno_id, aluno_nome:r.aluno_nome, sala_id:r.sala_id, sala_nome:r.sala_nome, data:r.data,
+    status:r.status==='PAS'?'PSA':r.status, hora_entrada:r.hora_entrada||null, hora_saida:r.hora_saida||null,
+    motivo_atraso:r.motivo_atraso||'', motivo_saida:r.motivo_saida||''
+  }));
+  const r=await fetch('/api/frequencia/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(registros)});
+  const j=await r.json();
+  if(!r.ok||!j.success){alert(j.error||'Erro ao salvar frequência.');return;}
+  alert('Frequência salva com sucesso.');
+  await carregarAlunos();
+}
+document.getElementById('data_ref').value=hojeISO();
+carregarSalas();
+</script>
+</body>
+</html>

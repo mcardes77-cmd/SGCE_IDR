@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório do Aluno</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+    h1,h2,h3 { margin: 0 0 6px 0; }
+    .cabecalho { text-align: center; margin-bottom: 12px; }
+    .sub { font-size: 12px; color: #333; }
+    .box { border: 1px solid #333; border-radius: 6px; padding: 8px; margin-bottom: 10px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #333; padding: 4px; text-align: left; vertical-align: top; }
+    th { background: #f0f0f0; }
+    .small { font-size: 10px; }
+    .assinaturas { margin-top: 28px; display: flex; justify-content: space-between; gap: 20px; }
+    .linha { border-top: 1px solid #333; padding-top: 4px; text-align: center; width: 30%; }
+  </style>
+</head>
+<body>
+  <div class="cabecalho">
+    <h1>SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR</h1>
+    <div class="sub">Relatório Profissional do Aluno</div>
+  </div>
+
+  <div class="box">
+    <div class="grid5">
+      <div><strong>Aluno:</strong><br>{{ aluno_nome }}</div>
+      <div><strong>Sala:</strong><br>{{ sala_nome }}</div>
+      <div><strong>Tutor:</strong><br>{{ tutor_nome }}</div>
+      <div><strong>Projeto de Vida:</strong><br>{{ projeto_vida }}</div>
+      <div><strong>Data de emissão:</strong><br>{{ data_emissao }}</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>Resumo de Frequência</h2>
+    <div class="grid4">
+      <div><strong>Frequência Geral:</strong><br>{{ frequencia_percentual }}%</div>
+      <div><strong>Faltas:</strong><br>{{ faltas }}</div>
+      <div><strong>Atrasos:</strong><br>{{ atrasos }}</div>
+      <div><strong>Saídas/Atraso+Saída:</strong><br>{{ saidas }}</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>Ocorrências</h2>
+    <table class="small">
+      <thead>
+        <tr><th>Nº</th><th>Data</th><th>Status</th><th>Pendência</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        {% for x in ocorrencias %}
+        <tr>
+          <td>{{ x.numero or '' }}</td>
+          <td>{{ (x.data_hora or '')[:16].replace('T',' ') }}</td>
+          <td>{{ x.status or '' }}</td>
+          <td>{{ x.pendencia or '' }}</td>
+          <td>{{ x.descricao or '' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not ocorrencias %}
+        <tr><td colspan="5">Sem ocorrências.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>Atendimentos de Tutoria</h2>
+    <table class="small">
+      <thead>
+        <tr><th>Data</th><th>Tipo</th><th>Registro</th><th>Próximos passos</th></tr>
+      </thead>
+      <tbody>
+        {% for x in atendimentos %}
+        <tr>
+          <td>{{ (x.data_registro or '')[:16].replace('T',' ') }}</td>
+          <td>{{ x.tipo_atendimento or '' }}</td>
+          <td>{{ x.registro or '' }}</td>
+          <td>{{ x.proximos_passos or '' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not atendimentos %}
+        <tr><td colspan="4">Sem atendimentos.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>Boletim</h2>
+    <table class="small">
+      <thead>
+        <tr><th>Disciplina</th><th>1B</th><th>2B</th><th>3B</th><th>4B</th><th>Média</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for x in boletim %}
+        <tr>
+          <td>{{ x.disciplina or '' }}</td>
+          <td>{{ x.nota_1b or '' }}</td>
+          <td>{{ x.nota_2b or '' }}</td>
+          <td>{{ x.nota_3b or '' }}</td>
+          <td>{{ x.nota_4b or '' }}</td>
+          <td>{{ x.media or '' }}</td>
+          <td>{{ x.status or '' }}</td>
+        </tr>
+        {% endfor %}
+        {% if not boletim %}
+        <tr><td colspan="7">Sem notas lançadas.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="assinaturas">
+    <div class="linha">Tutor(a)</div>
+    <div class="linha">Coordenação</div>
+    <div class="linha">Responsável</div>
+  </div>
+</body>
+</html>

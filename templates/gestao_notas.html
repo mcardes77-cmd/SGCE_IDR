@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Gestão de Notas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-900 text-white p-6">
+<div class="max-w-6xl mx-auto space-y-6">
+
+<h1 class="text-2xl font-bold text-indigo-400">GESTÃO DE NOTAS</h1>
+
+<div class="grid md:grid-cols-3 gap-3">
+<select id="sala" class="bg-slate-800 p-2 rounded"></select>
+<select id="disciplina" class="bg-slate-800 p-2 rounded"></select>
+<button onclick="carregar()" class="bg-emerald-600 p-2 rounded">Carregar</button>
+</div>
+
+<table class="w-full mt-4">
+<thead>
+<tr>
+<th>Aluno</th>
+<th>1º</th>
+<th>2º</th>
+<th>3º</th>
+<th>4º</th>
+</tr>
+</thead>
+<tbody id="tb"></tbody>
+</table>
+
+<button onclick="salvar()" class="mt-4 bg-blue-600 p-2 rounded">Salvar</button>
+
+</div>
+
+<script>
+let alunos = [];
+
+async function carregarSalas(){
+let r = await fetch('/api/salas');
+let d = await r.json();
+
+document.getElementById('sala').innerHTML =
+'<option value="">Sala</option>' +
+d.map(x=>`<option value="${x.nome}">${x.nome}</option>`).join('');
+}
+
+async function carregarDisciplinas(){
+let r = await fetch('/api/disciplinas_todas');
+let d = await r.json();
+
+document.getElementById('disciplina').innerHTML =
+'<option value="">Disciplina</option>' +
+d.map(x=>`<option value="${x.nome}">${x.nome}</option>`).join('');
+}
+
+async function carregar(){
+let sala = document.getElementById('sala').value;
+let disc = document.getElementById('disciplina').value;
+
+let r = await fetch(`/api/notas_turma?sala=${sala}&disciplina=${disc}`);
+alunos = await r.json();
+
+document.getElementById('tb').innerHTML = alunos.map((a,i)=>`
+<tr>
+<td>${a.aluno_nome}</td>
+<td><input id="n1_${i}" value="${a.nota_1b||''}"></td>
+<td><input id="n2_${i}" value="${a.nota_2b||''}"></td>
+<td><input id="n3_${i}" value="${a.nota_3b||''}"></td>
+<td><input id="n4_${i}" value="${a.nota_4b||''}"></td>
+</tr>
+`).join('');
+}
+
+async function salvar(){
+let disc = document.getElementById('disciplina').value;
+
+let payload = alunos.map((a,i)=>({
+aluno_id:a.aluno_id,
+aluno_nome:a.aluno_nome,
+sala_nome:a.sala_nome,
+disciplina:disc,
+nota_1b:document.getElementById(`n1_${i}`).value,
+nota_2b:document.getElementById(`n2_${i}`).value,
+nota_3b:document.getElementById(`n3_${i}`).value,
+nota_4b:document.getElementById(`n4_${i}`).value
+}));
+
+await fetch('/api/salvar_notas',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify(payload)
+});
+
+alert('Salvo!');
+}
+
+carregarSalas();
+carregarDisciplinas();
+</script>
+</body>
+</html>

@@ -1,1 +1,311 @@
-<html><body class='bg-slate-900 text-white p-6'><h1>Ficha Integrada do Aluno</h1></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ficha Tutoria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-5">
+  <header class="flex justify-between items-center">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">FICHA COMPLETA DO ALUNO</h1>
+      <p class="text-slate-400">Tutoria, ocorrências, atendimentos, agendamentos, frequência geral e boletim</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/gestao_tutoria" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded">Voltar</a>
+      <a id="btnRelatorioAluno" target="_blank" class="bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded">Gerar Relatório Profissional</a>
+    </div>
+  </header>
+
+  <section class="bg-slate-800 rounded-xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+      <select id="tutor_id" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Selecione...</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Aluno</label>
+      <select id="aluno_id" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" disabled>
+        <option value="">Selecione primeiro o tutor...</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button onclick="carregarFicha()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded">Carregar ficha</button>
+    </div>
+    <div class="flex items-end">
+      <button onclick="salvarFicha()" class="w-full bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded">Salvar ficha</button>
+    </div>
+  </section>
+
+  <section id="painel" class="hidden space-y-4">
+    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <div id="dadosAluno" class="grid md:grid-cols-2 xl:grid-cols-5 gap-2 text-sm"></div>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <h2 class="font-bold text-emerald-400 mb-3">Tutoria</h2>
+      <div class="grid md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Clube Juvenil 1º Semestre</label>
+          <select id="clube1" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Clube Juvenil 2º Semestre</label>
+          <select id="clube2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Eletiva 1º Semestre</label>
+          <select id="eletiva1" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Eletiva 2º Semestre</label>
+          <select id="eletiva2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-xs text-slate-400 mt-3">Os clubes e eletivas são carregados pelas APIs por semestre.</p>
+    </div>
+
+    <div class="grid xl:grid-cols-2 gap-4">
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+        <h2 class="font-bold text-emerald-400 mb-3">Ocorrências</h2>
+        <div id="listaOcorrencias" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+        <h2 class="font-bold text-emerald-400 mb-3">Atendimentos</h2>
+        <div id="listaAtendimentos" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 xl:col-span-2">
+        <h2 class="font-bold text-emerald-400 mb-3">Agendamentos</h2>
+        <div id="listaAgendamentos" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <h2 class="font-bold text-emerald-400 mb-3">Boletim</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="text-left py-2">Disciplina</th>
+              <th class="text-left py-2">1B</th>
+              <th class="text-left py-2">2B</th>
+              <th class="text-left py-2">3B</th>
+              <th class="text-left py-2">4B</th>
+              <th class="text-left py-2">Média</th>
+              <th class="text-left py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbBoletim"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+let tutores = [];
+let alunos = [];
+let frequenciaPercentualAtual = 0;
+
+function safe(v) { return v == null ? '' : String(v); }
+function normalizar(v) { return String(v || '').trim(); }
+function caixa(html) { return `<div class="bg-slate-900 rounded p-3 border border-slate-700">${html}</div>`; }
+
+function calcularFrequenciaPercentual(lista) {
+  const dados = Array.isArray(lista) ? lista : [];
+  const total = dados.length;
+  if (!total) return 0;
+  const faltas = dados.filter(x => String(x.status || '').toUpperCase() === 'F').length;
+  const presencas = total - faltas;
+  return ((presencas / total) * 100).toFixed(2);
+}
+
+async function carregarTutores() {
+  const r = await fetch('/api/tutores');
+  const dados = await r.json();
+  tutores = Array.isArray(dados) ? dados : [];
+  const s = document.getElementById('tutor_id');
+  s.innerHTML = '<option value="">Selecione...</option>' + tutores.map(t => `<option value="${t.id}">${safe(t.nome)}</option>`).join('');
+  if (tutores.length === 1) {
+    s.value = tutores[0].id;
+    s.disabled = true;
+    await carregarAlunosDoTutor();
+  }
+}
+
+async function carregarAlunosDoTutor() {
+  const tutorId = document.getElementById('tutor_id').value;
+  const selectAluno = document.getElementById('aluno_id');
+  if (!tutorId) {
+    selectAluno.innerHTML = '<option value="">Selecione primeiro o tutor...</option>';
+    selectAluno.disabled = true;
+    return;
+  }
+  const r = await fetch(`/api/alunos_do_tutor/${tutorId}`);
+  const dados = await r.json();
+  alunos = Array.isArray(dados) ? dados : [];
+  selectAluno.disabled = false;
+  selectAluno.innerHTML = '<option value="">Selecione o aluno...</option>';
+  alunos.forEach(a => { selectAluno.innerHTML += `<option value="${a.id}">${safe(a.nome || a.aluno_nome)}</option>`; });
+}
+
+async function carregarOpcoes() {
+  try {
+    const [c1r, c2r, e1r, e2r] = await Promise.all([
+      fetch('/api/clubes_juvenis?semestre=1'),
+      fetch('/api/clubes_juvenis?semestre=2'),
+      fetch('/api/eletivas?semestre=1'),
+      fetch('/api/eletivas?semestre=2')
+    ]);
+
+    const c1 = await c1r.json();
+    const c2 = await c2r.json();
+    const e1 = await e1r.json();
+    const e2 = await e2r.json();
+
+    document.getElementById('clube1').innerHTML = '<option value="">Selecione...</option>' + (Array.isArray(c1) ? c1.map(x => `<option value="${safe(x.nome)}">${safe(x.nome)}</option>`).join('') : '');
+    document.getElementById('clube2').innerHTML = '<option value="">Selecione...</option>' + (Array.isArray(c2) ? c2.map(x => `<option value="${safe(x.nome)}">${safe(x.nome)}</option>`).join('') : '');
+    document.getElementById('eletiva1').innerHTML = '<option value="">Selecione...</option>' + (Array.isArray(e1) ? e1.map(x => `<option value="${safe(x.nome)}">${safe(x.nome)}</option>`).join('') : '');
+    document.getElementById('eletiva2').innerHTML = '<option value="">Selecione...</option>' + (Array.isArray(e2) ? e2.map(x => `<option value="${safe(x.nome)}">${safe(x.nome)}</option>`).join('') : '');
+  } catch (e) {
+    console.error('Erro ao carregar clubes/eletivas', e);
+  }
+}
+
+async function carregarOcorrenciasFallback(alunoId, aluno) {
+  try {
+    const r = await fetch('/api/ocorrencias_todas');
+    const todas = await r.json();
+    if (!Array.isArray(todas)) return [];
+    const alunoIdStr = String(alunoId);
+    const nomeAluno = normalizar(aluno?.nome || aluno?.aluno_nome);
+    return todas.filter(x => {
+      const xId = x.aluno_id != null ? String(x.aluno_id) : '';
+      const xNome = normalizar(x.aluno_nome);
+      return xId === alunoIdStr || (nomeAluno && xNome === nomeAluno);
+    });
+  } catch (e) { return []; }
+}
+
+async function carregarFrequenciaDireta(alunoId, aluno) {
+  try {
+    const todas = await (await fetch('/api/frequencia/listar')).json();
+    if (!Array.isArray(todas)) return [];
+    const alunoIdStr = String(alunoId);
+    const nomeAluno = normalizar(aluno?.nome || aluno?.aluno_nome);
+    return todas.filter(x => {
+      const xId = x.aluno_id != null ? String(x.aluno_id) : '';
+      const xNome = normalizar(x.aluno_nome);
+      return xId === alunoIdStr || (nomeAluno && xNome === nomeAluno);
+    });
+  } catch (e) { return []; }
+}
+
+async function carregarFicha() {
+  const alunoId = document.getElementById('aluno_id').value;
+  if (!alunoId) return alert('Selecione um aluno.');
+
+  const fichaResp = await fetch(`/api/ficha_tutoria/${alunoId}`);
+  const ficha = await fichaResp.json();
+
+  if (!fichaResp.ok || (ficha && ficha.success === false)) {
+    return alert((ficha && ficha.error) || 'Erro ao carregar ficha');
+  }
+
+  const aluno = ficha.aluno || {};
+  document.getElementById('painel').classList.remove('hidden');
+
+  let frequenciaLista = Array.isArray(ficha.frequencia) ? ficha.frequencia : [];
+  if (!frequenciaLista.length) frequenciaLista = await carregarFrequenciaDireta(alunoId, aluno);
+
+  frequenciaPercentualAtual = ficha.frequencia_percentual != null
+    ? ficha.frequencia_percentual
+    : calcularFrequenciaPercentual(frequenciaLista);
+
+  document.getElementById('dadosAluno').innerHTML = `
+    <div><strong>Aluno:</strong> ${safe(aluno.nome || aluno.aluno_nome)}</div>
+    <div><strong>Sala:</strong> ${safe(aluno.sala_nome)}</div>
+    <div><strong>Tutor:</strong> ${safe(aluno.tutor_nome)}</div>
+    <div><strong>Projeto de Vida:</strong> ${safe(aluno.projeto_de_vida || aluno.projeto_vida || aluno.eletiva_1_semestre)}</div>
+    <div><strong>Frequência Geral:</strong> ${safe(frequenciaPercentualAtual)}%</div>
+  `;
+
+  document.getElementById('clube1').value = aluno.clube_1_semestre || '';
+  document.getElementById('clube2').value = aluno.clube_2_semestre || '';
+  document.getElementById('eletiva1').value = aluno.eletiva_1_semestre || '';
+  document.getElementById('eletiva2').value = aluno.eletiva_2_semestre || '';
+
+  let ocorrencias = Array.isArray(ficha.ocorrencias) ? ficha.ocorrencias : [];
+  if (!ocorrencias.length) ocorrencias = await carregarOcorrenciasFallback(alunoId, aluno);
+
+  const atendimentos = Array.isArray(ficha.atendimentos) ? ficha.atendimentos : [];
+  const agendamentos = Array.isArray(ficha.agendamentos) ? ficha.agendamentos : [];
+
+  document.getElementById('listaOcorrencias').innerHTML =
+    ocorrencias.map(x => caixa(`<div><strong>Nº:</strong> ${safe(x.numero)}</div><div><strong>Data:</strong> ${safe((x.data_hora || '').replace('T',' ').slice(0,16))}</div><div><strong>Status:</strong> ${safe(x.status)}</div><div><strong>Pendência:</strong> ${safe(x.pendencia)}</div><div><strong>Descrição:</strong> ${safe(x.descricao)}</div>`)).join('') || '<div class="text-slate-400">Sem ocorrências.</div>';
+
+  document.getElementById('listaAtendimentos').innerHTML =
+    atendimentos.map(x => caixa(`<div><strong>Data:</strong> ${safe((x.data_registro || '').replace('T',' ').slice(0,16))}</div><div><strong>Tipo:</strong> ${safe(x.tipo_atendimento)}</div><div><strong>Registro:</strong> ${safe(x.registro)}</div><div><strong>Próximos passos:</strong> ${safe(x.proximos_passos)}</div>`)).join('') || '<div class="text-slate-400">Sem atendimentos.</div>';
+
+  document.getElementById('listaAgendamentos').innerHTML =
+    agendamentos.map(x => caixa(`<div><strong>Data:</strong> ${safe(x.data_agendamento)} ${safe(x.hora_agendamento)}</div><div><strong>Tema:</strong> ${safe(x.tema)}</div><div><strong>Status:</strong> ${safe(x.status)}</div><div><strong>Observação:</strong> ${safe(x.observacao)}</div>`)).join('') || '<div class="text-slate-400">Sem agendamentos.</div>';
+
+  await carregarBoletim(alunoId);
+  document.getElementById('btnRelatorioAluno').href = `/relatorio_aluno_pdf?aluno_id=${alunoId}`;
+}
+
+async function carregarBoletim(alunoId) {
+  const r = await fetch(`/api/boletim/${alunoId}`);
+  const boletim = await r.json();
+  const linhas = Array.isArray(boletim) ? boletim : [];
+  document.getElementById('tbBoletim').innerHTML = linhas.map(x => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${safe(x.disciplina)}</td>
+      <td class="py-2">${safe(x.nota_1b)}</td>
+      <td class="py-2">${safe(x.nota_2b)}</td>
+      <td class="py-2">${safe(x.nota_3b)}</td>
+      <td class="py-2">${safe(x.nota_4b)}</td>
+      <td class="py-2">${safe(x.media)}</td>
+      <td class="py-2">${safe(x.status)}</td>
+    </tr>
+  `).join('');
+}
+
+async function salvarFicha() {
+  const payload = {
+    aluno_id: document.getElementById('aluno_id').value,
+    clube_1_semestre: document.getElementById('clube1').value,
+    clube_2_semestre: document.getElementById('clube2').value,
+    eletiva_1_semestre: document.getElementById('eletiva1').value,
+    eletiva_2_semestre: document.getElementById('eletiva2').value
+  };
+
+  const r = await fetch('/api/salvar_tutoria_ficha', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert((j && j.error) || 'Erro');
+  alert('Ficha salva');
+}
+
+document.getElementById('tutor_id').addEventListener('change', carregarAlunosDoTutor);
+carregarTutores();
+carregarOpcoes();
+</script>
+</body>
+</html>

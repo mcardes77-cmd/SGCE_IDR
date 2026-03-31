@@ -1,1 +1,178 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Geral</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 text-white min-h-screen p-6"><div class="max-w-7xl mx-auto"><header class="mb-8"><h1 class="text-3xl font-bold text-emerald-400">Dashboard Geral SGCE</h1><p class="text-slate-400">Tela inicial com visão geral do sistema.</p></header><section class="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4 mb-8"><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Ocorrências</div><div id="kpi-ocorr" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Frequências</div><div id="kpi-freq" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Presenças</div><div id="kpi-pres" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Faltas</div><div id="kpi-falt" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Tutoria</div><div id="kpi-tut" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Alunos</div><div id="kpi-alu" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Salas</div><div id="kpi-sal" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5"><div class="text-slate-400 text-sm">Funcionários</div><div id="kpi-fun" class="text-3xl font-bold mt-2">0</div></div></section><section class="grid grid-cols-1 md:grid-cols-4 gap-4"><a href="/gestao_ocorrencia" class="rounded-2xl p-6 shadow bg-red-600 hover:bg-red-700 transition">📘 Ocorrências</a><a href="/gestao_frequencia_avancada" class="rounded-2xl p-6 shadow bg-blue-600 hover:bg-blue-700 transition">📊 Frequência</a><a href="/gestao_tutoria" class="rounded-2xl p-6 shadow bg-emerald-600 hover:bg-emerald-700 transition">🧠 Tutoria</a><a href="/gestao_cadastro" class="rounded-2xl p-6 shadow bg-amber-500 hover:bg-amber-600 transition text-black">🗂️ Cadastro</a></section></div><script>document.addEventListener('DOMContentLoaded', async ()=>{const r=await fetch('/api/dashboard_geral');const d=await r.json();document.getElementById('kpi-ocorr').textContent=d.ocorrencias||0;document.getElementById('kpi-freq').textContent=d.frequencias||0;document.getElementById('kpi-pres').textContent=d.presencas||0;document.getElementById('kpi-falt').textContent=d.faltas||0;document.getElementById('kpi-tut').textContent=d.atendimentos_tutoria||0;document.getElementById('kpi-alu').textContent=d.alunos||0;document.getElementById('kpi-sal').textContent=d.salas||0;document.getElementById('kpi-fun').textContent=d.funcionarios||0;});</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Geral</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">DASHBOARD GERAL</h1>
+      <p class="text-slate-400">Painel executivo do SGCE</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/logout" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Sair</a>
+    </div>
+  </header>
+
+  <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-slate-400 text-xs">Ocorrência do dia / Geral</div>
+      <div class="mt-2 text-2xl font-bold text-emerald-400">
+        <span id="cOcorrenciasDia">0</span> / <span id="cOcorrenciasGerais">0</span>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-slate-400 text-xs">Presentes do dia / Total de alunos</div>
+      <div class="mt-2 text-2xl font-bold text-blue-400">
+        <span id="cPresentesHoje">0</span> / <span id="cAlunosCadastrados">0</span>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-slate-400 text-xs">Frequência geral em %</div>
+      <div id="cFrequenciaGeralPercentual" class="mt-2 text-2xl font-bold text-cyan-400">0%</div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-slate-400 text-xs">Atendimento Tutoria</div>
+      <div id="cAtendimentoTutoria" class="mt-2 text-2xl font-bold text-violet-400">0</div>
+    </div>
+
+    <a href="/gestao_ocorrencia?pendencia=TUTOR&status=ATENDIMENTO" class="bg-blue-500/20 border border-blue-500 rounded-2xl p-5 hover:bg-blue-500/30">
+      <div class="text-slate-300 text-xs">Pendências Tutor</div>
+      <div id="cPendTutor" class="mt-2 text-2xl font-bold text-blue-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=COORDENACAO&status=ATENDIMENTO" class="bg-orange-500/20 border border-orange-500 rounded-2xl p-5 hover:bg-orange-500/30">
+      <div class="text-slate-300 text-xs">Pendências Coordenação</div>
+      <div id="cPendCoord" class="mt-2 text-2xl font-bold text-orange-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=GESTAO&status=ATENDIMENTO" class="bg-red-500/20 border border-red-500 rounded-2xl p-5 hover:bg-red-500/30">
+      <div class="text-slate-300 text-xs">Pendências Gestão</div>
+      <div id="cPendGestao" class="mt-2 text-2xl font-bold text-red-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=RESPONSAVEL&status=ATENDIMENTO" class="bg-yellow-500/20 border border-yellow-500 rounded-2xl p-5 hover:bg-yellow-500/30">
+      <div class="text-slate-300 text-xs">Pendências Responsável</div>
+      <div id="cPendResponsavel" class="mt-2 text-2xl font-bold text-yellow-300">0</div>
+    </a>
+  </section>
+
+  <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+    <a href="/dashboard_ocorrencias" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-red-400">Ocorrência</div>
+      <div class="text-xs text-slate-400 mt-2">Gestão completa</div>
+    </a>
+
+    <a href="/dashboard_frequencia" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-amber-400">Frequência</div>
+      <div class="text-xs text-slate-400 mt-2">Chamada e registros</div>
+    </a>
+
+    <a href="/gestao_tutoria" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-violet-400">Tutoria</div>
+      <div class="text-xs text-slate-400 mt-2">Ficha e atendimento</div>
+    </a>
+
+    <a href="/gestao_cadastro" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-cyan-400">Cadastro</div>
+      <div class="text-xs text-slate-400 mt-2">Dados do sistema</div>
+    </a>
+
+    <a href="/gestao_relatorios_profissional" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-emerald-400">Relatório</div>
+      <div class="text-xs text-slate-400 mt-2">Visão geral</div>
+    </a>
+
+    <a href="/gestao_notas" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
+      <div class="text-lg font-bold text-indigo-400">Notas</div>
+      <div class="text-xs text-slate-400 mt-2">Lançamento e boletim</div>
+    </a>
+  </section>
+
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <h2 class="text-lg font-bold text-emerald-400 mb-4">Ranking de Ocorrências por Sala</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="text-left py-2">Sala</th>
+              <th class="text-left py-2">Ocorrências</th>
+            </tr>
+          </thead>
+          <tbody id="tbRankingOcorrencias"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <h2 class="text-lg font-bold text-emerald-400 mb-4">Ranking de Presença por Sala</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="text-left py-2">Sala</th>
+              <th class="text-left py-2">Presentes</th>
+              <th class="text-left py-2">Total</th>
+              <th class="text-left py-2">%</th>
+            </tr>
+          </thead>
+          <tbody id="tbRankingPresenca"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+async function carregarDashboard(){
+  const r = await fetch('/api/dashboard_geral');
+  const j = await r.json();
+
+  if(!r.ok || !j.success){
+    alert(j.error || 'Erro');
+    return;
+  }
+
+  const c = j.data?.cards || {};
+  document.getElementById('cOcorrenciasDia').textContent = c.ocorrencias_dia ?? 0;
+  document.getElementById('cOcorrenciasGerais').textContent = c.ocorrencias_gerais ?? 0;
+  document.getElementById('cPresentesHoje').textContent = c.presentes_hoje ?? 0;
+  document.getElementById('cAlunosCadastrados').textContent = c.alunos_cadastrados ?? 0;
+  document.getElementById('cFrequenciaGeralPercentual').textContent = `${c.frequencia_percentual ?? 0}%`;
+  document.getElementById('cAtendimentoTutoria').textContent = c.atendimento_tutoria ?? 0;
+  document.getElementById('cPendTutor').textContent = c.pend_tutor ?? 0;
+  document.getElementById('cPendCoord').textContent = c.pend_coord ?? 0;
+  document.getElementById('cPendGestao').textContent = c.pend_gestao ?? 0;
+  document.getElementById('cPendResponsavel').textContent = c.pend_responsavel ?? 0;
+
+  const rankingOc = j.data?.ranking_ocorrencias || [];
+  const rankingPr = j.data?.ranking_presenca || [];
+
+  document.getElementById('tbRankingOcorrencias').innerHTML = rankingOc.map(x => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${x.sala}</td>
+      <td class="py-2">${x.total}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('tbRankingPresenca').innerHTML = rankingPr.map(x => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${x.sala}</td>
+      <td class="py-2">${x.presentes}</td>
+      <td class="py-2">${x.total}</td>
+      <td class="py-2">${x.percentual}%</td>
+    </tr>
+  `).join('');
+}
+carregarDashboard();
+</script>
+</body>
+</html>

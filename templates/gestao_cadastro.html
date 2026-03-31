@@ -1,1 +1,122 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Gestão de Cadastro</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 text-white min-h-screen p-6"><div class="max-w-7xl mx-auto"><header class="mb-8 flex justify-between items-center"><div><h1 class="text-3xl font-bold text-emerald-400">Gestão de Cadastro</h1><p class="text-slate-400">Consulta de alunos, salas e funcionários.</p></div><button onclick="window.location.href='/dashboard_geral'" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Voltar</button></header><section class="grid grid-cols-1 md:grid-cols-3 gap-6"><div class="bg-slate-800 rounded-2xl shadow overflow-hidden"><div class="px-5 py-4 border-b border-slate-700 font-semibold text-emerald-400">Alunos</div><div id="lista-alunos" class="p-5 space-y-3 text-sm"></div></div><div class="bg-slate-800 rounded-2xl shadow overflow-hidden"><div class="px-5 py-4 border-b border-slate-700 font-semibold text-emerald-400">Salas</div><div id="lista-salas" class="p-5 space-y-3 text-sm"></div></div><div class="bg-slate-800 rounded-2xl shadow overflow-hidden"><div class="px-5 py-4 border-b border-slate-700 font-semibold text-emerald-400">Funcionários</div><div id="lista-funcs" class="p-5 space-y-3 text-sm"></div></div></section></div><script>async function carregar(){const [a,s,f]=await Promise.all([fetch('/api/cadastro/alunos').then(r=>r.json()),fetch('/api/cadastro/salas').then(r=>r.json()),fetch('/api/cadastro/funcionarios').then(r=>r.json())]);document.getElementById('lista-alunos').innerHTML=(a||[]).slice(0,50).map(x=>`<div class="rounded-lg bg-slate-900 p-3"><div class="font-semibold">${x.nome||''}</div><div class="text-slate-400">${x.sala_nome||''}</div></div>`).join('')||'<div class="text-slate-400">Sem alunos.</div>';document.getElementById('lista-salas').innerHTML=(s||[]).map(x=>`<div class="rounded-lg bg-slate-900 p-3">${x.nome||''}</div>`).join('')||'<div class="text-slate-400">Sem salas.</div>';document.getElementById('lista-funcs').innerHTML=(f||[]).slice(0,50).map(x=>`<div class="rounded-lg bg-slate-900 p-3"><div class="font-semibold">${x.nome||''}</div><div class="text-slate-400">${x.funcao||''}</div></div>`).join('')||'<div class="text-slate-400">Sem funcionários.</div>';}document.addEventListener('DOMContentLoaded',carregar);</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Cadastro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            darkPrimary: '#0F172A',
+            darkSecondary: '#1E293B',
+            accent: '#10B981',
+            textLight: '#F8FAFC'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-darkPrimary text-textLight min-h-screen p-4 md:p-6 text-sm">
+  <div class="max-w-7xl mx-auto space-y-5">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-accent">GESTÃO DE CADASTRO</h1>
+        <p class="text-slate-400">Consulta rápida de alunos, salas e funcionários</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+        <a href="/dashboard_ocorrencias" class="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-lg font-semibold">Início</a>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <button onclick="mostrarAba('alunos')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Alunos</button>
+      <button onclick="mostrarAba('salas')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Salas</button>
+      <button onclick="mostrarAba('funcionarios')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Funcionários</button>
+    </section>
+
+    <section id="aba-alunos" class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
+      <h2 class="font-semibold text-accent text-base mb-3">Alunos</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs md:text-sm">
+          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Nome</th><th class="text-left py-2 px-2">Sala</th><th class="text-left py-2 px-2">Tutor</th></tr></thead>
+          <tbody id="tbAlunos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="aba-salas" class="hidden bg-darkSecondary rounded-xl p-4 border border-slate-800">
+      <h2 class="font-semibold text-accent text-base mb-3">Salas</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs md:text-sm">
+          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Sala</th></tr></thead>
+          <tbody id="tbSalas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="aba-funcionarios" class="hidden bg-darkSecondary rounded-xl p-4 border border-slate-800">
+      <h2 class="font-semibold text-accent text-base mb-3">Funcionários</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs md:text-sm">
+          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Nome</th><th class="text-left py-2 px-2">Função</th><th class="text-left py-2 px-2">Email</th><th class="text-left py-2 px-2">Tipo</th></tr></thead>
+          <tbody id="tbFuncionarios"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+<script>
+function mostrarAba(nome) {
+  ['alunos','salas','funcionarios'].forEach(x => {
+    document.getElementById(`aba-${x}`).classList.add('hidden');
+  });
+  document.getElementById(`aba-${nome}`).classList.remove('hidden');
+}
+
+async function carregarCadastro() {
+  const response = await fetch('/api/cadastro_premium');
+  const json = await response.json();
+
+  if (!response.ok || !json.success) {
+    alert(json.error || 'Erro ao carregar cadastro');
+    return;
+  }
+
+  const data = json.data;
+
+  document.getElementById('tbAlunos').innerHTML = (data.alunos || []).map(x => `
+    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+      <td class="py-2 px-2">${x.id || ''}</td>
+      <td class="py-2 px-2">${x.nome || ''}</td>
+      <td class="py-2 px-2">${x.sala_nome || ''}</td>
+      <td class="py-2 px-2">${x.tutor_nome || ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
+
+  document.getElementById('tbSalas').innerHTML = (data.salas || []).map(x => `
+    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+      <td class="py-2 px-2">${x.id || ''}</td>
+      <td class="py-2 px-2">${x.nome || ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="2" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
+
+  document.getElementById('tbFuncionarios').innerHTML = (data.funcionarios || []).map(x => `
+    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+      <td class="py-2 px-2">${x.id || ''}</td>
+      <td class="py-2 px-2">${x.nome || ''}</td>
+      <td class="py-2 px-2">${x.funcao || ''}</td>
+      <td class="py-2 px-2">${x.email || ''}</td>
+      <td class="py-2 px-2">${x.tipo || ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
+}
+
+carregarCadastro();
+</script>
+</body>
+</html>

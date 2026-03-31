@@ -1,194 +1,228 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Ocorrências</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        darkPrimary: '#0F172A',
-                        darkSecondary: '#1E293B',
-                        accent: '#10B981',
-                        textLight: '#F8FAFC'
-                    }
-                }
-            }
-        }
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Ocorrências</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-darkPrimary text-textLight min-h-screen p-4 md:p-6 text-sm">
-<div class="max-w-7xl mx-auto space-y-5">
-    <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-            <h1 class="text-2xl md:text-3xl font-bold text-accent">PAINEL DE GESTÃO DE OCORRÊNCIAS</h1>
-            <p class="text-slate-400 text-sm">Sistema de Convivência Escolar</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="/gestao_ocorrencia" class="bg-accent hover:bg-emerald-600 px-3 py-2 rounded-lg font-semibold text-sm">Gestão de Ocorrências</a>
-            <a href="/gestao_ocorrencia_nova" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold text-sm">Nova Ocorrência</a>
-            <a href="/gestao_relatorio_impressao" class="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-lg font-semibold text-sm">Relatório / Impressão</a>
-        </div>
-    </header>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">DASHBOARD DE OCORRÊNCIAS</h1>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/dashboard_geral" class="bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+      <a href="/gestao_ocorrencia" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Gestão</a>
+      <a href="/gestao_ocorrencia_nova" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Nova Ocorrência</a>
+    </div>
+  </header>
 
-    <section class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="font-semibold text-accent text-base">Resumo diário</h2>
-                <span id="data-hoje" class="text-xs text-slate-400"></span>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Tutor</div><div id="d_tutor" class="text-lg font-bold text-blue-400">0</div></div>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Coordenação</div><div id="d_coord" class="text-lg font-bold text-yellow-400">0</div></div>
-                <a href="/gestao_ocorrencia?pendencia=GESTAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Gestão</div><div id="d_gestao" class="text-lg font-bold text-red-400">0</div></a>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Responsável</div><div id="d_resp" class="text-lg font-bold text-purple-400">0</div></div>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Finalizadas</div><div id="d_final" class="text-lg font-bold text-emerald-400">0</div></div>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Total do dia</div><div id="d_total" class="text-lg font-bold">0</div></div>
-            </div>
-        </div>
+  <section class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-slate-400 text-xs">Ocorrência Geral</div>
+      <div id="cTotal" class="text-3xl font-bold mt-2 text-emerald-400">0</div>
+    </div>
 
-        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-            <h2 class="font-semibold text-accent text-base mb-3">Resumo acumulado</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Tutor</div><div id="a_tutor" class="text-lg font-bold text-blue-400">0</div></div>
-                <a href="/gestao_ocorrencia?pendencia=COORDENACAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Coordenação</div><div id="a_coord" class="text-lg font-bold text-yellow-400">0</div></a>
-                <a href="/gestao_ocorrencia?pendencia=GESTAO" class="bg-slate-900 rounded-lg p-2.5 text-center hover:bg-slate-800 transition"><div class="text-[11px] text-slate-400">Gestão</div><div id="a_gestao" class="text-lg font-bold text-red-400">0</div></a>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Responsável</div><div id="a_resp" class="text-lg font-bold text-purple-400">0</div></div>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Finalizadas</div><div id="a_final" class="text-lg font-bold text-emerald-400">0</div></div>
-                <div class="bg-slate-900 rounded-lg p-2.5 text-center"><div class="text-[11px] text-slate-400">Total geral</div><div id="a_total" class="text-lg font-bold">0</div></div>
-            </div>
-            <div id="alerta-gestao" class="hidden mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-red-300 text-sm font-semibold">
-                Existem pendências de gestão. Clique no card vermelho para abrir a lista filtrada.
-            </div>
-        </div>
-    </section>
+    <a href="/gestao_ocorrencia?status=ATENDIMENTO" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 hover:bg-slate-700/50">
+      <div class="text-slate-400 text-xs">Em Atendimento</div>
+      <div id="cAtendimento" class="text-3xl font-bold mt-2 text-amber-400">0</div>
+    </a>
 
-    <section class="grid grid-cols-1 xl:grid-cols-[1.1fr,0.9fr] gap-5">
-        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-            <h2 class="font-semibold text-accent text-base mb-3">Evolução semanal por sala</h2>
-            <canvas id="graficoSemanalSalas" height="120"></canvas>
-        </div>
+    <a href="/gestao_ocorrencia?status=FINALIZADA" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 hover:bg-slate-700/50">
+      <div class="text-slate-400 text-xs">Finalizadas</div>
+      <div id="cFinalizadas" class="text-3xl font-bold mt-2 text-blue-400">0</div>
+    </a>
 
-        <div class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-            <h2 class="font-semibold text-accent text-base mb-3">Ocorrências por status</h2>
-            <canvas id="graficoStatus" height="120"></canvas>
-        </div>
-    </section>
+    <a href="/gestao_ocorrencia?status=ASSINADA" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 hover:bg-slate-700/50">
+      <div class="text-slate-400 text-xs">Assinadas</div>
+      <div id="cAssinadas" class="text-3xl font-bold mt-2 text-fuchsia-400">0</div>
+    </a>
 
-    <section class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-        <h2 class="font-semibold text-accent text-base mb-3">Ranking de salas por ocorrências</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-xs md:text-sm">
-                <thead>
-                    <tr class="text-slate-300 border-b border-slate-700">
-                        <th class="text-left py-2 px-2">Posição</th>
-                        <th class="text-left py-2 px-2">Sala</th>
-                        <th class="text-left py-2 px-2">Quantidade</th>
-                    </tr>
-                </thead>
-                <tbody id="rankingSalasBody"></tbody>
-            </table>
-        </div>
-    </section>
+    <a href="/gestao_ocorrencia?pendencia=TUTOR&status=ATENDIMENTO" class="bg-blue-500/20 border border-blue-500 rounded-2xl p-5 hover:bg-blue-500/30">
+      <div class="text-slate-300 text-xs">Pendência Tutor</div>
+      <div id="cPendTutor" class="text-3xl font-bold mt-2 text-blue-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=COORDENACAO&status=ATENDIMENTO" class="bg-orange-500/20 border border-orange-500 rounded-2xl p-5 hover:bg-orange-500/30">
+      <div class="text-slate-300 text-xs">Pendência Coordenação</div>
+      <div id="cPendCoord" class="text-3xl font-bold mt-2 text-orange-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=GESTAO&status=ATENDIMENTO" class="bg-red-500/20 border border-red-500 rounded-2xl p-5 hover:bg-red-500/30">
+      <div class="text-slate-300 text-xs">Pendência Gestão</div>
+      <div id="cPendGestao" class="text-3xl font-bold mt-2 text-red-400">0</div>
+    </a>
+
+    <a href="/gestao_ocorrencia?pendencia=RESPONSAVEL&status=ATENDIMENTO" class="bg-yellow-500/20 border border-yellow-500 rounded-2xl p-5 hover:bg-yellow-500/30">
+      <div class="text-slate-300 text-xs">Pendência Responsável</div>
+      <div id="cPendResponsavel" class="text-3xl font-bold mt-2 text-yellow-300">0</div>
+    </a>
+  </section>
+
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <h2 class="text-lg font-bold text-emerald-400 mb-3">Situação das Ocorrências</h2>
+      <div class="h-[340px]">
+        <canvas id="graficoPizzaOcorrencias"></canvas>
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <h2 class="text-lg font-bold text-emerald-400 mb-3">Ranking de Sala por Semana</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead id="theadRankingSemanal">
+            <tr class="border-b border-slate-700">
+              <th class="text-left py-2">Sala</th>
+              <th class="text-left py-2">Semana 1</th>
+              <th class="text-left py-2">Semana 2</th>
+              <th class="text-left py-2">Semana 3</th>
+              <th class="text-left py-2">Semana 4</th>
+              <th class="text-left py-2">Acumulado</th>
+            </tr>
+          </thead>
+          <tbody id="tbRankingSemanalSala"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
-let graficoStatus = null;
-let graficoSemanalSalas = null;
+function n(t){ return (t||'').toString().normalize("NFD").replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
 
-function setText(id, value) {
-    document.getElementById(id).textContent = value ?? 0;
-}
+let graficoPizzaOcorrencias = null;
 
-function renderRanking(ranking) {
-    const body = document.getElementById('rankingSalasBody');
-    if (!ranking.length) {
-        body.innerHTML = '<tr><td colspan="3" class="py-4 px-2 text-slate-400">Nenhuma ocorrência encontrada.</td></tr>';
-        return;
-    }
-    body.innerHTML = ranking.map((item, idx) => `
-        <tr class="border-b border-slate-800 hover:bg-slate-800/50">
-            <td class="py-2 px-2 font-semibold">${idx + 1}</td>
-            <td class="py-2 px-2">${item.sala}</td>
-            <td class="py-2 px-2">${item.total}</td>
-        </tr>
-    `).join('');
-}
+const labelPlugin = {
+  id: 'labelPlugin',
+  afterDatasetsDraw(chart) {
+    const {ctx} = chart;
+    const dataset = chart.data.datasets[0];
+    const total = dataset.data.reduce((a,b)=>a+b,0);
+    const meta = chart.getDatasetMeta(0);
+    ctx.save();
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-function renderStatusChart(payload) {
-    const ctx = document.getElementById('graficoStatus');
-    if (graficoStatus) graficoStatus.destroy();
-    graficoStatus = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: payload.labels,
-            datasets: [{ data: payload.data }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { labels: { color: '#F8FAFC', font: { size: 11 } } }
-            }
-        }
+    meta.data.forEach((arc, index) => {
+      const value = dataset.data[index] || 0;
+      if (!value || !total) return;
+      const pct = ((value / total) * 100).toFixed(1) + '%';
+      const pos = arc.tooltipPosition();
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(15,23,42,0.8)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(pct, pos.x, pos.y);
+      ctx.fillText(pct, pos.x, pos.y);
     });
+    ctx.restore();
+  }
+};
+
+async function carregarCards(){
+  const r = await fetch('/api/ocorrencias_todas');
+  const base = await r.json();
+  document.getElementById('cTotal').textContent = base.length;
+  document.getElementById('cAtendimento').textContent = base.filter(x => n(x.status) === 'ATENDIMENTO').length;
+  document.getElementById('cFinalizadas').textContent = base.filter(x => n(x.status) === 'FINALIZADA').length;
+  document.getElementById('cAssinadas').textContent = base.filter(x => n(x.status) === 'ASSINADA').length;
+  document.getElementById('cPendTutor').textContent = base.filter(x => n(x.pendencia) === 'TUTOR' && n(x.status) === 'ATENDIMENTO').length;
+  document.getElementById('cPendCoord').textContent = base.filter(x => n(x.pendencia) === 'COORDENACAO' && n(x.status) === 'ATENDIMENTO').length;
+  document.getElementById('cPendGestao').textContent = base.filter(x => n(x.pendencia) === 'GESTAO' && n(x.status) === 'ATENDIMENTO').length;
+  document.getElementById('cPendResponsavel').textContent = base.filter(x => n(x.pendencia) === 'RESPONSAVEL' && n(x.status) === 'ATENDIMENTO').length;
 }
 
-function renderWeeklyChart(payload) {
-    const ctx = document.getElementById('graficoSemanalSalas');
-    if (graficoSemanalSalas) graficoSemanalSalas.destroy();
-    graficoSemanalSalas = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: payload.labels,
-            datasets: payload.datasets.map(ds => ({ ...ds, tension: 0.35, fill: false }))
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { labels: { color: '#F8FAFC', font: { size: 11 } } }
-            },
-            scales: {
-                x: { ticks: { color: '#CBD5E1', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } },
-                y: { beginAtZero: true, ticks: { color: '#CBD5E1', precision: 0, font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } }
-            }
+async function carregarPainelOcorrencias() {
+  const r = await fetch('/api/dashboard_ocorrencias');
+  const j = await r.json();
+
+  if (!r.ok || !j.success) {
+    alert(j.error || 'Erro ao carregar painel');
+    return;
+  }
+
+  const pizza = j.data?.pizza || {};
+  const ranking = j.data?.ranking_salas_semanal || [];
+  const semanasLegenda = j.data?.semanas_legenda || [];
+
+  const ctx = document.getElementById('graficoPizzaOcorrencias');
+
+  if (graficoPizzaOcorrencias) {
+    graficoPizzaOcorrencias.destroy();
+  }
+
+  graficoPizzaOcorrencias = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: [
+        'Finalizadas',
+        'Pendência Tutor',
+        'Pendência Gestão',
+        'Pendência Coordenação',
+        'Pendência Responsável'
+      ],
+      datasets: [{
+        data: [
+          pizza.finalizadas || 0,
+          pizza.tutor || 0,
+          pizza.gestao || 0,
+          pizza.coordenacao || 0,
+          pizza.responsavel || 0
+        ],
+        backgroundColor: [
+          '#22c55e',
+          '#3b82f6',
+          '#ef4444',
+          '#f97316',
+          '#eab308'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#e2e8f0'
+          }
         }
-    });
+      }
+    },
+    plugins: [labelPlugin]
+  });
+
+  document.getElementById('tbRankingSemanalSala').innerHTML = ranking.map(x => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${x.sala}</td>
+      <td class="py-2">${x.semana_1}</td>
+      <td class="py-2">${x.semana_2}</td>
+      <td class="py-2">${x.semana_3}</td>
+      <td class="py-2">${x.semana_4}</td>
+      <td class="py-2 font-bold text-emerald-400">${x.acumulado}</td>
+    </tr>
+  `).join('');
+
+  if (semanasLegenda.length === 4) {
+    document.getElementById('theadRankingSemanal').innerHTML = `
+      <tr class="border-b border-slate-700">
+        <th class="text-left py-2">Sala</th>
+        <th class="text-left py-2">S1<br><span class="text-xs text-slate-400">${semanasLegenda[0]}</span></th>
+        <th class="text-left py-2">S2<br><span class="text-xs text-slate-400">${semanasLegenda[1]}</span></th>
+        <th class="text-left py-2">S3<br><span class="text-xs text-slate-400">${semanasLegenda[2]}</span></th>
+        <th class="text-left py-2">S4<br><span class="text-xs text-slate-400">${semanasLegenda[3]}</span></th>
+        <th class="text-left py-2">Acumulado</th>
+      </tr>
+    `;
+  }
 }
 
-async function carregarDashboard() {
-    const response = await fetch('/api/dashboard_ocorrencias');
-    const json = await response.json();
-    if (!response.ok || !json.success) throw new Error(json.error || 'Erro ao carregar dashboard');
-
-    const data = json.data;
-    document.getElementById('data-hoje').textContent = new Date().toLocaleDateString('pt-BR');
-
-    setText('d_tutor', data.diario.tutor);
-    setText('d_coord', data.diario.coordenacao);
-    setText('d_gestao', data.diario.gestao);
-    setText('d_resp', data.diario.responsavel);
-    setText('d_final', data.diario.finalizadas);
-    setText('d_total', data.diario.total);
-
-    setText('a_tutor', data.acumulado.tutor);
-    setText('a_coord', data.acumulado.coordenacao);
-    setText('a_gestao', data.acumulado.gestao);
-    setText('a_resp', data.acumulado.responsavel);
-    setText('a_final', data.acumulado.finalizadas);
-    setText('a_total', data.acumulado.total);
-
-    document.getElementById('alerta-gestao').classList.toggle('hidden', !(data.acumulado.gestao > 0));
-
-    renderRanking(data.ranking_salas || []);
-    renderStatusChart(data.status_chart || {labels: [], data: []});
-    renderWeeklyChart(data.semanal_salas || {labels: [], datasets: []});
-}
-
-carregarDashboard().catch(err => console.error(err));
+carregarCards();
+carregarPainelOcorrencias();
 </script>
 </body>
 </html>

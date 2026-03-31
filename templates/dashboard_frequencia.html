@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Frequência</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex justify-between items-end">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">DASHBOARD DE FREQUÊNCIA</h1>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+      <a href="/gestao_relatorio_frequencia" class="bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded-lg font-semibold">Relatório de Frequência</a>
+    </div>
+  </header>
+
+  <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Presença</div>
+      <div id="cPresenca" class="text-3xl font-bold mt-2 text-emerald-400">0</div>
+    </div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Falta</div>
+      <div id="cFalta" class="text-3xl font-bold mt-2 text-red-400">0</div>
+    </div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Entrada com Atraso</div>
+      <div id="cAtraso" class="text-3xl font-bold mt-2 text-amber-400">0</div>
+    </div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Saída Antecipada</div>
+      <div id="cSaida" class="text-3xl font-bold mt-2 text-blue-400">0</div>
+    </div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Atraso + Saída</div>
+      <div id="cPSA" class="text-3xl font-bold mt-2 text-fuchsia-400">0</div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="/gestao_frequencia_lancamento" class="bg-emerald-700 hover:bg-emerald-600 rounded-2xl p-6 font-bold">Lançar Frequência</a>
+    <a href="/gestao_frequencia_atraso" class="bg-amber-700 hover:bg-amber-600 rounded-2xl p-6 font-bold">Registrar Chegada Atrasada</a>
+    <a href="/gestao_frequencia_saida" class="bg-blue-700 hover:bg-blue-600 rounded-2xl p-6 font-bold">Registrar Saída Antecipada</a>
+  </section>
+
+  <section class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <h2 class="text-lg font-bold text-emerald-400">Evolução diária da presença (%)</h2>
+      <input id="mesRef" type="month" class="bg-slate-900 border border-slate-700 rounded px-3 py-2">
+    </div>
+    <div class="h-[380px]">
+      <canvas id="graficoPresencaLinha"></canvas>
+    </div>
+  </section>
+</div>
+
+<script>
+let graficoPresencaLinha = null;
+
+function mesAtual(){
+  const d = new Date();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  return `${d.getFullYear()}-${m}`;
+}
+
+async function carregarDashboard() {
+  const mes = document.getElementById('mesRef').value || mesAtual();
+  const r = await fetch(`/api/dashboard_frequencia_mensal?mes=${mes}`);
+  const j = await r.json();
+
+  if (!r.ok || !j.success) {
+    alert(j.error || 'Erro ao carregar dashboard');
+    return;
+  }
+
+  const c = j.data.cards || {};
+  document.getElementById('cPresenca').textContent = c.p_total || 0;
+  document.getElementById('cFalta').textContent = c.f_total || 0;
+  document.getElementById('cAtraso').textContent = c.pa_total || 0;
+  document.getElementById('cSaida').textContent = c.ps_total || 0;
+  document.getElementById('cPSA').textContent = c.psa_total || 0;
+
+  const linha = j.data.grafico_presenca || {labels: [], data: []};
+  const ctx = document.getElementById('graficoPresencaLinha');
+  if (graficoPresencaLinha) graficoPresencaLinha.destroy();
+
+  graficoPresencaLinha = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: linha.labels,
+      datasets: [{
+        label: 'Presença %',
+        data: linha.data,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.15)',
+        tension: 0.25,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.15)' } },
+        y: { min: 0, max: 100, ticks: { color: '#cbd5e1', callback: v => v + '%' }, grid: { color: 'rgba(148,163,184,0.15)' } }
+      },
+      plugins: {
+        legend: { labels: { color: '#e2e8f0' } }
+      }
+    }
+  });
+}
+
+document.getElementById('mesRef').value = mesAtual();
+document.getElementById('mesRef').addEventListener('change', carregarDashboard);
+carregarDashboard();
+</script>
+</body>
+</html>

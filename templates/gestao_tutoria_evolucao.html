@@ -1,1 +1,20 @@
-<html><body class='bg-slate-900 text-white p-6'><h1>Evolução do Aluno</h1></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Evolução do Aluno</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-6xl mx-auto space-y-5">
+<header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+<div><h1 class="text-2xl md:text-3xl font-bold text-emerald-400">EVOLUÇÃO DO ALUNO</h1><p class="text-slate-400">Indicadores de frequência e ocorrências por aluno</p></div>
+<div class="flex flex-wrap gap-2"><a href="/gestao_tutoria" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Tutoria</a><a href="/dashboard_geral" class="bg-violet-700 hover:bg-violet-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a></div>
+</header>
+<section class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="grid grid-cols-1 md:grid-cols-3 gap-3"><div class="md:col-span-2"><label class="block text-xs text-slate-400 mb-1">Aluno</label><input id="aluno_id" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2" placeholder="ID do aluno"></div><div class="flex items-end"><button onclick="carregar()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar</button></div></div></section>
+<section id="cards" class="hidden grid grid-cols-2 md:grid-cols-5 gap-3">
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Presenças</div><div id="cP" class="text-2xl font-bold text-emerald-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Faltas</div><div id="cF" class="text-2xl font-bold text-red-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Atrasos</div><div id="cA" class="text-2xl font-bold text-amber-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Saídas</div><div id="cS" class="text-2xl font-bold text-blue-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Ocorrências</div><div id="cO" class="text-2xl font-bold">0</div></div>
+</section>
+</div>
+<script>
+async function carregar(){const alunoId=document.getElementById('aluno_id').value; if(!alunoId){alert('Informe o ID do aluno'); return;} const r=await fetch('/api/evolucao_aluno/'+alunoId); const j=await r.json(); if(!r.ok){alert(j.error||'Erro'); return;} document.getElementById('cards').classList.remove('hidden'); const x=j.resumo||{}; document.getElementById('cP').textContent=x.presencas||0; document.getElementById('cF').textContent=x.faltas||0; document.getElementById('cA').textContent=x.atrasos||0; document.getElementById('cS').textContent=x.saidas||0; document.getElementById('cO').textContent=x.ocorrencias||0;}
+</script></body></html>

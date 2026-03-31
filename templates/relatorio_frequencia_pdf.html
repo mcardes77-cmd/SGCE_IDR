@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Frequência</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    body { font-family: Arial, sans-serif; font-size: 10px; color: #111; }
+    h1, h2 { margin: 0; }
+    .topo { margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #333; padding: 4px; text-align: center; }
+    th.nome, td.nome { text-align: left; width: 180px; }
+  </style>
+</head>
+<body>
+  <div class="topo">
+    <h1>Relatório de Frequência</h1>
+    <h2>Sala: {{ sala_nome }} | Mês: {{ mes }}</h2>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="nome">Aluno</th>
+        {% for d in dias %}
+          <th>{{ d }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for aluno in alunos %}
+        <tr>
+          <td class="nome">{{ aluno.nome }}</td>
+          {% for r in aluno.registros %}
+            <td>{{ r }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

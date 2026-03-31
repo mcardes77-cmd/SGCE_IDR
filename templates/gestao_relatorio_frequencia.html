@@ -1,530 +1,100 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestão de Frequência - Relatório Mensal</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório de Frequência</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'dark-primary': '#0F172A',
-            'dark-secondary': '#1E293B',
-            'accent': '#10B981',
-            'text-light': '#F8FAFC',
-            'danger': '#DC2626',
-            'warning': '#FACC15'
-          },
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-        },
-      },
-    };
-
-    let dadosFrequencia = [];
-
-    document.addEventListener("DOMContentLoaded", () => {
-      carregarSalas();
-      carregarMeses();
-      document.getElementById("btnVisualizar").addEventListener("click", visualizar);
-      document.getElementById("btnGerarPDF").addEventListener("click", gerarPDF);
-    });
-
-    async function carregarSalas() {
-      try {
-        const resp = await fetch("/api/salas");
-        if (!resp.ok) throw new Error("Erro ao carregar salas");
-        const salas = await resp.json();
-        const select = document.getElementById("salaSelect");
-        select.innerHTML = '<option value="">Selecione a Sala</option>';
-        salas.forEach(s => {
-          select.innerHTML += `<option value="${s.id}">${s.sala || s.nome}</option>`;
-        });
-      } catch (err) {
-        console.error(err);
-        alert("Erro ao carregar salas.");
-      }
-    }
-
-    function carregarMeses() {
-      const meses = [
-        "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-        "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
-      ];
-      const sel = document.getElementById("mesSelect");
-      sel.innerHTML = '<option value="">Selecione o Mês</option>';
-      meses.forEach((m,i) => {
-        sel.innerHTML += `<option value="${i+1}">${m}</option>`;
-      });
-    }
-
-    async function visualizar() {
-      const sala = document.getElementById("salaSelect").value;
-      const mes = document.getElementById("mesSelect").value;
-      if (!sala || !mes) {
-        alert("Selecione a sala e o mês.");
-        return;
-      }
-      try {
-        const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
-        if (!resp.ok) throw new Error("Erro ao carregar frequência");
-        dadosFrequencia = await resp.json();
-        montarTabela(dadosFrequencia, parseInt(mes));
-      } catch (e) {
-        console.error(e);
-        alert("Erro ao carregar relatório.");
-      }
-    }
-
-    function montarTabela(dados, mes) {
-      const container = document.getElementById("tabelaContainer");
-      container.innerHTML = "";
-      const ano = new Date().getFullYear();
-      const dias = [];
-      const totalDias = new Date(ano, mes, 0).getDate();
-
-      for (let d = 1; d <= totalDias; d++) {
-        const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
-        const diaSemana = data.day();
-        if (diaSemana !== 0 && diaSemana !== 6) dias.push(data);
-      }
-
-      const alunos = Array.isArray(dados) && dados.length ? dados : [];
-
-      let html = `
-        <div class="overflow-x-auto">
-          <table class="min-w-full border border-gray-700 text-sm text-center rounded-lg overflow-hidden">
-            <thead class="bg-dark-primary">
-              <tr>
-                <th class="px-2 py-2 border border-gray-700 text-gray-300">Aluno</th>`;
-      dias.forEach(d => {
-        html += `<th class="px-2 py-2 border border-gray-700 text-gray-400">${d.format("DD")}</th>`;
-      });
-      html += `</tr></thead><tbody>`;
-
-      if (alunos.length === 0) {
-        html += `<tr><td colspan="${dias.length + 1}" class="text-gray-400 py-4">Nenhum registro encontrado.</td></tr>`;
-      } else {
-        alunos.forEach(aluno => {
-          html += `<tr><td class="border border-gray-700 text-left px-2">${aluno.nome}</td>`;
-          dias.forEach(d => {
-            const dataKey = d.format("YYYY-MM-DD");
-            const freq = aluno.frequencia?.[dataKey] || {};
-            const status = freq.status || "";
-            
-            let cor = "text-gray-500 cursor-default";
-            let clickHandler = "";
-            
-            if (status === "P") {
-              cor = "text-green-500 font-bold cursor-default";
-            } else if (status === "F") {
-              cor = "text-red-500 font-bold cursor-default";
-            } else if (["PA", "PS", "PSA"].includes(status)) {
-              cor = "text-yellow-400 font-bold cursor-pointer hover:bg-yellow-400 hover:text-gray-900";
-              clickHandler = `onclick="mostrarDetalhesFrequencia(${aluno.id}, '${dataKey}')"`;
-            }
-            
-            html += `<td class="border border-gray-700 ${cor}" ${clickHandler}>${status}</td>`;
-          });
-          html += `</tr>`;
-        });
-      }
-
-      html += `</tbody></table>
-        <div class="mt-4 text-gray-400 text-sm text-left">
-          <p><span class="text-green-500 font-bold">P</span> = Presença |
-             <span class="text-red-500 font-bold">F</span> = Ausente |
-             <span class="text-yellow-400 font-bold cursor-pointer" onclick="mostrarLegenda()">PA, PS, PSA</span> = Clique para ver detalhes
-          </p>
-        </div>
-      </div>`;
-
-      container.innerHTML = html;
-    }
-
-    async function mostrarDetalhesFrequencia(alunoId, data) {
-      try {
-        const resp = await fetch(`/api/frequencia_detalhes/${alunoId}/${data}`);
-        if (!resp.ok) throw new Error("Erro ao carregar detalhes");
-        const detalhes = await resp.json();
-        
-        // Encontrar nome do aluno
-        const aluno = dadosFrequencia.find(a => a.id === alunoId);
-        const alunoNome = aluno ? aluno.nome : 'Aluno';
-        
-        let modalContent = `
-          <div class="mb-4">
-            <h3 class="text-lg font-bold text-accent">Detalhes da Frequência</h3>
-            <p class="text-sm text-gray-300">${alunoNome} - ${dayjs(data).format('DD/MM/YYYY')}</p>
-          </div>
-        `;
-        
-        if (detalhes.hora_entrada || detalhes.motivo_atraso) {
-          modalContent += `
-            <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
-              <h4 class="font-bold text-yellow-400">Entrada com Atraso</h4>
-              <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_entrada || 'N/A'}</p>
-              <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_atraso || 'N/A'}</p>
-            </div>
-          `;
-        }
-        
-        if (detalhes.hora_saida || detalhes.motivo_saida) {
-          modalContent += `
-            <div class="mb-4 p-3 bg-yellow-900 rounded-lg">
-              <h4 class="font-bold text-yellow-400">Saída Antecipada</h4>
-              <p class="text-sm"><strong>Hora:</strong> ${detalhes.hora_saida || 'N/A'}</p>
-              <p class="text-sm"><strong>Motivo:</strong> ${detalhes.motivo_saida || 'N/A'}</p>
-            </div>
-          `;
-        }
-        
-        if (detalhes.responsavel_nome) {
-          modalContent += `
-            <div class="mb-4 p-3 bg-gray-800 rounded-lg">
-              <h4 class="font-bold text-gray-300">Responsável</h4>
-              <p class="text-sm"><strong>Nome:</strong> ${detalhes.responsavel_nome}</p>
-              <p class="text-sm"><strong>Telefone:</strong> ${detalhes.responsavel_telefone || 'N/A'}</p>
-            </div>
-          `;
-        }
-        
-        if (!detalhes.hora_entrada && !detalhes.hora_saida) {
-          modalContent += `<p class="text-gray-400 text-center">Nenhum detalhe adicional disponível.</p>`;
-        }
-        
-        // Criar modal
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        modal.innerHTML = `
-          <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
-            ${modalContent}
-            <div class="text-center mt-4">
-              <button onclick="this.closest('.fixed').remove()" 
-                class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
-                Fechar
-              </button>
-            </div>
-          </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-      } catch (e) {
-        console.error(e);
-        alert("Erro ao carregar detalhes da frequência.");
-      }
-    }
-
-    function mostrarLegenda() {
-      const modal = document.createElement('div');
-      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-      modal.innerHTML = `
-        <div class="bg-dark-secondary p-6 rounded-lg max-w-md w-full mx-4">
-          <h3 class="text-lg font-bold text-accent mb-4">Legenda de Status</h3>
-          <div class="space-y-2 text-sm">
-            <p><span class="text-green-500 font-bold">P</span> = Presença</p>
-            <p><span class="text-red-500 font-bold">F</span> = Falta</p>
-            <p><span class="text-yellow-400 font-bold">PA</span> = Presença com Atraso</p>
-            <p><span class="text-yellow-400 font-bold">PS</span> = Presença com Saída Antecipada</p>
-            <p><span class="text-yellow-400 font-bold">PSA</span> = Presença com Atraso e Saída Antecipada</p>
-          </div>
-          <div class="text-center mt-4">
-            <button onclick="this.closest('.fixed').remove()" 
-              class="px-4 py-2 bg-accent hover:bg-green-600 rounded-lg text-white">
-              Fechar
-            </button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-    }
-
-   async function gerarPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4"
-  });
-
-  // Configurações
-  const salaSelect = document.getElementById("salaSelect");
-  const mesSelect = document.getElementById("mesSelect");
-  const salaNome = salaSelect.options[salaSelect.selectedIndex]?.text || "Sala não selecionada";
-  const mesNome = mesSelect.options[mesSelect.selectedIndex]?.text || "Mês não selecionado";
-  const ano = new Date().getFullYear();
-
-  // Obter dados
-  const sala = document.getElementById("salaSelect").value;
-  const mes = document.getElementById("mesSelect").value;
-  
-  if (!sala || !mes) {
-    alert("Selecione a sala e o mês para gerar o PDF.");
-    return;
-  }
-
-  try {
-    const resp = await fetch(`/api/frequencia?sala=${sala}&mes=${mes}`);
-    if (!resp.ok) throw new Error("Erro ao carregar frequência");
-    const dadosFrequencia = await resp.json();
-
-    // Configurações de layout
-    const marginLeft = 15;
-    const marginRight = 15;
-    const marginTop = 15;
-    const marginBottom = 20;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - marginLeft - marginRight;
-    
-    // Calcular dias úteis
-    const dias = [];
-    const totalDias = new Date(ano, mes, 0).getDate();
-    for (let d = 1; d <= totalDias; d++) {
-      const data = dayjs(`${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
-      const diaSemana = data.day();
-      if (diaSemana !== 0 && diaSemana !== 6) {
-        dias.push({
-          data: data,
-          dia: d,
-          diaSemana: data.format('ddd')
-        });
-      }
-    }
-
-    // Definir larguras das colunas - NOME COM 100mm (LARGURA AUMENTADA)
-    const nomeColWidth = 100; // COLUNA NOME COM 100mm
-    const diaColWidth = 5.5;  // Colunas de dias com 5.5mm cada
-    
-    // Verificar se cabe na página
-    const larguraTabela = nomeColWidth + (dias.length * diaColWidth);
-    if (larguraTabela > contentWidth) {
-      // Ajustar proporcionalmente
-      const fatorAjuste = contentWidth / larguraTabela;
-      nomeColWidth *= fatorAjuste;
-      diaColWidth *= fatorAjuste;
-    }
-
-    // Cabeçalho
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text("RELATÓRIO DE FREQUÊNCIA ESCOLAR", pageWidth / 2, marginTop, { align: "center" });
-
-    // Informações
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Sala: ${salaNome}`, marginLeft, marginTop + 10);
-    doc.text(`Período: ${mesNome}/${ano}`, marginLeft, marginTop + 16);
-    doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - marginRight, marginTop + 10, { align: "right" });
-    doc.text(`Escola: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO`, pageWidth - marginRight, marginTop + 16, { align: "right" });
-
-    // Linha divisória
-    doc.setDrawColor(100, 100, 100);
-    doc.line(marginLeft, marginTop + 22, pageWidth - marginRight, marginTop + 22);
-
-    // Iniciar tabela
-    let currentY = marginTop + 28;
-    const lineHeight = 6;
-
-    // Cabeçalho da tabela - ALUNO (coluna grande)
-    doc.setFillColor(30, 64, 175); // Azul escuro
-    doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text("ALUNO", marginLeft + 3, currentY + lineHeight/2 + 1);
-    
-    // Cabeçalhos dos dias
-    dias.forEach((dia, index) => {
-      const xPos = marginLeft + nomeColWidth + (index * diaColWidth);
-      doc.setFillColor(30, 64, 175);
-      doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-      doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
-    });
-
-    currentY += lineHeight;
-
-    // Dados dos alunos
-    const alunos = Array.isArray(dadosFrequencia) && dadosFrequencia.length ? dadosFrequencia : [];
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-
-    // Adicionar bordas visíveis
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.1);
-
-    alunos.forEach((aluno, alunoIndex) => {
-      // Desenhar linha do aluno
-      const fillColor = alunoIndex % 2 === 0 ? [240, 240, 240] : [255, 255, 255];
-      doc.setFillColor(...fillColor);
-      doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
-      
-      // Nome do aluno (truncar se necessário)
-      let nomeAluno = aluno.nome;
-      if (nomeAluno.length > 40) {
-        nomeAluno = nomeAluno.substring(0, 40) + '...';
-      }
-      
-      doc.setTextColor(0, 0, 0);
-      doc.text(nomeAluno, marginLeft + 3, currentY + lineHeight/2 + 1);
-
-      // Status de cada dia
-      dias.forEach((dia, diaIndex) => {
-        const xPos = marginLeft + nomeColWidth + (diaIndex * diaColWidth);
-        const dataKey = dia.data.format("YYYY-MM-DD");
-        const freq = aluno.frequencia?.[dataKey] || {};
-        const status = freq.status || "";
-        
-        // Fundo da célula
-        doc.setFillColor(...fillColor);
-        doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-        
-        // Cor do status
-        if (status === "P") {
-          doc.setTextColor(0, 128, 0); // Verde
-        } else if (status === "F") {
-          doc.setTextColor(255, 0, 0); // Vermelho
-        } else if (["PA", "PS", "PSA"].includes(status)) {
-          doc.setTextColor(255, 140, 0); // Laranja
-        } else {
-          doc.setTextColor(100, 100, 100); // Cinza
-        }
-        
-        // Centralizar o status
-        const textX = xPos + diaColWidth/2;
-        const textY = currentY + lineHeight/2 + 1;
-        doc.text(status, textX, textY, { align: "center" });
-        
-        // Borda da célula
-        doc.setDrawColor(220, 220, 220);
-        doc.rect(xPos, currentY, diaColWidth, lineHeight);
-        
-        doc.setTextColor(0, 0, 0); // reset para preto
-      });
-
-      // Borda da linha do nome
-      doc.setDrawColor(220, 220, 220);
-      doc.rect(marginLeft, currentY, nomeColWidth, lineHeight);
-
-      currentY += lineHeight;
-
-      // Verificar se precisa de nova página
-      if (currentY + lineHeight > pageHeight - marginBottom) {
-        doc.addPage();
-        currentY = marginTop;
-        
-        // Recriar cabeçalho na nova página
-        doc.setFillColor(30, 64, 175);
-        doc.rect(marginLeft, currentY, nomeColWidth, lineHeight, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.text("ALUNO", marginLeft + 3, currentY + lineHeight/2 + 1);
-        
-        dias.forEach((dia, index) => {
-          const xPos = marginLeft + nomeColWidth + (index * diaColWidth);
-          doc.setFillColor(30, 64, 175);
-          doc.rect(xPos, currentY, diaColWidth, lineHeight, 'F');
-          doc.text(dia.dia.toString(), xPos + diaColWidth/2, currentY + lineHeight/2 + 1, { align: "center" });
-        });
-        
-        currentY += lineHeight;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-      }
-    });
-
-    // Legenda
-    const legendaY = pageHeight - marginBottom + 5;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Legenda: P = Presença | F = Falta | PA = Atraso | PS = Saída Antecipada | PSA = Atraso + Saída", 
-             marginLeft, legendaY);
-
-    // Estatísticas
-    const totalAlunos = alunos.length;
-    const totalDiasUteis = dias.length;
-    doc.text(`Total de Alunos: ${totalAlunos} | Dias Úteis: ${totalDiasUteis}`, 
-             pageWidth - marginRight, legendaY, { align: "right" });
-
-    // Salvar PDF
-    doc.save(`relatorio_frequencia_${salaNome.replace(/\s+/g, '_')}_${mesNome}_${ano}.pdf`);
-    
-  } catch (e) {
-    console.error(e);
-    alert("Erro ao gerar PDF. Tente novamente.");
-  }
-}
-  </script>
 </head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-5">
+  <header class="flex justify-between items-end">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">RELATÓRIO DE FREQUÊNCIA</h1>
+      <p class="text-slate-400">Selecione a sala e o mês para gerar a tabela e o PDF</p>
+    </div>
+    <a href="/dashboard_frequencia" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Dashboard Frequência</a>
+  </header>
 
-<body class="bg-dark-primary min-h-screen p-8 text-text-light">
-  <div class="max-w-7xl mx-auto">
-    <header class="text-center mb-8 mt-4">
-      <h1 class="text-2xl font-light border-b border-gray-700 pb-2 inline-block">
-        SISTEMA DE GESTÃO DE CONVIVÊNCIA ESCOLAR
-      </h1><br>
-      <h2 class="text-lg font-light border-b border-gray-700 pb-2 inline-block">
-        GESTÃO DE FREQUÊNCIA - RELATÓRIO MENSAL
-      </h2>
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
+    <select id="sala_id" class="bg-slate-900 border border-slate-700 rounded px-3 py-2">
+      <option value="">Selecione a sala</option>
+    </select>
+    <input id="mesRef" type="month" class="bg-slate-900 border border-slate-700 rounded px-3 py-2">
+    <button onclick="carregarRelatorio()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded">Gerar tabela</button>
+    <button onclick="gerarPdf()" class="bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded">Gerar PDF</button>
+  </section>
 
-      <div class="flex justify-center gap-4 mt-4">
-        <button onclick="window.location.href='{{ url_for('main.gestao_frequencia') }}'"
-          class="px-4 py-2 text-sm rounded-lg border border-gray-600 hover:bg-gray-700 flex items-center">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M4 6h16M4 12h16M4 18h7"/>
-          </svg>
-          Voltar ao Menu
-        </button>
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+    <div class="overflow-auto">
+      <table class="w-full text-sm whitespace-nowrap">
+        <thead id="theadRelatorio"></thead>
+        <tbody id="tbodyRelatorio"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
 
-        <button id="btnGerarPDF"
-          class="px-4 py-2 text-sm rounded-lg bg-accent hover:bg-green-600 text-white flex items-center">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 4v16m8-8H4"/>
-          </svg>
-          Gerar PDF
-        </button>
-      </div>
-    </header>
+<script>
+let relatorioAtual = null;
 
-    <main class="bg-dark-secondary rounded-xl shadow-2xl p-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1">Sala</label>
-          <select id="salaSelect" class="w-full p-3 bg-gray-800 rounded border border-gray-700"></select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1">Mês</label>
-          <select id="mesSelect" class="w-full p-3 bg-gray-800 rounded border border-gray-700"></select>
-        </div>
-        <div class="flex items-end">
-          <button id="btnVisualizar"
-            class="w-full bg-accent hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
-            Visualizar Frequência
-          </button>
-        </div>
-      </div>
+function mesAtual(){
+  const d = new Date();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  return `${d.getFullYear()}-${m}`;
+}
 
-      <div id="tabelaContainer" class="overflow-x-auto text-center text-gray-400">
-        Selecione a sala e o mês para visualizar a frequência.
-      </div>
-    </main>
+async function carregarSalas(){
+  const salas = await (await fetch('/api/salas')).json();
+  document.getElementById('sala_id').innerHTML =
+    '<option value="">Selecione a sala</option>' +
+    (Array.isArray(salas) ? salas.map(s => `<option value="${s.id}">${s.nome || s.sala || ''}</option>`).join('') : '');
+}
 
-    <footer class="w-full text-center mt-10 p-4 text-gray-400 text-sm border-t border-gray-800">
-      <p class="text-base font-medium">DESENVOLVEDOR: MARCELO ANDRÉ NOGUEIRA CARDES</p>
-      <p class="text-xs font-light">LICENCIADO: E.E. PEI PROFESSORA IRENE DIAS RIBEIRO</p>
-    </footer>
-  </div>
+async function carregarRelatorio(){
+  const salaId = document.getElementById('sala_id').value;
+  const mes = document.getElementById('mesRef').value || mesAtual();
+  if(!salaId) return alert('Selecione a sala');
+
+  const r = await fetch(`/api/relatorio_frequencia?sala_id=${salaId}&mes=${mes}`);
+  const j = await r.json();
+  if(!r.ok || !j.success) return alert(j.error || 'Erro ao gerar relatório');
+
+  relatorioAtual = j.data;
+
+  const dias = j.data.dias || [];
+  document.getElementById('theadRelatorio').innerHTML = `
+    <tr class="border-b border-slate-700">
+      <th class="text-left py-2 pr-4">Aluno</th>
+      ${dias.map(d => `<th class="text-left py-2 px-2">${d}</th>`).join('')}
+    </tr>
+  `;
+
+  document.getElementById('tbodyRelatorio').innerHTML = (j.data.alunos || []).map(al => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2 pr-4 font-medium">${al.nome}</td>
+      ${(al.registros || []).map(v => `<td class="py-2 px-2">${v || ''}</td>`).join('')}
+    </tr>
+  `).join('');
+}
+
+async function gerarPdf(){
+  const salaId = document.getElementById('sala_id').value;
+  const mes = document.getElementById('mesRef').value || mesAtual();
+  if(!salaId) return alert('Selecione a sala');
+
+  const r = await fetch('/api/relatorio_frequencia_pdf', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sala_id: salaId, mes})
+  });
+  const j = await r.json();
+  if(!r.ok || !j.success) return alert(j.error || 'Erro ao gerar PDF');
+  window.open(j.pdf_url, '_blank');
+}
+
+document.getElementById('mesRef').value = mesAtual();
+carregarSalas();
+</script>
 </body>
 </html>
-
-
-
-

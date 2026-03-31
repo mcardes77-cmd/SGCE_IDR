@@ -1,1 +1,41 @@
-<html><body class='bg-slate-900 text-white p-6'><h1>Relatório de Frequência</h1></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Relatório de Frequência</title><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-5">
+<header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+<div><h1 class="text-2xl md:text-3xl font-bold text-emerald-400">RELATÓRIO DE FREQUÊNCIA</h1><p class="text-slate-400">Visão resumida dos lançamentos de frequência</p></div>
+<div class="flex flex-wrap gap-2"><a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a><a href="/gestao_frequencia_avancada" class="bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded-lg font-semibold">Frequência</a></div>
+</header>
+<section class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+<div><label class="block text-xs text-slate-400 mb-1">Sala</label><select id="sala_id" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"><option value="">Todas</option></select></div>
+<div><label class="block text-xs text-slate-400 mb-1">Data</label><input id="data_ref" type="date" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"></div>
+<div class="flex items-end"><button onclick="carregar()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar</button></div>
+</div>
+</section>
+<section class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">P</div><div id="cP" class="text-2xl font-bold text-emerald-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">F</div><div id="cF" class="text-2xl font-bold text-red-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">PA</div><div id="cPA" class="text-2xl font-bold text-amber-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">PS</div><div id="cPS" class="text-2xl font-bold text-blue-400">0</div></div>
+<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">PSA</div><div id="cPSA" class="text-2xl font-bold text-fuchsia-400">0</div></div>
+</section>
+<section class="bg-slate-800 rounded-xl p-4 border border-slate-700"><canvas id="grafico" height="120"></canvas></section>
+</div>
+<script>
+let chart=null;
+function setText(id,v){document.getElementById(id).textContent=v??0;}
+async function carregar(){
+ const params=new URLSearchParams({sala_id:document.getElementById('sala_id').value,data:document.getElementById('data_ref').value});
+ const r=await fetch('/api/frequencia_premium?'+params.toString());
+ const j=await r.json();
+ if(!r.ok||!j.success){alert(j.error||'Erro');return;}
+ const d=j.data; const x=d.resumo||{};
+ setText('cP',x.P); setText('cF',x.F); setText('cPA',x.PA); setText('cPS',x.PS); setText('cPSA',x.PSA);
+ const sel=document.getElementById('sala_id'); const existing=[...sel.options].map(o=>o.value);
+ (d.salas||[]).forEach(s=>{const id=String(s.id||''); if(!existing.includes(id)){const op=document.createElement('option'); op.value=id; op.textContent=s.nome; sel.appendChild(op);}});
+ if(chart) chart.destroy();
+ chart=new Chart(document.getElementById('grafico'),{type:'bar',data:{labels:['P','F','PA','PS','PSA'],datasets:[{data:[x.P||0,x.F||0,x.PA||0,x.PS||0,x.PSA||0]}]},options:{plugins:{legend:{display:false}}}});
+}
+carregar();
+</script></body></html>

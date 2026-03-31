@@ -1,1 +1,55 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Gestão de Tutoria</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 text-white min-h-screen p-6"><div class="max-w-7xl mx-auto"><header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4"><div><h1 class="text-3xl font-bold text-emerald-400">Gestão de Tutoria</h1><p class="text-slate-400">Dashboard avançado com agendamento, atendimento, ficha integrada e evolução.</p></div><button onclick="window.location.href='/dashboard_geral'" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Voltar</button></header><section class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8"><div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Tutores</div><div id="kpi-tutores" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendamentos</div><div id="kpi-agendamentos" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendados</div><div id="kpi-agendados" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Concluídos</div><div id="kpi-concluidos" class="text-3xl font-bold mt-2">0</div></div><div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Atendimentos</div><div id="kpi-atendimentos" class="text-3xl font-bold mt-2">0</div></div></section><section class="grid grid-cols-1 md:grid-cols-4 gap-5"><a href="/gestao_tutoria_agendamento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📅 Agendamento</a><a href="/gestao_tutoria_atendimento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📝 Atendimento</a><a href="/gestao_tutoria_ficha" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📘 Ficha do Aluno</a><a href="/gestao_tutoria_evolucao" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📈 Evolução</a></section></div><script>document.addEventListener('DOMContentLoaded', async ()=>{const r=await fetch('/api/dashboard_tutoria');const d=await r.json();document.getElementById('kpi-tutores').textContent=d.total_tutores||0;document.getElementById('kpi-agendamentos').textContent=d.total_agendamentos||0;document.getElementById('kpi-agendados').textContent=d.agendados||0;document.getElementById('kpi-concluidos').textContent=d.concluidos||0;document.getElementById('kpi-atendimentos').textContent=d.total_atendimentos||0;});</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Tutoria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+    <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-emerald-400">Gestão de Tutoria</h1>
+        <p class="text-slate-400">Dashboard com alunos, tutores, atendimentos e ficha do aluno.</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Dashboard Geral</a>
+      </div>
+    </header>
+
+    <section class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Tutores</div><div id="kpi-tutores" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Alunos</div><div id="kpi-alunos" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Com Tutor</div><div id="kpi-alunos-tutor" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendamentos</div><div id="kpi-agendamentos" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendados</div><div id="kpi-agendados" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Atendimentos</div><div id="kpi-atendimentos" class="text-3xl font-bold mt-2">0</div></div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-5">
+      <a href="/gestao_tutoria_agendamento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📅 Agendamento</a>
+      <a href="/gestao_tutoria_atendimento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📝 Atendimento</a>
+      <a href="/gestao_tutoria_ficha" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📘 Ficha do Aluno</a>
+      <a href="/gestao_tutoria_evolucao" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📈 Evolução</a>
+    </section>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const r = await fetch('/api/dashboard_tutoria');
+        const d = await r.json();
+        document.getElementById('kpi-tutores').textContent = d.total_tutores || 0;
+        document.getElementById('kpi-alunos').textContent = d.total_alunos || 0;
+        document.getElementById('kpi-alunos-tutor').textContent = d.alunos_com_tutor || 0;
+        document.getElementById('kpi-agendamentos').textContent = d.total_agendamentos || 0;
+        document.getElementById('kpi-agendados').textContent = d.agendados || 0;
+        document.getElementById('kpi-atendimentos').textContent = d.total_atendimentos || 0;
+      } catch(e) {
+        console.error(e);
+      }
+    });
+  </script>
+</body>
+</html>

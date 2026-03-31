@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primeiro acesso</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-8">
+    <h1 class="text-3xl font-bold text-emerald-400 text-center">Primeiro acesso</h1>
+    <p class="text-slate-400 text-center mt-2">Escolha seu nome e crie seu usuário e senha.</p>
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="block text-sm text-slate-300 mb-1">Funcionário</label>
+        <select id="funcionario" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none">
+          <option value="">Selecione...</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Usuário</label>
+        <input id="username" type="text" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none" placeholder="crie seu usuário">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-1">Senha</label>
+        <input id="senha" type="password" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none" placeholder="mínimo 6 caracteres">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-sm text-slate-300 mb-1">Confirmar senha</label>
+        <input id="confirmar" type="password" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-4 py-3 outline-none" placeholder="repita a senha">
+      </div>
+    </div>
+    <div class="mt-6 flex flex-col md:flex-row gap-3">
+      <button onclick="criarConta()" class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-semibold">Criar conta</button>
+      <a href="/login" class="flex-1 text-center rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar ao login</a>
+    </div>
+    <div id="erro" class="hidden mt-4 rounded-xl bg-red-950/40 border border-red-500/30 px-4 py-3 text-sm text-red-300"></div>
+    <div id="ok" class="hidden mt-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 px-4 py-3 text-sm text-emerald-300"></div>
+  </div>
+<script>
+async function carregarFuncionarios() {
+  const response = await fetch('/api/funcionarios_primeiro_acesso');
+  const json = await response.json();
+  const select = document.getElementById('funcionario');
+  if (!response.ok || !json.success) return;
+  (json.data || []).forEach(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.nome;
+    select.appendChild(option);
+  });
+}
+async function criarConta() {
+  const erro = document.getElementById('erro');
+  const ok = document.getElementById('ok');
+  erro.classList.add('hidden');
+  ok.classList.add('hidden');
+  const response = await fetch('/api/primeiro_acesso', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      funcionario_id: document.getElementById('funcionario').value,
+      username: document.getElementById('username').value,
+      senha: document.getElementById('senha').value,
+      confirmar_senha: document.getElementById('confirmar').value
+    })
+  });
+  const json = await response.json();
+  if (!response.ok || !json.success) {
+    erro.textContent = json.error || 'Falha ao criar a conta.';
+    erro.classList.remove('hidden');
+    return;
+  }
+  ok.textContent = json.message || 'Conta criada com sucesso.';
+  ok.classList.remove('hidden');
+  setTimeout(() => window.location.href = json.redirect || '/login', 1200);
+}
+carregarFuncionarios();
+</script>
+</body>
+</html>
