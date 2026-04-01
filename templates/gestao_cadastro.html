@@ -5,118 +5,436 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestão de Cadastro</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            darkPrimary: '#0F172A',
-            darkSecondary: '#1E293B',
-            accent: '#10B981',
-            textLight: '#F8FAFC'
-          }
-        }
-      }
-    }
-  </script>
 </head>
-<body class="bg-darkPrimary text-textLight min-h-screen p-4 md:p-6 text-sm">
-  <div class="max-w-7xl mx-auto space-y-5">
-    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">GESTÃO DE CADASTRO</h1>
+      <p class="text-slate-400">Cadastro de alunos, funcionários, clubes, eletivas e edição de ocorrências.</p>
+    </div>
+    <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Voltar</a>
+  </header>
+
+  <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+    <button class="card-op bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-tab="alunos">
+      <div class="text-lg font-bold text-emerald-400">Aluno</div>
+      <div class="text-xs text-slate-400 mt-1">Cadastrar, editar e excluir</div>
+    </button>
+    <button class="card-op bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-tab="funcionarios">
+      <div class="text-lg font-bold text-cyan-400">Funcionário</div>
+      <div class="text-xs text-slate-400 mt-1">Acesso total</div>
+    </button>
+    <button class="card-op bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-tab="clubes">
+      <div class="text-lg font-bold text-violet-400">Clube Juvenil</div>
+      <div class="text-xs text-slate-400 mt-1">Acesso total</div>
+    </button>
+    <button class="card-op bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-tab="eletivas">
+      <div class="text-lg font-bold text-fuchsia-400">Eletiva</div>
+      <div class="text-xs text-slate-400 mt-1">Acesso total</div>
+    </button>
+    <button class="card-op bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-tab="ocorrencias">
+      <div class="text-lg font-bold text-amber-400">Editar Ocorrência</div>
+      <div class="text-xs text-slate-400 mt-1">Acesso total</div>
+    </button>
+  </section>
+
+  <section id="painel_alunos" class="painel space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
       <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-accent">GESTÃO DE CADASTRO</h1>
-        <p class="text-slate-400">Consulta rápida de alunos, salas e funcionários</p>
+        <label class="block text-xs text-slate-400 mb-1">Sala</label>
+        <select id="filtroSalaAluno" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          <option value="">Selecione a sala</option>
+        </select>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a>
-        <a href="/dashboard_ocorrencias" class="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-lg font-semibold">Início</a>
+      <div class="flex items-end">
+        <button onclick="carregarAlunosSala()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar alunos</button>
       </div>
-    </header>
+      <div class="flex items-end">
+        <button onclick="novoAluno()" class="w-full bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg font-semibold">Cadastrar novo aluno</button>
+      </div>
+      <div class="flex items-end">
+        <div class="text-xs text-slate-400">Todos podem cadastrar, editar e excluir alunos.</div>
+      </div>
+    </div>
 
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <button onclick="mostrarAba('alunos')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Alunos</button>
-      <button onclick="mostrarAba('salas')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Salas</button>
-      <button onclick="mostrarAba('funcionarios')" class="bg-darkSecondary rounded-xl p-4 border border-slate-800 text-left font-semibold">Funcionários</button>
-    </section>
-
-    <section id="aba-alunos" class="bg-darkSecondary rounded-xl p-4 border border-slate-800">
-      <h2 class="font-semibold text-accent text-base mb-3">Alunos</h2>
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <div class="overflow-x-auto">
-        <table class="w-full text-xs md:text-sm">
-          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Nome</th><th class="text-left py-2 px-2">Sala</th><th class="text-left py-2 px-2">Tutor</th></tr></thead>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700">
+              <th class="text-left py-2">Aluno</th>
+              <th class="text-left py-2">Sala</th>
+              <th class="text-left py-2">Tutor</th>
+              <th class="text-left py-2">Projeto de Vida</th>
+              <th class="text-left py-2">Ações</th>
+            </tr>
+          </thead>
           <tbody id="tbAlunos"></tbody>
         </table>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section id="aba-salas" class="hidden bg-darkSecondary rounded-xl p-4 border border-slate-800">
-      <h2 class="font-semibold text-accent text-base mb-3">Salas</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs md:text-sm">
-          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Sala</th></tr></thead>
-          <tbody id="tbSalas"></tbody>
-        </table>
+  <section id="painel_funcionarios" class="painel hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-bold text-cyan-400">Cadastrar Funcionário</h2>
+        <button onclick="novoFuncionario()" class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-lg font-semibold">Novo funcionário</button>
       </div>
-    </section>
-
-    <section id="aba-funcionarios" class="hidden bg-darkSecondary rounded-xl p-4 border border-slate-800">
-      <h2 class="font-semibold text-accent text-base mb-3">Funcionários</h2>
       <div class="overflow-x-auto">
-        <table class="w-full text-xs md:text-sm">
-          <thead><tr class="text-slate-300 border-b border-slate-700"><th class="text-left py-2 px-2">ID</th><th class="text-left py-2 px-2">Nome</th><th class="text-left py-2 px-2">Função</th><th class="text-left py-2 px-2">Email</th><th class="text-left py-2 px-2">Tipo</th></tr></thead>
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-700"><th class="text-left py-2">Nome</th><th class="text-left py-2">Cargo</th><th class="text-left py-2">Função</th><th class="text-left py-2">Acesso</th><th class="text-left py-2">Ações</th></tr></thead>
           <tbody id="tbFuncionarios"></tbody>
         </table>
       </div>
-    </section>
+    </div>
+  </section>
+
+  <section id="painel_clubes" class="painel hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-bold text-violet-400">Cadastrar Clube Juvenil</h2>
+        <button onclick="novoClube()" class="bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded-lg font-semibold">Novo clube</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-700"><th class="text-left py-2">Nome</th><th class="text-left py-2">Semestre</th><th class="text-left py-2">Ativo</th><th class="text-left py-2">Ações</th></tr></thead>
+          <tbody id="tbClubes"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="painel_eletivas" class="painel hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-bold text-fuchsia-400">Cadastrar Eletiva</h2>
+        <button onclick="novaEletiva()" class="bg-fuchsia-700 hover:bg-fuchsia-600 px-4 py-2 rounded-lg font-semibold">Nova eletiva</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-slate-700"><th class="text-left py-2">Nome</th><th class="text-left py-2">Semestre</th><th class="text-left py-2">Ativo</th><th class="text-left py-2">Ações</th></tr></thead>
+          <tbody id="tbEletivas"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="painel_ocorrencias" class="painel hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Número da ocorrência</label>
+        <input id="numeroOcorrenciaBusca" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+      </div>
+      <div class="flex items-end">
+        <button onclick="buscarOcorrenciaParaEditar()" class="w-full bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg font-semibold">Carregar ocorrência</button>
+      </div>
+      <div class="md:col-span-2 flex items-end text-xs text-slate-400">
+        Somente os 5 usuários com acesso total podem editar ocorrência.
+      </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="grid md:grid-cols-2 gap-3">
+        <div><label class="block text-xs text-slate-400 mb-1">Descrição</label><textarea id="editOcDescricao" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Atendimento Professor</label><textarea id="editOcAtProf" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Atendimento Tutor</label><textarea id="editOcAtTutor" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Atendimento Coordenação</label><textarea id="editOcAtCoord" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Atendimento Gestão</label><textarea id="editOcAtGestao" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+        <div><label class="block text-xs text-slate-400 mb-1">Atendimento Responsável</label><textarea id="editOcAtResp" class="w-full h-28 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea></div>
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button onclick="salvarOcorrenciaEditada()" class="bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg font-semibold">Salvar edição</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="modalForm" class="hidden fixed inset-0 bg-black/70 items-center justify-center p-4">
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-3xl p-5 space-y-4">
+    <div class="flex justify-between items-center">
+      <h2 id="modalTitulo" class="text-xl font-bold text-emerald-400">Cadastro</h2>
+      <button onclick="fecharModal()" class="text-slate-300">✕</button>
+    </div>
+    <div id="modalBody" class="space-y-4"></div>
+    <div class="flex justify-end gap-2">
+      <button onclick="fecharModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Cancelar</button>
+      <button id="btnSalvarModal" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg">Salvar</button>
+    </div>
   </div>
+</div>
 
 <script>
-function mostrarAba(nome) {
-  ['alunos','salas','funcionarios'].forEach(x => {
-    document.getElementById(`aba-${x}`).classList.add('hidden');
+let tutores = [];
+let salas = [];
+let funcionarios = [];
+let clubes = [];
+let eletivas = [];
+let ocorrenciaAtual = null;
+
+function soMaiusculoSemAcento(v) {
+  return (v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+}
+function showPainel(id) {
+  document.querySelectorAll('.painel').forEach(p => p.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+function abrirModal(titulo, bodyHtml, onSave) {
+  document.getElementById('modalTitulo').textContent = titulo;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('btnSalvarModal').onclick = onSave;
+  document.getElementById('modalForm').classList.remove('hidden');
+  document.getElementById('modalForm').classList.add('flex');
+}
+function fecharModal() {
+  document.getElementById('modalForm').classList.add('hidden');
+  document.getElementById('modalForm').classList.remove('flex');
+}
+
+async function carregarBases() {
+  salas = await (await fetch('/api/salas')).json();
+  const salaOptions = '<option value="">Selecione a sala</option>' + (Array.isArray(salas) ? salas.map(s => {
+    const nome = s.nome || s.sala || s.sala_nome || '';
+    return `<option value="${nome}">${nome}</option>`;
+  }).join('') : '');
+  document.getElementById('filtroSalaAluno').innerHTML = salaOptions;
+
+  funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
+  tutores = (Array.isArray(funcionarios) ? funcionarios : []).filter(f => {
+    const tipo = (f.tipo || '').toUpperCase();
+    const funcao = (f.funcao || '').toUpperCase();
+    return tipo === 'PROFESSOR' && !funcao.includes('APOIO');
   });
-  document.getElementById(`aba-${nome}`).classList.remove('hidden');
+
+  await listarFuncionarios();
+  await listarClubes();
+  await listarEletivas();
 }
 
-async function carregarCadastro() {
-  const response = await fetch('/api/cadastro_premium');
-  const json = await response.json();
-
-  if (!response.ok || !json.success) {
-    alert(json.error || 'Erro ao carregar cadastro');
-    return;
-  }
-
-  const data = json.data;
-
-  document.getElementById('tbAlunos').innerHTML = (data.alunos || []).map(x => `
-    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-      <td class="py-2 px-2">${x.id || ''}</td>
-      <td class="py-2 px-2">${x.nome || ''}</td>
-      <td class="py-2 px-2">${x.sala_nome || ''}</td>
-      <td class="py-2 px-2">${x.tutor_nome || ''}</td>
+async function carregarAlunosSala() {
+  const sala = document.getElementById('filtroSalaAluno').value;
+  if (!sala) return alert('Selecione a sala.');
+  const alunos = await (await fetch(`/api/cadastro/alunos_por_sala_nome?sala_nome=${encodeURIComponent(sala)}`)).json();
+  document.getElementById('tbAlunos').innerHTML = (Array.isArray(alunos) ? alunos : []).map(a => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${a.nome || a.aluno_nome || ''}</td>
+      <td class="py-2">${a.sala_nome || ''}</td>
+      <td class="py-2">${a.tutor_nome || a.nome_tutor || ''}</td>
+      <td class="py-2">${a.projeto_de_vida || a.projeto_vida || ''}</td>
+      <td class="py-2">
+        <button class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded mr-1" onclick='editarAluno(${JSON.stringify(a)})'>Editar</button>
+        <button class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onclick='excluirAluno(${a.id})'>Excluir</button>
+      </td>
     </tr>
-  `).join('') || '<tr><td colspan="4" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
-
-  document.getElementById('tbSalas').innerHTML = (data.salas || []).map(x => `
-    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-      <td class="py-2 px-2">${x.id || ''}</td>
-      <td class="py-2 px-2">${x.nome || ''}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="2" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
-
-  document.getElementById('tbFuncionarios').innerHTML = (data.funcionarios || []).map(x => `
-    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-      <td class="py-2 px-2">${x.id || ''}</td>
-      <td class="py-2 px-2">${x.nome || ''}</td>
-      <td class="py-2 px-2">${x.funcao || ''}</td>
-      <td class="py-2 px-2">${x.email || ''}</td>
-      <td class="py-2 px-2">${x.tipo || ''}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="5" class="py-4 px-2 text-slate-400">Sem registros.</td></tr>';
+  `).join('') || '<tr><td colspan="5" class="py-2 text-slate-400">Nenhum aluno encontrado.</td></tr>';
 }
 
-carregarCadastro();
+function formAlunoHtml(aluno) {
+  aluno = aluno || {};
+  const salaOptions = '<option value="">Selecione a sala</option>' + (Array.isArray(salas) ? salas.map(s => {
+    const nome = s.nome || s.sala || s.sala_nome || '';
+    return `<option value="${nome}" ${nome === (aluno.sala_nome || '') ? 'selected' : ''}>${nome}</option>`;
+  }).join('') : '');
+  const tutorOptions = '<option value="">Selecione o tutor</option>' + tutores.map(t => `<option value="${t.id}" data-nome="${t.nome}" ${String(t.id) === String(aluno.tutor_id || aluno.id_tutor || '') ? 'selected' : ''}>${t.nome}</option>`).join('');
+  return `
+    <input type="hidden" id="frmAlunoId" value="${aluno.id || ''}">
+    <div class="grid md:grid-cols-2 gap-3">
+      <div><label class="block text-xs text-slate-400 mb-1">Nome do aluno</label><input id="frmAlunoNome" value="${aluno.nome || aluno.aluno_nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Sala</label><select id="frmAlunoSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${salaOptions}</select></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Tutor</label><select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${tutorOptions}</select></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Projeto de Vida</label><input id="frmAlunoProjeto" value="${aluno.projeto_de_vida || aluno.projeto_vida || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></div>
+    </div>
+  `;
+}
+function novoAluno(){ abrirModal('Cadastrar novo aluno', formAlunoHtml({}), salvarAlunoModal); }
+function editarAluno(aluno){ abrirModal('Editar aluno', formAlunoHtml(aluno), salvarAlunoModal); }
+
+async function salvarAlunoModal() {
+  const id = document.getElementById('frmAlunoId').value;
+  const tutorSelect = document.getElementById('frmAlunoTutor');
+  const tutorId = tutorSelect.value;
+  const opt = tutorSelect.options[tutorSelect.selectedIndex];
+  const tutorNome = opt ? (opt.dataset.nome || '') : '';
+  const payload = {
+    nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
+    aluno_nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
+    sala_nome: document.getElementById('frmAlunoSala').value,
+    tutor_id: tutorId || null,
+    id_tutor: tutorId || null,
+    tutor_nome: tutorNome,
+    nome_tutor: tutorNome,
+    projeto_de_vida: document.getElementById('frmAlunoProjeto').value
+  };
+  const url = id ? `/api/cadastro/aluno/${id}` : '/api/cadastro/aluno';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar aluno.');
+  fecharModal();
+  if (document.getElementById('filtroSalaAluno').value) carregarAlunosSala();
+}
+async function excluirAluno(id) {
+  if (!confirm('Excluir este aluno?')) return;
+  const r = await fetch(`/api/cadastro/aluno/${id}`, {method:'DELETE'});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao excluir.');
+  if (document.getElementById('filtroSalaAluno').value) carregarAlunosSala();
+}
+
+async function listarFuncionarios() {
+  document.getElementById('tbFuncionarios').innerHTML = (Array.isArray(funcionarios) ? funcionarios : []).map(f => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${f.nome || ''}</td>
+      <td class="py-2">${f.tipo || ''}</td>
+      <td class="py-2">${f.funcao || ''}</td>
+      <td class="py-2">${f.acesso_total ? 'Total' : 'Padrão'}</td>
+      <td class="py-2">
+        <button class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded mr-1" onclick='editarFuncionario(${JSON.stringify(f)})'>Editar</button>
+        <button class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onclick='excluirFuncionario(${f.id})'>Excluir</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function formFuncionarioHtml(func) {
+  func = func || {};
+  return `
+    <input type="hidden" id="frmFuncId" value="${func.id || ''}">
+    <div class="grid md:grid-cols-2 gap-3">
+      <div><label class="block text-xs text-slate-400 mb-1">Nome</label><input id="frmFuncNome" value="${func.nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Tipo/Cargo</label><select id="frmFuncTipo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="PROFESSOR" ${(func.tipo||'')==='PROFESSOR'?'selected':''}>PROFESSOR</option><option value="GESTAO" ${(func.tipo||'')==='GESTAO'?'selected':''}>GESTAO</option><option value="COORDENACAO" ${(func.tipo||'')==='COORDENACAO'?'selected':''}>COORDENACAO</option><option value="SECRETARIA" ${(func.tipo||'')==='SECRETARIA'?'selected':''}>SECRETARIA</option><option value="PEDAGOGICO" ${(func.tipo||'')==='PEDAGOGICO'?'selected':''}>PEDAGOGICO</option></select></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Função</label><input id="frmFuncFuncao" value="${func.funcao || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Usuário com acesso total?</label><select id="frmFuncAcessoTotal" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="false" ${func.acesso_total ? '' : 'selected'}>Não</option><option value="true" ${func.acesso_total ? 'selected' : ''}>Sim</option></select></div>
+    </div>
+  `;
+}
+function novoFuncionario(){ abrirModal('Cadastrar funcionário', formFuncionarioHtml({}), salvarFuncionarioModal); }
+function editarFuncionario(func){ abrirModal('Editar funcionário', formFuncionarioHtml(func), salvarFuncionarioModal); }
+async function salvarFuncionarioModal() {
+  const id = document.getElementById('frmFuncId').value;
+  const payload = {
+    nome: soMaiusculoSemAcento(document.getElementById('frmFuncNome').value),
+    tipo: document.getElementById('frmFuncTipo').value,
+    funcao: soMaiusculoSemAcento(document.getElementById('frmFuncFuncao').value),
+    acesso_total: document.getElementById('frmFuncAcessoTotal').value === 'true',
+    conta_ativada: false
+  };
+  const url = id ? `/api/cadastro/funcionario/${id}` : '/api/cadastro/funcionario';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar funcionário.');
+  fecharModal();
+  funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
+  tutores = (Array.isArray(funcionarios) ? funcionarios : []).filter(f => ((f.tipo || '').toUpperCase()==='PROFESSOR') && !((f.funcao || '').toUpperCase().includes('APOIO')));
+  listarFuncionarios();
+}
+async function excluirFuncionario(id) {
+  if (!confirm('Excluir este funcionário?')) return;
+  const r = await fetch(`/api/cadastro/funcionario/${id}`, {method:'DELETE'});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao excluir.');
+  funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
+  listarFuncionarios();
+}
+
+function formSimplesHtml(item) {
+  item = item || {};
+  return `
+    <input type="hidden" id="frmItemId" value="${item.id || ''}">
+    <div class="grid md:grid-cols-2 gap-3">
+      <div><label class="block text-xs text-slate-400 mb-1">Nome</label><input id="frmItemNome" value="${item.nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Semestre</label><select id="frmItemSemestre" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="1" ${String(item.semestre || '1')==='1'?'selected':''}>1</option><option value="2" ${String(item.semestre || '1')==='2'?'selected':''}>2</option></select></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Ativo</label><select id="frmItemAtivo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="true" ${(item.ativo ?? true)?'selected':''}>Sim</option><option value="false" ${(item.ativo ?? true)?'':'selected'}>Não</option></select></div>
+    </div>
+  `;
+}
+async function listarClubes() {
+  const c1 = await (await fetch('/api/clubes_juvenis?semestre=1')).json().catch(()=>[]);
+  const c2 = await (await fetch('/api/clubes_juvenis?semestre=2')).json().catch(()=>[]);
+  clubes = [...(Array.isArray(c1)?c1:[]), ...(Array.isArray(c2)?c2:[])];
+  document.getElementById('tbClubes').innerHTML = clubes.map(c => `<tr class="border-b border-slate-800"><td class="py-2">${c.nome||''}</td><td class="py-2">${c.semestre||''}</td><td class="py-2">${c.ativo?'Sim':'Não'}</td><td class="py-2"><button class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded mr-1" onclick='editarClube(${JSON.stringify(c)})'>Editar</button><button class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onclick='excluirClube(${c.id})'>Excluir</button></td></tr>`).join('');
+}
+function novoClube(){ abrirModal('Cadastrar clube juvenil', formSimplesHtml({}), salvarClubeModal); }
+function editarClube(c){ abrirModal('Editar clube juvenil', formSimplesHtml(c), salvarClubeModal); }
+async function salvarClubeModal() {
+  const id = document.getElementById('frmItemId').value;
+  const payload = {nome: document.getElementById('frmItemNome').value, semestre: parseInt(document.getElementById('frmItemSemestre').value), ativo: document.getElementById('frmItemAtivo').value === 'true'};
+  const url = id ? `/api/cadastro/clube/${id}` : '/api/cadastro/clube';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar clube.');
+  fecharModal();
+  listarClubes();
+}
+async function excluirClube(id) {
+  if (!confirm('Excluir este clube?')) return;
+  const r = await fetch(`/api/cadastro/clube/${id}`, {method:'DELETE'});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao excluir.');
+  listarClubes();
+}
+
+async function listarEletivas() {
+  const e1 = await (await fetch('/api/eletivas?semestre=1')).json().catch(()=>[]);
+  const e2 = await (await fetch('/api/eletivas?semestre=2')).json().catch(()=>[]);
+  eletivas = [...(Array.isArray(e1)?e1:[]), ...(Array.isArray(e2)?e2:[])];
+  document.getElementById('tbEletivas').innerHTML = eletivas.map(c => `<tr class="border-b border-slate-800"><td class="py-2">${c.nome||''}</td><td class="py-2">${c.semestre||''}</td><td class="py-2">${c.ativo?'Sim':'Não'}</td><td class="py-2"><button class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded mr-1" onclick='editarEletiva(${JSON.stringify(c)})'>Editar</button><button class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onclick='excluirEletiva(${c.id})'>Excluir</button></td></tr>`).join('');
+}
+function novaEletiva(){ abrirModal('Cadastrar eletiva', formSimplesHtml({}), salvarEletivaModal); }
+function editarEletiva(c){ abrirModal('Editar eletiva', formSimplesHtml(c), salvarEletivaModal); }
+async function salvarEletivaModal() {
+  const id = document.getElementById('frmItemId').value;
+  const payload = {nome: document.getElementById('frmItemNome').value, semestre: parseInt(document.getElementById('frmItemSemestre').value), ativo: document.getElementById('frmItemAtivo').value === 'true'};
+  const url = id ? `/api/cadastro/eletiva/${id}` : '/api/cadastro/eletiva';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar eletiva.');
+  fecharModal();
+  listarEletivas();
+}
+async function excluirEletiva(id) {
+  if (!confirm('Excluir esta eletiva?')) return;
+  const r = await fetch(`/api/cadastro/eletiva/${id}`, {method:'DELETE'});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao excluir.');
+  listarEletivas();
+}
+
+async function buscarOcorrenciaParaEditar() {
+  const numero = document.getElementById('numeroOcorrenciaBusca').value;
+  if (!numero) return alert('Informe o número da ocorrência.');
+  const r = await fetch(`/api/ocorrencia_detalhes?numero=${encodeURIComponent(numero)}`);
+  const j = await r.json();
+  if (!r.ok || j.success === false) return alert(j.error || 'Ocorrência não encontrada.');
+  ocorrenciaAtual = j;
+  document.getElementById('editOcDescricao').value = j.descricao || '';
+  document.getElementById('editOcAtProf').value = j.atendimento_professor || '';
+  document.getElementById('editOcAtTutor').value = j.atendimento_tutor || '';
+  document.getElementById('editOcAtCoord').value = j.atendimento_coordenacao || '';
+  document.getElementById('editOcAtGestao').value = j.atendimento_gestao || '';
+  document.getElementById('editOcAtResp').value = j.atendimento_responsavel || '';
+}
+async function salvarOcorrenciaEditada() {
+  if (!ocorrenciaAtual) return alert('Carregue a ocorrência primeiro.');
+  const payload = {
+    descricao: document.getElementById('editOcDescricao').value,
+    atendimento_professor: document.getElementById('editOcAtProf').value,
+    atendimento_tutor: document.getElementById('editOcAtTutor').value,
+    atendimento_coordenacao: document.getElementById('editOcAtCoord').value,
+    atendimento_gestao: document.getElementById('editOcAtGestao').value,
+    atendimento_responsavel: document.getElementById('editOcAtResp').value
+  };
+  const r = await fetch(`/api/cadastro/ocorrencia/${ocorrenciaAtual.numero}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar ocorrência.');
+  alert('Ocorrência atualizada.');
+}
+
+document.querySelectorAll('.card-op').forEach(btn => btn.addEventListener('click', () => showPainel('painel_' + btn.dataset.tab)));
+carregarBases();
 </script>
 </body>
 </html>

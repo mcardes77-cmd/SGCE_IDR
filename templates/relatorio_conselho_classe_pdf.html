@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Mapão Conselho de Classe</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: Arial, sans-serif; font-size: 10px; color: #111; }
+    h1,h2 { margin: 0 0 6px 0; }
+    .topo { margin-bottom: 10px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #333; padding: 4px; vertical-align: top; }
+    th { background: #f0f0f0; }
+    .assinaturas { margin-top: 20px; }
+    .bloco-ass { margin-bottom: 18px; }
+    .linha { border-top: 1px solid #333; width: 260px; padding-top: 4px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="topo">
+    <h1>Mapão de Conselho de Classe</h1>
+    <h2>Sala: {{ sala_nome }} | Bimestre: {{ bimestre }}º</h2>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Aluno</th>
+        {% for d in disciplinas %}
+          <th>{{ d }}</th>
+        {% endfor %}
+        <th>Causas</th>
+        <th>Soluções</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in linhas %}
+      <tr>
+        <td>{{ linha.aluno_nome }}</td>
+        {% for n in linha.notas %}
+          <td>{{ n }}</td>
+        {% endfor %}
+        <td>{{ linha.causas }}</td>
+        <td>{{ linha.solucoes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="assinaturas">
+    {% for prof in professores %}
+      <div class="bloco-ass">
+        <div class="linha">{{ prof }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

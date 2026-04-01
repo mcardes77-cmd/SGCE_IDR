@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conselho de Classe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">CONSELHO DE CLASSE</h1>
+      <p class="text-slate-400">Selecione a sala e o bimestre para discutir alunos com média inferior a 5.</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Voltar</a>
+      <a href="/gestao_notas" class="bg-indigo-700 hover:bg-indigo-600 px-4 py-2 rounded-lg font-semibold">Gestão de Notas</a>
+    </div>
+  </header>
+
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Sala</label>
+      <select id="sala_nome" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Bimestre</label>
+      <select id="bimestre" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="1">1º Bimestre</option>
+        <option value="2">2º Bimestre</option>
+        <option value="3">3º Bimestre</option>
+        <option value="4">4º Bimestre</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button onclick="carregarConselho()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar</button>
+    </div>
+    <div class="flex items-end">
+      <button onclick="imprimirMapao()" class="w-full bg-violet-700 hover:bg-violet-600 px-4 py-2 rounded-lg font-semibold">Imprimir Mapão</button>
+    </div>
+  </section>
+
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+    <h2 class="text-lg font-bold text-emerald-400 mb-3">Alunos para discussão</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="text-left py-2">Aluno</th>
+            <th class="text-left py-2">Disciplina</th>
+            <th class="text-left py-2">Nota</th>
+            <th class="text-left py-2">Causas</th>
+            <th class="text-left py-2">Soluções</th>
+          </tr>
+        </thead>
+        <tbody id="tbConselho"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Pontos fortes da sala</label>
+      <textarea id="pontos_fortes" class="w-full h-32 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Pontos de melhoria da sala</label>
+      <textarea id="pontos_melhoria" class="w-full h-32 bg-slate-900 border border-slate-700 rounded px-3 py-2"></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Aluno destaque</label>
+      <select id="aluno_destaque" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Aluno evolução</label>
+      <select id="aluno_evolucao" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+    </div>
+  </section>
+
+  <div class="flex justify-end">
+    <button onclick="salvarConselho()" class="bg-blue-700 hover:bg-blue-600 px-5 py-2 rounded-lg font-semibold">Salvar conselho</button>
+  </div>
+</div>
+
+<script>
+let dadosAtuais = [];
+
+function safe(v){ return v == null ? '' : String(v); }
+
+async function carregarSalas(){
+  const r = await fetch('/api/salas');
+  const salas = await r.json();
+  document.getElementById('sala_nome').innerHTML =
+    '<option value="">Selecione a sala</option>' +
+    (Array.isArray(salas) ? salas.map(s => {
+      const nome = s.nome || s.sala || s.sala_nome || '';
+      return `<option value="${nome}">${nome}</option>`;
+    }).join('') : '');
+}
+
+function preencherCombosAlunos(alunos){
+  const opts = '<option value="">Selecione...</option>' + alunos.map(a => `<option value="${a}">${a}</option>`).join('');
+  document.getElementById('aluno_destaque').innerHTML = opts;
+  document.getElementById('aluno_evolucao').innerHTML = opts;
+}
+
+async function carregarConselho(){
+  const sala = document.getElementById('sala_nome').value;
+  const bimestre = document.getElementById('bimestre').value;
+  if(!sala) return alert('Selecione a sala.');
+
+  const r = await fetch(`/api/conselho_classe?sala=${encodeURIComponent(sala)}&bimestre=${bimestre}`);
+  const j = await r.json();
+  if(!r.ok || !j.success) return alert(j.error || 'Erro ao carregar conselho.');
+
+  dadosAtuais = j.data.alunos_criticos || [];
+  document.getElementById('tbConselho').innerHTML = dadosAtuais.map(x => `
+    <tr class="border-b border-slate-800">
+      <td class="py-2">${safe(x.aluno_nome)}</td>
+      <td class="py-2">${safe(x.disciplina)}</td>
+      <td class="py-2">${safe(x.nota)}</td>
+      <td class="py-2">${safe((x.causas || []).join(', '))}</td>
+      <td class="py-2">${safe((x.solucoes || []).join(', '))}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="py-2 text-slate-400">Nenhum aluno abaixo de 5 neste bimestre.</td></tr>';
+
+  document.getElementById('pontos_fortes').value = j.data.resumo?.pontos_fortes || '';
+  document.getElementById('pontos_melhoria').value = j.data.resumo?.pontos_melhoria || '';
+  preencherCombosAlunos(j.data.alunos_sala || []);
+  document.getElementById('aluno_destaque').value = j.data.resumo?.aluno_destaque || '';
+  document.getElementById('aluno_evolucao').value = j.data.resumo?.aluno_evolucao || '';
+}
+
+async function salvarConselho(){
+  const sala = document.getElementById('sala_nome').value;
+  const bimestre = document.getElementById('bimestre').value;
+  if(!sala) return alert('Selecione a sala.');
+
+  const payload = {
+    sala_nome: sala,
+    bimestre: parseInt(bimestre),
+    pontos_fortes: document.getElementById('pontos_fortes').value,
+    pontos_melhoria: document.getElementById('pontos_melhoria').value,
+    aluno_destaque: document.getElementById('aluno_destaque').value,
+    aluno_evolucao: document.getElementById('aluno_evolucao').value
+  };
+
+  const r = await fetch('/api/salvar_conselho_classe', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if(!r.ok || !j.success) return alert(j.error || 'Erro ao salvar.');
+  alert('Conselho salvo com sucesso.');
+}
+
+function imprimirMapao(){
+  const sala = document.getElementById('sala_nome').value;
+  const bimestre = document.getElementById('bimestre').value;
+  if(!sala) return alert('Selecione a sala.');
+  window.open(`/relatorio_conselho_classe_pdf?sala=${encodeURIComponent(sala)}&bimestre=${bimestre}`, '_blank');
+}
+
+carregarSalas();
+</script>
+</body>
+</html>

@@ -1,101 +1,251 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Gestão de Notas</title>
-<script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Notas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="bg-slate-900 text-white min-h-screen p-4 md:p-6">
+<div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-indigo-400">GESTÃO DE NOTAS</h1>
+      <p class="text-slate-400">Selecione a sala, a disciplina e o bimestre para lançar as notas.</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Voltar</a>
+      <a href="/gestao_conselho_classe" class="bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg font-semibold">Conselho de Classe</a>
+    </div>
+  </header>
 
-<body class="bg-slate-900 text-white p-6">
-<div class="max-w-6xl mx-auto space-y-6">
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Sala</label>
+      <select id="sala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Sala</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Disciplina</label>
+      <select id="disciplina" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Disciplina</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Bimestre</label>
+      <select id="bimestre" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="1">1º Bimestre</option>
+        <option value="2">2º Bimestre</option>
+        <option value="3">3º Bimestre</option>
+        <option value="4">4º Bimestre</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button onclick="carregar()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar</button>
+    </div>
+  </section>
 
-<h1 class="text-2xl font-bold text-indigo-400">GESTÃO DE NOTAS</h1>
-
-<div class="grid md:grid-cols-3 gap-3">
-<select id="sala" class="bg-slate-800 p-2 rounded"></select>
-<select id="disciplina" class="bg-slate-800 p-2 rounded"></select>
-<button onclick="carregar()" class="bg-emerald-600 p-2 rounded">Carregar</button>
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="text-left py-2 pr-3 whitespace-nowrap">Aluno</th>
+            <th class="text-center py-2 px-2 whitespace-nowrap">1º</th>
+            <th class="text-center py-2 px-2 whitespace-nowrap">2º</th>
+            <th class="text-center py-2 px-2 whitespace-nowrap">3º</th>
+            <th class="text-center py-2 px-2 whitespace-nowrap">4º</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex justify-end">
+      <button onclick="salvar()" class="bg-blue-700 hover:bg-blue-600 px-4 py-2 rounded-lg font-semibold">Salvar</button>
+    </div>
+  </section>
 </div>
 
-<table class="w-full mt-4">
-<thead>
-<tr>
-<th>Aluno</th>
-<th>1º</th>
-<th>2º</th>
-<th>3º</th>
-<th>4º</th>
-</tr>
-</thead>
-<tbody id="tb"></tbody>
-</table>
+<div id="modalConselho" class="hidden fixed inset-0 bg-black/70 items-center justify-center p-4">
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl p-5 space-y-4">
+    <div class="flex justify-between items-center">
+      <h2 class="text-xl font-bold text-amber-400">Justificativa para nota abaixo de 5</h2>
+      <button onclick="fecharModal()" class="text-slate-300">✕</button>
+    </div>
+    <div class="text-sm text-slate-300">
+      <div><strong>Aluno:</strong> <span id="mAluno"></span></div>
+      <div><strong>Disciplina:</strong> <span id="mDisciplina"></span></div>
+      <div><strong>Bimestre:</strong> <span id="mBimestre"></span></div>
+      <div><strong>Nota:</strong> <span id="mNota"></span></div>
+    </div>
 
-<button onclick="salvar()" class="mt-4 bg-blue-600 p-2 rounded">Salvar</button>
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Causas</label>
+      <div class="grid md:grid-cols-2 gap-2 text-sm">
+        <label><input type="checkbox" class="causa" value="Baixa frequência"> Baixa frequência</label>
+        <label><input type="checkbox" class="causa" value="Dificuldade de aprendizagem"> Dificuldade de aprendizagem</label>
+        <label><input type="checkbox" class="causa" value="Falta de estudo/entrega"> Falta de estudo/entrega</label>
+        <label><input type="checkbox" class="causa" value="Questões comportamentais"> Questões comportamentais</label>
+        <label><input type="checkbox" class="causa" value="Questões familiares/emocionais"> Questões familiares/emocionais</label>
+      </div>
+    </div>
 
+    <div>
+      <label class="block text-sm font-semibold text-emerald-400 mb-2">Soluções</label>
+      <div class="grid md:grid-cols-2 gap-2 text-sm">
+        <label><input type="checkbox" class="solucao" value="Recuperação paralela"> Recuperação paralela</label>
+        <label><input type="checkbox" class="solucao" value="Acompanhamento individual"> Acompanhamento individual</label>
+        <label><input type="checkbox" class="solucao" value="Contato com responsável"> Contato com responsável</label>
+        <label><input type="checkbox" class="solucao" value="Encaminhamento para tutoria/apoio"> Encaminhamento para tutoria/apoio</label>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button onclick="fecharModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Cancelar</button>
+      <button onclick="confirmarJustificativa()" class="bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg">Salvar justificativa</button>
+    </div>
+  </div>
 </div>
 
 <script>
 let alunos = [];
+let contextoModal = null;
+
+function esc(v){ return v == null ? '' : String(v); }
+function campoNota(id, valor, habilitado) {
+  const disabled = habilitado ? '' : 'disabled';
+  const classes = habilitado
+    ? 'w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center'
+    : 'w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-center text-slate-500 cursor-not-allowed';
+  return `<input id="${id}" type="number" step="0.1" min="0" max="10" value="${esc(valor)}" ${disabled} class="${classes}" onblur="verificarNota(${id.split('_')[1]}, '${id.split('_')[0].replace('n','')}', this.value)">`;
+}
 
 async function carregarSalas(){
-let r = await fetch('/api/salas');
-let d = await r.json();
-
-document.getElementById('sala').innerHTML =
-'<option value="">Sala</option>' +
-d.map(x=>`<option value="${x.nome}">${x.nome}</option>`).join('');
+  const r = await fetch('/api/salas');
+  const d = await r.json();
+  document.getElementById('sala').innerHTML =
+    '<option value="">Sala</option>' +
+    (Array.isArray(d) ? d.map(x => {
+      const nome = x.nome || x.sala || x.sala_nome || '';
+      return `<option value="${nome}">${nome}</option>`;
+    }).join('') : '');
 }
 
 async function carregarDisciplinas(){
-let r = await fetch('/api/disciplinas_todas');
-let d = await r.json();
+  const r = await fetch('/api/disciplinas_todas');
+  const d = await r.json();
+  document.getElementById('disciplina').innerHTML =
+    '<option value="">Disciplina</option>' +
+    (Array.isArray(d) ? d.map(x => `<option value="${x.nome}">${x.nome}</option>`).join('') : '');
+}
 
-document.getElementById('disciplina').innerHTML =
-'<option value="">Disciplina</option>' +
-d.map(x=>`<option value="${x.nome}">${x.nome}</option>`).join('');
+function renderTabela() {
+  const bimestre = document.getElementById('bimestre').value;
+  document.getElementById('tb').innerHTML = alunos.map((a,i)=>`
+    <tr class="border-b border-slate-800">
+      <td class="py-2 pr-3 whitespace-nowrap">${esc(a.aluno_nome)}</td>
+      <td class="py-2 px-2 text-center"><input id="n1_${i}" type="number" step="0.1" min="0" max="10" value="${esc(a.nota_1b || '')}" ${bimestre==='1'?'':'disabled'} class="${bimestre==='1'?'w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center':'w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-center text-slate-500 cursor-not-allowed'}" onblur="verificarNota(${i},1,this.value)"></td>
+      <td class="py-2 px-2 text-center"><input id="n2_${i}" type="number" step="0.1" min="0" max="10" value="${esc(a.nota_2b || '')}" ${bimestre==='2'?'':'disabled'} class="${bimestre==='2'?'w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center':'w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-center text-slate-500 cursor-not-allowed'}" onblur="verificarNota(${i},2,this.value)"></td>
+      <td class="py-2 px-2 text-center"><input id="n3_${i}" type="number" step="0.1" min="0" max="10" value="${esc(a.nota_3b || '')}" ${bimestre==='3'?'':'disabled'} class="${bimestre==='3'?'w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center':'w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-center text-slate-500 cursor-not-allowed'}" onblur="verificarNota(${i},3,this.value)"></td>
+      <td class="py-2 px-2 text-center"><input id="n4_${i}" type="number" step="0.1" min="0" max="10" value="${esc(a.nota_4b || '')}" ${bimestre==='4'?'':'disabled'} class="${bimestre==='4'?'w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center':'w-16 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-center text-slate-500 cursor-not-allowed'}" onblur="verificarNota(${i},4,this.value)"></td>
+    </tr>
+  `).join('');
 }
 
 async function carregar(){
-let sala = document.getElementById('sala').value;
-let disc = document.getElementById('disciplina').value;
+  const sala = document.getElementById('sala').value;
+  const disc = document.getElementById('disciplina').value;
+  if (!sala) return alert('Selecione a sala.');
+  if (!disc) return alert('Selecione a disciplina.');
+  const r = await fetch(`/api/notas_turma?sala=${encodeURIComponent(sala)}&disciplina=${encodeURIComponent(disc)}`);
+  alunos = await r.json();
+  if (!Array.isArray(alunos)) {
+    alunos = [];
+    return alert('Erro ao carregar alunos/notas.');
+  }
+  renderTabela();
+}
 
-let r = await fetch(`/api/notas_turma?sala=${sala}&disciplina=${disc}`);
-alunos = await r.json();
+function verificarNota(index, bim, valor){
+  const num = parseFloat(valor);
+  if (!isNaN(num) && num < 5) {
+    contextoModal = { index, bim, nota: num };
+    document.getElementById('mAluno').textContent = alunos[index].aluno_nome || '';
+    document.getElementById('mDisciplina').textContent = document.getElementById('disciplina').value || '';
+    document.getElementById('mBimestre').textContent = `${bim}º Bimestre`;
+    document.getElementById('mNota').textContent = String(num);
+    document.querySelectorAll('.causa').forEach(x => x.checked = false);
+    document.querySelectorAll('.solucao').forEach(x => x.checked = false);
+    const atual = alunos[index][`conselho_${bim}b`] || {};
+    (atual.causas || []).forEach(v => {
+      const el = [...document.querySelectorAll('.causa')].find(x => x.value === v);
+      if (el) el.checked = true;
+    });
+    (atual.solucoes || []).forEach(v => {
+      const el = [...document.querySelectorAll('.solucao')].find(x => x.value === v);
+      if (el) el.checked = true;
+    });
+    document.getElementById('modalConselho').classList.remove('hidden');
+    document.getElementById('modalConselho').classList.add('flex');
+  }
+}
 
-document.getElementById('tb').innerHTML = alunos.map((a,i)=>`
-<tr>
-<td>${a.aluno_nome}</td>
-<td><input id="n1_${i}" value="${a.nota_1b||''}"></td>
-<td><input id="n2_${i}" value="${a.nota_2b||''}"></td>
-<td><input id="n3_${i}" value="${a.nota_3b||''}"></td>
-<td><input id="n4_${i}" value="${a.nota_4b||''}"></td>
-</tr>
-`).join('');
+function fecharModal(){
+  document.getElementById('modalConselho').classList.add('hidden');
+  document.getElementById('modalConselho').classList.remove('flex');
+}
+
+function confirmarJustificativa(){
+  if (!contextoModal) return;
+  const causas = [...document.querySelectorAll('.causa:checked')].map(x => x.value);
+  const solucoes = [...document.querySelectorAll('.solucao:checked')].map(x => x.value);
+  alunos[contextoModal.index][`conselho_${contextoModal.bim}b`] = { causas, solucoes };
+  fecharModal();
 }
 
 async function salvar(){
-let disc = document.getElementById('disciplina').value;
+  const disc = document.getElementById('disciplina').value;
+  const bim = document.getElementById('bimestre').value;
+  if (!alunos.length) return alert('Carregue a lista antes de salvar.');
+  if (!disc) return alert('Selecione a disciplina.');
 
-let payload = alunos.map((a,i)=>({
-aluno_id:a.aluno_id,
-aluno_nome:a.aluno_nome,
-sala_nome:a.sala_nome,
-disciplina:disc,
-nota_1b:document.getElementById(`n1_${i}`).value,
-nota_2b:document.getElementById(`n2_${i}`).value,
-nota_3b:document.getElementById(`n3_${i}`).value,
-nota_4b:document.getElementById(`n4_${i}`).value
-}));
+  const payload = alunos.map((a,i)=>({
+    aluno_id:a.aluno_id,
+    aluno_nome:a.aluno_nome,
+    sala_nome:a.sala_nome,
+    disciplina:disc,
+    nota_1b:bim === '1' ? (document.getElementById(`n1_${i}`)?.value || null) : a.nota_1b,
+    nota_2b:bim === '2' ? (document.getElementById(`n2_${i}`)?.value || null) : a.nota_2b,
+    nota_3b:bim === '3' ? (document.getElementById(`n3_${i}`)?.value || null) : a.nota_3b,
+    nota_4b:bim === '4' ? (document.getElementById(`n4_${i}`)?.value || null) : a.nota_4b,
+    conselho_1b: a.conselho_1b || {},
+    conselho_2b: a.conselho_2b || {},
+    conselho_3b: a.conselho_3b || {},
+    conselho_4b: a.conselho_4b || {}
+  }));
 
-await fetch('/api/salvar_notas',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify(payload)
-});
+  const r = await fetch('/api/salvar_notas',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar');
 
-alert('Salvo!');
+  alunos = alunos.map((a,i) => ({
+    ...a,
+    nota_1b: bim === '1' ? (document.getElementById(`n1_${i}`)?.value || '') : a.nota_1b,
+    nota_2b: bim === '2' ? (document.getElementById(`n2_${i}`)?.value || '') : a.nota_2b,
+    nota_3b: bim === '3' ? (document.getElementById(`n3_${i}`)?.value || '') : a.nota_3b,
+    nota_4b: bim === '4' ? (document.getElementById(`n4_${i}`)?.value || '') : a.nota_4b
+  }));
+
+  renderTabela();
+  alert('Salvo!');
 }
 
+document.getElementById('bimestre').addEventListener('change', () => { if (alunos.length) renderTabela(); });
 carregarSalas();
 carregarDisciplinas();
 </script>

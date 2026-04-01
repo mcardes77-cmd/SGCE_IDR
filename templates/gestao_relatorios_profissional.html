@@ -1,88 +1,222 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>Relatórios Gerais</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Relatórios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
-<body class="bg-slate-900 text-white p-6">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
 <div class="max-w-7xl mx-auto space-y-6">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">DASHBOARD DE RELATÓRIOS</h1>
+      <p class="text-slate-400">Visão geral da escola com relatórios, filtros e gráficos.</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+    </div>
+  </header>
 
-<h1 class="text-3xl font-bold text-emerald-400">RELATÓRIOS GERAIS</h1>
+  <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_sala">
+      <div class="text-sm font-bold text-red-400">Ocorrência por Sala</div>
+      <div class="text-xs text-slate-400 mt-1">Pizza/Barra + ranking</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_por_sala">
+      <div class="text-sm font-bold text-amber-400">Frequência por Sala</div>
+      <div class="text-xs text-slate-400 mt-1">Comparativo por turma</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_tutor">
+      <div class="text-sm font-bold text-blue-400">Ocorrência por Tutor</div>
+      <div class="text-xs text-slate-400 mt-1">Tutoria e pendências</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor">
+      <div class="text-sm font-bold text-violet-400">Alunos por Tutor</div>
+      <div class="text-xs text-slate-400 mt-1">Distribuição de tutorandos</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atendimentos_por_tutor">
+      <div class="text-sm font-bold text-fuchsia-400">Atendimento por Tutor</div>
+      <div class="text-xs text-slate-400 mt-1">Tutor e alunos atendidos</div>
+    </button>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-<div class="bg-slate-800 p-4 rounded">Ocorrências: <span id="oc">0</span></div>
-<div class="bg-slate-800 p-4 rounded">Frequência %: <span id="fr">0</span></div>
-<div class="bg-slate-800 p-4 rounded">Atendimentos: <span id="at">0</span></div>
-</div>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo">
+      <div class="text-sm font-bold text-emerald-400">Frequência Semanal/Mensal</div>
+      <div class="text-xs text-slate-400 mt-1">Linha de evolução</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ranking_frequencia_alunos">
+      <div class="text-sm font-bold text-cyan-400">Ranking de Frequência</div>
+      <div class="text-xs text-slate-400 mt-1">Alunos com mais presença</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_professor">
+      <div class="text-sm font-bold text-orange-400">Ocorrência por Professor</div>
+      <div class="text-xs text-slate-400 mt-1">Quem mais registrou</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_baixa_presenca">
+      <div class="text-sm font-bold text-yellow-300">Presença abaixo de 85%</div>
+      <div class="text-xs text-slate-400 mt-1">Risco de frequência</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atrasos_saidas">
+      <div class="text-sm font-bold text-rose-400">Atraso e Saída Antecipada</div>
+      <div class="text-xs text-slate-400 mt-1">Ranking recorrente</div>
+    </button>
+  </section>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-6 gap-3">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Sala</label>
+      <select id="filtroSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Todas</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+      <select id="filtroTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Professor</label>
+      <select id="filtroProfessor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Período</label>
+      <select id="filtroPeriodo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <option value="acumulado">Acumulado</option>
+        <option value="semanal">Semanal</option>
+        <option value="mensal">Mensal</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Mês</label>
+      <input id="filtroMes" type="month" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+    </div>
+    <div class="flex items-end">
+      <button onclick="carregarRelatorioAtual()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar filtros</button>
+    </div>
+  </section>
 
-<div class="bg-slate-800 p-4 rounded">
-<canvas id="graficoOcorrencias"></canvas>
-</div>
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <h2 id="tituloRelatorio" class="text-lg font-bold text-emerald-400 mb-3">Selecione um relatório</h2>
+      <div class="h-[380px]">
+        <canvas id="graficoRelatorio"></canvas>
+      </div>
+    </div>
 
-<div class="bg-slate-800 p-4 rounded">
-<canvas id="graficoFrequencia"></canvas>
-</div>
-
-</div>
-
-<div class="bg-slate-800 p-4 rounded">
-<h2 class="text-lg mb-2">Ranking de Salas</h2>
-<table class="w-full text-sm">
-<thead>
-<tr>
-<th>Sala</th>
-<th>Ocorrências</th>
-<th>Frequência %</th>
-</tr>
-</thead>
-<tbody id="tbRanking"></tbody>
-</table>
-</div>
-
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <h2 class="text-lg font-bold text-emerald-400 mb-3">Tabela detalhada</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead id="theadTabela"></thead>
+          <tbody id="tbodyTabela"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
-async function carregar(){
-const r = await fetch('/api/relatorios_geral');
-const j = await r.json();
+let reportAtual = 'ocorrencias_por_sala';
+let grafico = null;
 
-document.getElementById('oc').textContent = j.ocorrencias;
-document.getElementById('fr').textContent = j.frequencia + '%';
-document.getElementById('at').textContent = j.atendimentos;
-
-new Chart(document.getElementById('graficoOcorrencias'),{
-type:'bar',
-data:{
-labels:j.ocorrencias_por_sala.labels,
-datasets:[{data:j.ocorrencias_por_sala.data}]
+function mesAtual() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
+
+async function carregarFiltrosBase() {
+  const salas = await (await fetch('/api/salas')).json();
+  document.getElementById('filtroSala').innerHTML =
+    '<option value="">Todas</option>' +
+    (Array.isArray(salas) ? salas.map(s => {
+      const nome = s.nome || s.sala || s.sala_nome || '';
+      return `<option value="${nome}">${nome}</option>`;
+    }).join('') : '');
+
+  const tutores = await (await fetch('/api/tutores')).json();
+  document.getElementById('filtroTutor').innerHTML =
+    '<option value="">Todos</option>' +
+    (Array.isArray(tutores) ? tutores.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('') : '');
+
+  const professores = await (await fetch('/api/professores')).json();
+  document.getElementById('filtroProfessor').innerHTML =
+    '<option value="">Todos</option>' +
+    (Array.isArray(professores) ? professores.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('') : '');
+}
+
+function renderTabela(headers, rows) {
+  document.getElementById('theadTabela').innerHTML = `
+    <tr class="border-b border-slate-700">
+      ${headers.map(h => `<th class="text-left py-2 px-2">${h}</th>`).join('')}
+    </tr>
+  `;
+  document.getElementById('tbodyTabela').innerHTML = rows.map(r => `
+    <tr class="border-b border-slate-800">
+      ${r.map(v => `<td class="py-2 px-2">${v ?? ''}</td>`).join('')}
+    </tr>
+  `).join('');
+}
+
+function renderGrafico(config) {
+  const ctx = document.getElementById('graficoRelatorio');
+  if (grafico) grafico.destroy();
+  grafico = new Chart(ctx, config);
+}
+
+async function carregarRelatorioAtual() {
+  const sala = encodeURIComponent(document.getElementById('filtroSala').value || '');
+  const tutor = encodeURIComponent(document.getElementById('filtroTutor').value || '');
+  const professor = encodeURIComponent(document.getElementById('filtroProfessor').value || '');
+  const periodo = encodeURIComponent(document.getElementById('filtroPeriodo').value || 'acumulado');
+  const mes = encodeURIComponent(document.getElementById('filtroMes').value || mesAtual());
+
+  const r = await fetch(`/api/relatorios_dashboard/${reportAtual}?sala=${sala}&tutor=${tutor}&professor=${professor}&periodo=${periodo}&mes=${mes}`);
+  const j = await r.json();
+  if (!r.ok || !j.success) {
+    alert(j.error || 'Erro ao carregar relatório');
+    return;
+  }
+
+  document.getElementById('tituloRelatorio').textContent = j.data.titulo || 'Relatório';
+
+  renderGrafico({
+    type: j.data.chart_type || 'bar',
+    data: {
+      labels: j.data.chart.labels || [],
+      datasets: [{
+        label: j.data.chart.dataset_label || 'Total',
+        data: j.data.chart.data || [],
+        borderWidth: 1,
+        fill: j.data.chart_type === 'line'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#e2e8f0' } } },
+      scales: j.data.chart_type === 'pie' ? {} : {
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    }
+  });
+
+  renderTabela(j.data.table.headers || [], j.data.table.rows || []);
+}
+
+document.querySelectorAll('.card-relatorio').forEach(btn => {
+  btn.addEventListener('click', () => {
+    reportAtual = btn.dataset.report;
+    carregarRelatorioAtual();
+  });
 });
 
-new Chart(document.getElementById('graficoFrequencia'),{
-type:'line',
-data:{
-labels:j.frequencia_dias.labels,
-datasets:[{data:j.frequencia_dias.data}]
-}
-});
-
-document.getElementById('tbRanking').innerHTML =
-j.ranking.map(x=>`
-<tr>
-<td>${x.sala}</td>
-<td>${x.ocorrencias}</td>
-<td>${x.frequencia}%</td>
-</tr>
-`).join('');
-}
-
-carregar();
+document.getElementById('filtroMes').value = mesAtual();
+carregarFiltrosBase().then(() => carregarRelatorioAtual());
 </script>
-
 </body>
 </html>

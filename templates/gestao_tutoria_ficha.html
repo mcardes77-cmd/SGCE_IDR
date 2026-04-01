@@ -72,6 +72,22 @@
             <option value="">Selecione...</option>
           </select>
         </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Projeto de Vida</label>
+          <input id="projeto_vida" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Telefone do Aluno</label>
+          <input id="telefone_aluno" maxlength="15" placeholder="(99) 99999-9999" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Nome do Responsável</label>
+          <input id="responsavel_nome" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Telefone do Responsável</label>
+          <input id="responsavel_telefone" maxlength="15" placeholder="(99) 99999-9999" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        </div>
       </div>
       <p class="text-xs text-slate-400 mt-3">Os clubes e eletivas são carregados pelas APIs por semestre.</p>
     </div>
@@ -123,6 +139,19 @@ let frequenciaPercentualAtual = 0;
 function safe(v) { return v == null ? '' : String(v); }
 function normalizar(v) { return String(v || '').trim(); }
 function caixa(html) { return `<div class="bg-slate-900 rounded p-3 border border-slate-700">${html}</div>`; }
+
+function aplicarMascaraTelefone(input) {
+  let v = (input.value || '').replace(/\D/g, '').slice(0, 11);
+  if (v.length <= 2) {
+    input.value = v ? `(${v}` : '';
+    return;
+  }
+  if (v.length <= 7) {
+    input.value = `(${v.slice(0,2)}) ${v.slice(2)}`;
+    return;
+  }
+  input.value = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+}
 
 function calcularFrequenciaPercentual(lista) {
   const dados = Array.isArray(lista) ? lista : [];
@@ -247,6 +276,12 @@ async function carregarFicha() {
   document.getElementById('clube2').value = aluno.clube_2_semestre || '';
   document.getElementById('eletiva1').value = aluno.eletiva_1_semestre || '';
   document.getElementById('eletiva2').value = aluno.eletiva_2_semestre || '';
+  document.getElementById('projeto_vida').value = aluno.projeto_de_vida || aluno.projeto_vida || '';
+  document.getElementById('telefone_aluno').value = aluno.telefone_aluno || aluno.telefone || '';
+  document.getElementById('responsavel_nome').value = aluno.responsavel_nome || aluno.nome_responsavel || '';
+  document.getElementById('responsavel_telefone').value = aluno.responsavel_telefone || aluno.telefone_responsavel || '';
+  aplicarMascaraTelefone(document.getElementById('telefone_aluno'));
+  aplicarMascaraTelefone(document.getElementById('responsavel_telefone'));
 
   let ocorrencias = Array.isArray(ficha.ocorrencias) ? ficha.ocorrencias : [];
   if (!ocorrencias.length) ocorrencias = await carregarOcorrenciasFallback(alunoId, aluno);
@@ -290,7 +325,11 @@ async function salvarFicha() {
     clube_1_semestre: document.getElementById('clube1').value,
     clube_2_semestre: document.getElementById('clube2').value,
     eletiva_1_semestre: document.getElementById('eletiva1').value,
-    eletiva_2_semestre: document.getElementById('eletiva2').value
+    eletiva_2_semestre: document.getElementById('eletiva2').value,
+    projeto_de_vida: document.getElementById('projeto_vida').value,
+    telefone_aluno: document.getElementById('telefone_aluno').value,
+    responsavel_nome: document.getElementById('responsavel_nome').value,
+    responsavel_telefone: document.getElementById('responsavel_telefone').value
   };
 
   const r = await fetch('/api/salvar_tutoria_ficha', {
@@ -304,6 +343,12 @@ async function salvarFicha() {
 }
 
 document.getElementById('tutor_id').addEventListener('change', carregarAlunosDoTutor);
+document.addEventListener('input', function(e){
+  if (e.target && (e.target.id === 'telefone_aluno' || e.target.id === 'responsavel_telefone')) {
+    aplicarMascaraTelefone(e.target);
+  }
+});
+
 carregarTutores();
 carregarOpcoes();
 </script>
