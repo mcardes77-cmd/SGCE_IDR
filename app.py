@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from datetime import datetime, timedelta, date
 import os
+import unicodedata
 
 # =========================================================
 # CONFIG
@@ -47,6 +48,19 @@ USUARIOS_ACESSO_TOTAL = {
     "MARCOS DE BRITO BORTOLOSSI",
 }
 
+def _usuario_nome_limpo():
+    nome = ((session.get("user") or {}).get("nome") or "").strip().upper()
+    nome = unicodedata.normalize("NFD", nome)
+    nome = "".join(c for c in nome if unicodedata.category(c) != "Mn")
+    return nome
+
+def _eh_acesso_total():
+    return _usuario_nome_limpo() in USUARIOS_ACESSO_TOTAL
+
+def _upper_noaccent(v):
+    v = (v or "").strip().upper()
+    v = unicodedata.normalize("NFD", v)
+    return "".join(c for c in v if unicodedata.category(c) != "Mn")
 def normalizar_texto(txt):
     return (txt or "").strip().upper()
 
@@ -1727,17 +1741,29 @@ def api_salvar_tutoria_ficha():
     try:
         db = get_supabase()
         data = request.get_json() or {}
+
         aluno_id = data.get("aluno_id")
         if not aluno_id:
             return json_error("Aluno não informado.", 400)
-        update = {
+
+        payload = {
             "clube_1_semestre": data.get("clube_1_semestre"),
             "clube_2_semestre": data.get("clube_2_semestre"),
             "eletiva_1_semestre": data.get("eletiva_1_semestre"),
             "eletiva_2_semestre": data.get("eletiva_2_semestre"),
+            "projeto_de_vida": data.get("projeto_de_vida"),
+            "telefone_aluno": data.get("telefone_aluno"),
+            "responsavel_nome": data.get("responsavel_nome"),
+            "responsavel_telefone": data.get("responsavel_telefone"),
+            "updated_at": now_iso()
         }
-        db.table("d_alunos").update(update).eq("id", aluno_id).execute()
-        return jsonify({"success": True})
+
+        db.table("d_alunos").update(payload).eq("id", aluno_id).execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Ficha salva com sucesso."
+        })
     except Exception as e:
         return json_error(e)
 
@@ -1805,32 +1831,6 @@ def api_notas_turma():
     except Exception as e:
         return json_error(e)
 
-@app.route("/api/salvar_notas", methods=["POST"])
-def api_salvar_notas():
-    try:
-        db = get_supabase()
-        dados = request.get_json() or []
-        for item in dados:
-            existente = db.table("f_notas").select("id").eq("aluno_id", item.get("aluno_id")).eq("disciplina", item.get("disciplina")).limit(1).execute()
-            payload = {
-                "aluno_id": item.get("aluno_id"),
-                "aluno_nome": item.get("aluno_nome"),
-                "sala_nome": item.get("sala_nome"),
-                "disciplina": item.get("disciplina"),
-                "nota_1b": item.get("nota_1b"),
-                "nota_2b": item.get("nota_2b"),
-                "nota_3b": item.get("nota_3b"),
-                "nota_4b": item.get("nota_4b"),
-                "updated_at": now_iso()
-            }
-            if existente.data:
-                db.table("f_notas").update(payload).eq("id", existente.data[0]["id"]).execute()
-            else:
-                payload["created_at"] = now_iso()
-                db.table("f_notas").insert(payload).execute()
-        return jsonify({"success": True})
-    except Exception as e:
-        return json_error(e)
 
 @app.route("/api/boletim/<int:aluno_id>")
 def api_boletim(aluno_id):
@@ -1947,6 +1947,236 @@ def gestao_relatorios_profissional():
     return render_template("gestao_relatorios_profissional.html")
 
 
+def _parse_mes_intervalo(mes_str):
+    from datetime import datetime, date, timedelta
+    mes = (mes_str or datetime.now().strftime("%Y-%m")).strip()
+    inicio = datetime.strptime(mes + "-01", "%Y-%m-%d").date()
+    if inicio.month == 12:
+        fim = date(inicio.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        fim = date(inicio.year, inicio.month + 1, 1) - timedelta(days=1)
+    return inicio, fim
+
+def _status_presenca(status):
+    return (status or "").upper() != "F"
+
+@app.route("/api/relatorios_dashboard/<report_name>")
+def api_relatorios_dashboard(report_name):
+    try:
+        db = get_supabase()
+        sala = (request.args.get("sala") or "").strip()
+        tutor = (request.args.get("tutor") or "").strip()
+        professor = (request.args.get("professor") or "").strip()
+        periodo = (request.args.get("periodo") or "acumulado").strip()
+        mes = (request.args.get("mes") or "").strip()
+
+        ocorr = db.table("ocorrencias").select("*").execute().data or []
+        freq = db.table("f_frequencia").select("*").execute().data or []
+        atend = db.table("atendimentos_tutoria").select("*").execute().data or []
+        alunos = db.table("d_alunos").select("*").execute().data or []
+
+        if sala:
+            ocorr = [x for x in ocorr if (x.get("sala_nome") or "") == sala]
+            freq = [x for x in freq if (x.get("sala_nome") or "") == sala]
+            atend = [x for x in atend if (x.get("sala_nome") or "") == sala]
+            alunos = [x for x in alunos if (x.get("sala_nome") or "") == sala]
+
+        if tutor:
+            ocorr = [x for x in ocorr if (x.get("tutor_nome") or "") == tutor]
+            atend = [x for x in atend if (x.get("tutor_nome") or "") == tutor]
+            alunos = [x for x in alunos if (x.get("tutor_nome") or "") == tutor]
+
+        if professor:
+            ocorr = [x for x in ocorr if (x.get("professor_nome") or "") == professor]
+
+        if report_name == "ocorrencias_por_sala":
+            mapa = {}
+            for x in ocorr:
+                k = x.get("sala_nome") or "SEM SALA"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Sala",
+                "chart_type": "pie",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Sala", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "frequencia_por_sala":
+            mapa = {}
+            for x in freq:
+                k = x.get("sala_nome") or "SEM SALA"
+                mapa.setdefault(k, {"presentes": 0, "total": 0})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                p = round((v["presentes"]/v["total"])*100, 2) if v["total"] else 0
+                ordered.append((k, p, v["presentes"], v["total"]))
+            ordered.sort(key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Frequência por Sala",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered], "data": [x[1] for x in ordered], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Sala", "Frequência %", "Presentes", "Total"], "rows": [[x[0], x[1], x[2], x[3]] for x in ordered]}
+            }})
+
+        if report_name == "ocorrencias_por_tutor":
+            mapa = {}
+            for x in ocorr:
+                k = x.get("tutor_nome") or "SEM TUTOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Tutor", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "alunos_por_tutor":
+            mapa = {}
+            for x in alunos:
+                k = x.get("tutor_nome") or "SEM TUTOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Alunos por Tutor",
+                "chart_type": "pie",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Alunos"},
+                "table": {"headers": ["Tutor", "Alunos"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "atendimentos_por_tutor":
+            mapa = {}
+            for x in atend:
+                k = x.get("tutor_nome") or "SEM TUTOR"
+                mapa.setdefault(k, set()).add(x.get("aluno_nome") or "")
+            ordered = sorted([(k, len(v), ", ".join(sorted([a for a in v if a]))) for k, v in mapa.items()], key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Atendimentos de Tutoria por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered], "data": [x[1] for x in ordered], "dataset_label": "Alunos atendidos"},
+                "table": {"headers": ["Tutor", "Qtd. alunos atendidos", "Alunos"], "rows": [[x[0], x[1], x[2]] for x in ordered]}
+            }})
+
+        if report_name == "frequencia_periodo":
+            from datetime import datetime, timedelta
+            inicio, fim = _parse_mes_intervalo(mes)
+            if periodo == "semanal":
+                labels, values = [], []
+                base = inicio
+                while base <= fim:
+                    fim_sem = min(base + timedelta(days=6), fim)
+                    subset = [x for x in freq if base <= datetime.strptime(str(x.get("data"))[:10], "%Y-%m-%d").date() <= fim_sem]
+                    total = len(subset)
+                    pres = len([x for x in subset if _status_presenca(x.get("status"))])
+                    labels.append(f"{base.strftime('%d/%m')} a {fim_sem.strftime('%d/%m')}")
+                    values.append(round((pres/total)*100, 2) if total else 0)
+                    base = fim_sem + timedelta(days=1)
+            else:
+                labels, values = [], []
+                cur = inicio
+                while cur <= fim:
+                    dstr = cur.strftime("%Y-%m-%d")
+                    subset = [x for x in freq if str(x.get("data"))[:10] == dstr]
+                    total = len(subset)
+                    pres = len([x for x in subset if _status_presenca(x.get("status"))])
+                    labels.append(cur.strftime("%d/%m"))
+                    values.append(round((pres/total)*100, 2) if total else 0)
+                    cur += timedelta(days=1)
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Frequência Semanal, Mensal e Acumulado",
+                "chart_type": "line",
+                "chart": {"labels": labels, "data": values, "dataset_label": "Frequência %"},
+                "table": {"headers": ["Período", "Frequência %"], "rows": [[labels[i], values[i]] for i in range(len(labels))]}
+            }})
+
+        if report_name == "ranking_frequencia_alunos":
+            mapa = {}
+            for x in freq:
+                k = x.get("aluno_nome") or "SEM ALUNO"
+                mapa.setdefault(k, {"presentes": 0, "total": 0, "sala": x.get("sala_nome") or ""})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                pct = round((v["presentes"]/v["total"])*100, 2) if v["total"] else 0
+                ordered.append((k, v["sala"], pct, v["presentes"], v["total"]))
+            ordered.sort(key=lambda i: (-i[2], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Ranking de Alunos com Mais Frequência",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered[:20]], "data": [x[2] for x in ordered[:20]], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Aluno", "Sala", "Frequência %", "Presenças", "Total"], "rows": [[*x] for x in ordered]}
+            }})
+
+        if report_name == "ocorrencias_por_professor":
+            mapa = {}
+            for x in ocorr:
+                k = x.get("professor_nome") or "SEM PROFESSOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Professor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Professor", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "alunos_baixa_presenca":
+            mapa = {}
+            for x in freq:
+                k = x.get("aluno_nome") or "SEM ALUNO"
+                mapa.setdefault(k, {"presentes": 0, "total": 0, "sala": x.get("sala_nome") or ""})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            rows = []
+            for k, v in mapa.items():
+                pct = round((v["presentes"]/v["total"])*100, 2) if v["total"] else 0
+                if pct < 85:
+                    rows.append((k, v["sala"], pct, v["presentes"], v["total"]))
+            rows.sort(key=lambda i: (i[2], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Alunos com Presença abaixo de 85%",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in rows[:20]], "data": [x[2] for x in rows[:20]], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Aluno", "Sala", "Frequência %", "Presenças", "Total"], "rows": [[*x] for x in rows]}
+            }})
+
+        if report_name == "atrasos_saidas":
+            mapa = {}
+            for x in freq:
+                status = (x.get("status") or "").upper()
+                if status in ["PA", "PS", "PSA"]:
+                    k = x.get("aluno_nome") or "SEM ALUNO"
+                    mapa.setdefault(k, {"sala": x.get("sala_nome") or "", "pa": 0, "ps": 0, "psa": 0})
+                    if status == "PA": mapa[k]["pa"] += 1
+                    if status == "PS": mapa[k]["ps"] += 1
+                    if status == "PSA": mapa[k]["psa"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                total = v["pa"] + v["ps"] + v["psa"]
+                ordered.append((k, v["sala"], v["pa"], v["ps"], v["psa"], total))
+            ordered.sort(key=lambda i: (-i[5], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Atraso e Saída Antecipada",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered[:20]], "data": [x[5] for x in ordered[:20]], "dataset_label": "Ocorrências de atraso/saída"},
+                "table": {"headers": ["Aluno", "Sala", "PA", "PS", "PSA", "Total"], "rows": [[*x] for x in ordered]}
+            }})
+
+        return json_error("Relatório não encontrado.", 404)
+
+    except Exception as e:
+        return json_error(e)
+
+
+
+
 @app.route("/api/relatorios_geral")
 def api_relatorios_geral():
     try:
@@ -2000,6 +2230,446 @@ def api_relatorios_geral():
         })
     except Exception as e:
         return json_error(e)
+
+@app.route("/api/cadastro/alunos_por_sala_nome")
+def api_cadastro_alunos_por_sala_nome():
+    try:
+        db = get_supabase()
+        sala_nome = (request.args.get("sala_nome") or "").strip()
+        if not sala_nome:
+            return jsonify([])
+        resp = db.table("d_alunos").select("*").eq("sala_nome", sala_nome).order("nome").execute()
+        return jsonify(resp.data or [])
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/aluno", methods=["POST"])
+def api_cadastro_aluno():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        tutor_id = data.get("tutor_id")
+        if tutor_id in ("", "None"): tutor_id = None
+        id_tutor = data.get("id_tutor")
+        if id_tutor in ("", "None"): id_tutor = None
+        payload = {
+            "nome": _upper_noaccent(data.get("nome")),
+            "aluno_nome": _upper_noaccent(data.get("aluno_nome") or data.get("nome")),
+            "sala_nome": data.get("sala_nome"),
+            "tutor_id": int(tutor_id) if tutor_id else None,
+            "id_tutor": int(id_tutor) if id_tutor else None,
+            "tutor_nome": data.get("tutor_nome"),
+            "nome_tutor": data.get("nome_tutor"),
+            "projeto_de_vida": data.get("projeto_de_vida"),
+        }
+        resp = db.table("d_alunos").insert(payload).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/aluno/<int:aluno_id>", methods=["PUT"])
+def api_editar_aluno(aluno_id):
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+        tutor_id = data.get("tutor_id")
+        if tutor_id in ("", "None"): tutor_id = None
+        id_tutor = data.get("id_tutor")
+        if id_tutor in ("", "None"): id_tutor = None
+        payload = {
+            "nome": _upper_noaccent(data.get("nome")),
+            "aluno_nome": _upper_noaccent(data.get("aluno_nome") or data.get("nome")),
+            "sala_nome": data.get("sala_nome"),
+            "tutor_id": int(tutor_id) if tutor_id else None,
+            "id_tutor": int(id_tutor) if id_tutor else None,
+            "tutor_nome": data.get("tutor_nome"),
+            "nome_tutor": data.get("nome_tutor"),
+            "projeto_de_vida": data.get("projeto_de_vida"),
+        }
+        db.table("d_alunos").update(payload).eq("id", aluno_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/aluno/<int:aluno_id>", methods=["DELETE"])
+def api_excluir_aluno(aluno_id):
+    try:
+        db = get_supabase()
+        db.table("d_alunos").delete().eq("id", aluno_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/funcionario", methods=["POST"])
+def api_cadastro_funcionario():
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        payload = {
+            "nome": _upper_noaccent(data.get("nome")),
+            "tipo": data.get("tipo"),
+            "funcao": _upper_noaccent(data.get("funcao")),
+            "acesso_total": bool(data.get("acesso_total")),
+            "conta_ativada": False,
+            "primeiro_login": False
+        }
+        resp = db.table("d_funcionarios").insert(payload).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/funcionario/<int:func_id>", methods=["PUT"])
+def api_editar_funcionario(func_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        payload = {
+            "nome": _upper_noaccent(data.get("nome")),
+            "tipo": data.get("tipo"),
+            "funcao": _upper_noaccent(data.get("funcao")),
+            "acesso_total": bool(data.get("acesso_total")),
+            "conta_ativada": False
+        }
+        db.table("d_funcionarios").update(payload).eq("id", func_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/funcionario/<int:func_id>", methods=["DELETE"])
+def api_excluir_funcionario(func_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        db.table("d_funcionarios").delete().eq("id", func_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/clube", methods=["POST"])
+def api_cadastro_clube():
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        resp = db.table("d_clubes_juvenis").insert({
+            "nome": data.get("nome"),
+            "semestre": int(data.get("semestre")),
+            "ativo": bool(data.get("ativo"))
+        }).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/clube/<int:item_id>", methods=["PUT"])
+def api_editar_clube(item_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        db.table("d_clubes_juvenis").update({
+            "nome": data.get("nome"),
+            "semestre": int(data.get("semestre")),
+            "ativo": bool(data.get("ativo"))
+        }).eq("id", item_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/clube/<int:item_id>", methods=["DELETE"])
+def api_excluir_clube(item_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        db.table("d_clubes_juvenis").delete().eq("id", item_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/eletiva", methods=["POST"])
+def api_cadastro_eletiva():
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        resp = db.table("d_eletivas").insert({
+            "nome": data.get("nome"),
+            "semestre": int(data.get("semestre")),
+            "ativo": bool(data.get("ativo"))
+        }).execute()
+        return jsonify({"success": True, "data": resp.data})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/eletiva/<int:item_id>", methods=["PUT"])
+def api_editar_eletiva(item_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        db.table("d_eletivas").update({
+            "nome": data.get("nome"),
+            "semestre": int(data.get("semestre")),
+            "ativo": bool(data.get("ativo"))
+        }).eq("id", item_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/eletiva/<int:item_id>", methods=["DELETE"])
+def api_excluir_eletiva(item_id):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        db.table("d_eletivas").delete().eq("id", item_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/cadastro/ocorrencia/<int:numero>", methods=["PUT"])
+def api_cadastro_editar_ocorrencia(numero):
+    try:
+        if not _eh_acesso_total():
+            return json_error("Acesso restrito aos 5 usuários com acesso total.", 403)
+        db = get_supabase()
+        data = request.get_json() or {}
+        db.table("ocorrencias").update({
+            "descricao": data.get("descricao"),
+            "atendimento_professor": data.get("atendimento_professor"),
+            "atendimento_tutor": data.get("atendimento_tutor"),
+            "atendimento_coordenacao": data.get("atendimento_coordenacao"),
+            "atendimento_gestao": data.get("atendimento_gestao"),
+            "atendimento_responsavel": data.get("atendimento_responsavel"),
+        }).eq("numero", numero).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/gestao_conselho_classe")
+def gestao_conselho_classe():
+    return render_template("gestao_conselho_classe.html")
+
+
+@app.route("/api/conselho_classe")
+def api_conselho_classe():
+    try:
+        db = get_supabase()
+        sala = (request.args.get("sala") or "").strip()
+        bimestre = int(request.args.get("bimestre") or 1)
+
+        if not sala:
+            return json_error("Sala não informada.", 400)
+
+        alunos = db.table("d_alunos").select("*").eq("sala_nome", sala).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("sala_nome", sala).execute().data or []
+
+        resumo_resp = db.table("f_conselho_classe").select("*").eq("sala_nome", sala).eq("bimestre", bimestre).limit(1).execute().data or []
+        resumo = resumo_resp[0] if resumo_resp else {}
+
+        criticos = []
+        alunos_sala = []
+
+        for a in alunos:
+            nome = a.get("nome") or a.get("aluno_nome") or ""
+            alunos_sala.append(nome)
+
+        for n in notas:
+            nota = n.get(f"nota_{bimestre}b")
+            try:
+                nota_num = float(nota) if nota not in (None, "", "null") else None
+            except Exception:
+                nota_num = None
+
+            if nota_num is not None and nota_num < 5:
+                conselho = n.get(f"conselho_{bimestre}b") or {}
+                criticos.append({
+                    "aluno_nome": n.get("aluno_nome"),
+                    "disciplina": n.get("disciplina"),
+                    "nota": nota_num,
+                    "causas": conselho.get("causas", []),
+                    "solucoes": conselho.get("solucoes", [])
+                })
+
+        criticos.sort(key=lambda x: ((x.get("aluno_nome") or "").upper(), (x.get("disciplina") or "").upper()))
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "alunos_criticos": criticos,
+                "alunos_sala": sorted(alunos_sala),
+                "resumo": {
+                    "pontos_fortes": resumo.get("pontos_fortes", ""),
+                    "pontos_melhoria": resumo.get("pontos_melhoria", ""),
+                    "aluno_destaque": resumo.get("aluno_destaque", ""),
+                    "aluno_evolucao": resumo.get("aluno_evolucao", "")
+                }
+            }
+        })
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/salvar_conselho_classe", methods=["POST"])
+def api_salvar_conselho_classe():
+    try:
+        db = get_supabase()
+        data = request.get_json() or {}
+
+        sala_nome = (data.get("sala_nome") or "").strip()
+        bimestre = int(data.get("bimestre") or 0)
+        if not sala_nome or not bimestre:
+            return json_error("Sala e bimestre são obrigatórios.", 400)
+
+        payload = {
+            "sala_nome": sala_nome,
+            "bimestre": bimestre,
+            "pontos_fortes": data.get("pontos_fortes"),
+            "pontos_melhoria": data.get("pontos_melhoria"),
+            "aluno_destaque": data.get("aluno_destaque"),
+            "aluno_evolucao": data.get("aluno_evolucao"),
+            "updated_at": now_iso()
+        }
+
+        existente = db.table("f_conselho_classe").select("id").eq("sala_nome", sala_nome).eq("bimestre", bimestre).limit(1).execute().data or []
+        if existente:
+            db.table("f_conselho_classe").update(payload).eq("id", existente[0]["id"]).execute()
+        else:
+            payload["created_at"] = now_iso()
+            db.table("f_conselho_classe").insert(payload).execute()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/disciplinas_todas")
+def api_disciplinas_todas():
+    try:
+        db = get_supabase()
+        r = db.table("d_disciplinas").select("nome").order("nome").execute()
+        nomes = sorted({x.get("nome") for x in (r.data or []) if x.get("nome")})
+        return jsonify([{"nome": n} for n in nomes])
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/api/salvar_notas", methods=["POST"])
+def api_salvar_notas():
+    try:
+        db = get_supabase()
+        dados = request.get_json() or []
+
+        for item in dados:
+            aluno_id = item.get("aluno_id")
+            disciplina = item.get("disciplina")
+
+            existente = db.table("f_notas").select("id").eq("aluno_id", aluno_id).eq("disciplina", disciplina).limit(1).execute().data or []
+
+            payload = {
+                "aluno_id": aluno_id,
+                "aluno_nome": item.get("aluno_nome"),
+                "sala_nome": item.get("sala_nome"),
+                "disciplina": disciplina,
+                "nota_1b": item.get("nota_1b"),
+                "nota_2b": item.get("nota_2b"),
+                "nota_3b": item.get("nota_3b"),
+                "nota_4b": item.get("nota_4b"),
+                "conselho_1b": item.get("conselho_1b") or {},
+                "conselho_2b": item.get("conselho_2b") or {},
+                "conselho_3b": item.get("conselho_3b") or {},
+                "conselho_4b": item.get("conselho_4b") or {},
+                "updated_at": now_iso()
+            }
+
+            if existente:
+                db.table("f_notas").update(payload).eq("id", existente[0]["id"]).execute()
+            else:
+                payload["created_at"] = now_iso()
+                db.table("f_notas").insert(payload).execute()
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(e)
+
+
+@app.route("/relatorio_conselho_classe_pdf")
+def relatorio_conselho_classe_pdf():
+    try:
+        db = get_supabase()
+        sala = (request.args.get("sala") or "").strip()
+        bimestre = int(request.args.get("bimestre") or 1)
+        if not sala:
+            return "Sala não informada.", 400
+
+        alunos = db.table("d_alunos").select("*").eq("sala_nome", sala).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("sala_nome", sala).execute().data or []
+
+        disciplinas = sorted({n.get("disciplina") for n in notas if n.get("disciplina")})
+        mapa = {}
+        professores = []
+
+        for n in notas:
+            nome = n.get("aluno_nome") or ""
+            mapa.setdefault(nome, {})
+            mapa[nome][n.get("disciplina")] = n
+            professor = n.get("professor_nome")
+            if professor and professor not in professores:
+                professores.append(professor)
+
+        linhas = []
+        for a in alunos:
+            nome = a.get("nome") or a.get("aluno_nome") or ""
+            notas_aluno = []
+            causas = []
+            solucoes = []
+
+            for d in disciplinas:
+                reg = mapa.get(nome, {}).get(d, {})
+                nota = reg.get(f"nota_{bimestre}b")
+                notas_aluno.append(nota if nota not in (None, "", "null") else "")
+
+                try:
+                    nota_num = float(nota) if nota not in (None, "", "null") else None
+                except Exception:
+                    nota_num = None
+
+                if nota_num is not None and nota_num < 5:
+                    conselho = reg.get(f"conselho_{bimestre}b") or {}
+                    causas.extend(conselho.get("causas", []))
+                    solucoes.extend(conselho.get("solucoes", []))
+
+            linhas.append({
+                "aluno_nome": nome,
+                "notas": notas_aluno,
+                "causas": ", ".join(sorted(set(causas))),
+                "solucoes": ", ".join(sorted(set(solucoes)))
+            })
+
+        if not professores:
+            professores = disciplinas
+
+        return render_template(
+            "relatorio_conselho_classe_pdf.html",
+            sala_nome=sala,
+            bimestre=bimestre,
+            disciplinas=disciplinas,
+            linhas=linhas,
+            professores=professores
+        )
+    except Exception as e:
+        return f"Erro ao gerar mapão: {e}", 500
+
+
 # =========================================================
 # START
 # =========================================================
