@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ titulo }}</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+    h1 { text-align:center; margin: 0 0 12px 0; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border:1px solid #333; padding:4px; text-align:left; vertical-align: top; }
+    th { background:#f0f0f0; }
+  </style>
+</head>
+<body>
+  <h1>{{ titulo }}</h1>
+  <table>
+    <thead>
+      <tr>
+        {% for h in headers %}
+        <th>{{ h }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for cell in row %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
+</body>
+</html>

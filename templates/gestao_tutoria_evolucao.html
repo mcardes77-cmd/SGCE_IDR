@@ -1,20 +1,162 @@
 <!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Evolução do Aluno</title><script src="https://cdn.tailwindcss.com"></script></head>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evolução do Aluno</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
 <div class="max-w-6xl mx-auto space-y-5">
 <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-<div><h1 class="text-2xl md:text-3xl font-bold text-emerald-400">EVOLUÇÃO DO ALUNO</h1><p class="text-slate-400">Indicadores de frequência e ocorrências por aluno</p></div>
-<div class="flex flex-wrap gap-2"><a href="/gestao_tutoria" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Tutoria</a><a href="/dashboard_geral" class="bg-violet-700 hover:bg-violet-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a></div>
+  <div>
+    <h1 class="text-2xl md:text-3xl font-bold text-emerald-400">EVOLUÇÃO DO ALUNO</h1>
+    <p class="text-slate-400">Frequência, ocorrência, atendimento e notas por aluno</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/gestao_tutoria" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold">Tutoria</a>
+    <a href="/dashboard_geral" class="bg-violet-700 hover:bg-violet-600 px-3 py-2 rounded-lg font-semibold">Dashboard Geral</a>
+  </div>
 </header>
-<section class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="grid grid-cols-1 md:grid-cols-3 gap-3"><div class="md:col-span-2"><label class="block text-xs text-slate-400 mb-1">Aluno</label><input id="aluno_id" type="number" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2" placeholder="ID do aluno"></div><div class="flex items-end"><button onclick="carregar()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar</button></div></div></section>
-<section id="cards" class="hidden grid grid-cols-2 md:grid-cols-5 gap-3">
-<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Presenças</div><div id="cP" class="text-2xl font-bold text-emerald-400">0</div></div>
-<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Faltas</div><div id="cF" class="text-2xl font-bold text-red-400">0</div></div>
-<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Atrasos</div><div id="cA" class="text-2xl font-bold text-amber-400">0</div></div>
-<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Saídas</div><div id="cS" class="text-2xl font-bold text-blue-400">0</div></div>
-<div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Ocorrências</div><div id="cO" class="text-2xl font-bold">0</div></div>
+
+<section class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div>
+      <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+      <select id="tutor_id" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2">
+        <option value="">Selecione...</option>
+      </select>
+    </div>
+    <div class="md:col-span-2">
+      <label class="block text-xs text-slate-400 mb-1">Aluno</label>
+      <select id="aluno_id" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2" disabled>
+        <option value="">Selecione primeiro o tutor...</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button onclick="carregarEvolucao()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar</button>
+    </div>
+  </div>
+</section>
+
+<section id="cards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Aluno</div><div id="cAluno" class="text-lg font-bold">-</div></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Sala</div><div id="cSala" class="text-lg font-bold">-</div></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Tutor</div><div id="cTutor" class="text-lg font-bold">-</div></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-xs text-slate-400">Gráficos</div><div class="text-lg font-bold text-emerald-400">Ativos</div></div>
+</section>
+
+<section id="graficos" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><h2 class="font-bold text-emerald-400 mb-3">Frequência semana a semana</h2><canvas id="grafFreq"></canvas></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><h2 class="font-bold text-emerald-400 mb-3">Ocorrências semana a semana</h2><canvas id="grafOc"></canvas></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><h2 class="font-bold text-emerald-400 mb-3">Atendimentos semana a semana</h2><canvas id="grafAt"></canvas></div>
+  <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><h2 class="font-bold text-emerald-400 mb-3">Notas bimestrais</h2><canvas id="grafNotas"></canvas></div>
 </section>
 </div>
+
 <script>
-async function carregar(){const alunoId=document.getElementById('aluno_id').value; if(!alunoId){alert('Informe o ID do aluno'); return;} const r=await fetch('/api/evolucao_aluno/'+alunoId); const j=await r.json(); if(!r.ok){alert(j.error||'Erro'); return;} document.getElementById('cards').classList.remove('hidden'); const x=j.resumo||{}; document.getElementById('cP').textContent=x.presencas||0; document.getElementById('cF').textContent=x.faltas||0; document.getElementById('cA').textContent=x.atrasos||0; document.getElementById('cS').textContent=x.saidas||0; document.getElementById('cO').textContent=x.ocorrencias||0;}
-</script></body></html>
+let tutores = [];
+let alunos = [];
+let grafFreq, grafOc, grafAt, grafNotas;
+
+async function carregarTutores() {
+  const r = await fetch('/api/tutores');
+  const dados = await r.json();
+  tutores = Array.isArray(dados) ? dados : [];
+  const s = document.getElementById('tutor_id');
+  s.innerHTML = '<option value="">Selecione...</option>' + tutores.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+  if (tutores.length === 1) {
+    s.value = tutores[0].id;
+    s.disabled = true;
+    await carregarAlunos();
+  }
+}
+async function carregarAlunos() {
+  const tutorId = document.getElementById('tutor_id').value;
+  const aluno = document.getElementById('aluno_id');
+  if (!tutorId) {
+    aluno.innerHTML = '<option value="">Selecione primeiro o tutor...</option>';
+    aluno.disabled = true;
+    return;
+  }
+  const r = await fetch(`/api/alunos_do_tutor/${tutorId}`);
+  const dados = await r.json();
+  alunos = Array.isArray(dados) ? dados : [];
+  aluno.disabled = false;
+  aluno.innerHTML = '<option value="">Selecione o aluno...</option>' + alunos.map(a => `<option value="${a.id}">${a.nome || a.aluno_nome}</option>`).join('');
+}
+function desenharGrafico(instancia, id, config) {
+  const ctx = document.getElementById(id).getContext('2d');
+  if (instancia) instancia.destroy();
+  return new Chart(ctx, config);
+}
+async function carregarEvolucao() {
+  const alunoId = document.getElementById('aluno_id').value;
+  if (!alunoId) return alert('Selecione o aluno.');
+
+  const r = await fetch(`/api/evolucao_aluno/${alunoId}`);
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao carregar evolução.');
+
+  document.getElementById('cards').classList.remove('hidden');
+  document.getElementById('graficos').classList.remove('hidden');
+
+  const a = j.aluno || {};
+  document.getElementById('cAluno').textContent = a.nome || '-';
+  document.getElementById('cSala').textContent = a.sala_nome || '-';
+  document.getElementById('cTutor').textContent = a.tutor_nome || '-';
+
+  const g = j.graficos || {};
+  grafFreq = desenharGrafico(grafFreq, 'grafFreq', {
+    type: 'line',
+    data: {
+      labels: g.frequencia?.labels || [],
+      datasets: [
+        { label: 'Presenças', data: g.frequencia?.presentes || [], borderColor: '#10b981', backgroundColor: '#10b981' },
+        { label: 'Faltas', data: g.frequencia?.faltas || [], borderColor: '#ef4444', backgroundColor: '#ef4444' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: true }
+  });
+
+  grafOc = desenharGrafico(grafOc, 'grafOc', {
+    type: 'bar',
+    data: { labels: g.ocorrencias?.labels || [], datasets: [{ label: 'Ocorrências', data: g.ocorrencias?.data || [] }] },
+    options: { responsive: true, maintainAspectRatio: true }
+  });
+
+  grafAt = desenharGrafico(grafAt, 'grafAt', {
+    type: 'bar',
+    data: { labels: g.atendimentos?.labels || [], datasets: [{ label: 'Atendimentos', data: g.atendimentos?.data || [] }] },
+    options: { responsive: true, maintainAspectRatio: true }
+  });
+
+  const notas = g.notas?.data || [];
+  grafNotas = desenharGrafico(grafNotas, 'grafNotas', {
+    type: 'bar',
+    data: {
+      labels: g.notas?.labels || [],
+      datasets: [{
+        label: 'Notas',
+        data: notas,
+        backgroundColor: notas.map(v => Number(v) < 5 ? '#ef4444' : '#3b82f6')
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: { y: { beginAtZero: true, suggestedMax: 10 } }
+    }
+  });
+}
+document.getElementById('tutor_id').addEventListener('change', carregarAlunos);
+carregarTutores();
+</script>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
+</body>
+</html>

@@ -123,7 +123,7 @@ async function carregarConselho(){
       <td class="py-2">${safe((x.causas || []).join(', '))}</td>
       <td class="py-2">${safe((x.solucoes || []).join(', '))}</td>
     </tr>
-  `).join('') || '<tr><td colspan="5" class="py-2 text-slate-400">Nenhum aluno abaixo de 5 neste bimestre.</td></tr>';
+  `).join('') || '<tr><td colspan="5" class="py-2 text-slate-400">Nenhum dado lançado neste bimestre.</td></tr>';
 
   document.getElementById('pontos_fortes').value = j.data.resumo?.pontos_fortes || '';
   document.getElementById('pontos_melhoria').value = j.data.resumo?.pontos_melhoria || '';
@@ -165,5 +165,10 @@ function imprimirMapao(){
 
 carregarSalas();
 </script>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
 </body>
 </html>

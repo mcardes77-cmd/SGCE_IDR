@@ -1,58 +1,126 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Mapão Conselho de Classe</title>
-  <style>
-    @page { size: A4 landscape; margin: 10mm; }
-    body { font-family: Arial, sans-serif; font-size: 10px; color: #111; }
-    h1,h2 { margin: 0 0 6px 0; }
-    .topo { margin-bottom: 10px; text-align: center; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid #333; padding: 4px; vertical-align: top; }
-    th { background: #f0f0f0; }
-    .assinaturas { margin-top: 20px; }
-    .bloco-ass { margin-bottom: 18px; }
-    .linha { border-top: 1px solid #333; width: 260px; padding-top: 4px; text-align: center; }
-  </style>
+<meta charset="UTF-8">
+<title>Mapão Conselho de Classe</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 10px; color: #111; margin:0; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { border: 1px solid #333; padding: 3px; vertical-align: middle; text-align:center; }
+  th { background: #f0f0f0; font-size: 9px; }
+  .nome { text-align: left; white-space: nowrap; width: 220px; }
+  .nota { width: 26px; font-size: 9px; }
+  .assinaturas { display:flex; gap:16px; justify-content:space-between; margin-top:20px; }
+  .bloco-ass { width: 32%; text-align:center; }
+  .linha { border-top: 1px solid #333; padding-top: 4px; margin-top: 28px; }
+  .info-box { margin-top: 10px; font-size: 11px; line-height: 1.45; }
+</style>
 </head>
 <body>
-  <div class="topo">
-    <h1>Mapão de Conselho de Classe</h1>
-    <h2>Sala: {{ sala_nome }} | Bimestre: {{ bimestre }}º</h2>
-  </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Aluno</th>
-        {% for d in disciplinas %}
-          <th>{{ d }}</th>
-        {% endfor %}
-        <th>Causas</th>
-        <th>Soluções</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for linha in linhas %}
-      <tr>
-        <td>{{ linha.aluno_nome }}</td>
-        {% for n in linha.notas %}
-          <td>{{ n }}</td>
-        {% endfor %}
-        <td>{{ linha.causas }}</td>
-        <td>{{ linha.solucoes }}</td>
-      </tr>
+<div style="width:100%; text-align:center; margin-bottom:10px; font-family: Arial, sans-serif;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div style="width:20%; text-align:left;">
+      <img src="{{ url_for('static', filename='logo_idr.png') }}" style="height:70px;">
+    </div>
+    <div style="width:60%; text-align:center; font-size:12px; line-height:1.4;">
+      <div><strong>Secretaria da Educação do Estado de São Paulo</strong></div>
+      <div>Unidade Regional de Ensino da Região de Ribeirão Preto</div>
+      <div><strong>E. E. Prof.ª Irene Dias Ribeiro</strong></div>
+      <div>Rua Dr. Antônio Sylvio Cunha Bueno, 205 - Geraldo Correia de Carvalho</div>
+      <div style="color:blue;">e900072p@educacao.sp.gov.br</div>
+    </div>
+    <div style="width:20%; text-align:right;">
+      <img src="{{ url_for('static', filename='logo_sp.png') }}" style="height:70px;">
+    </div>
+  </div>
+  <div style="font-size:20px; font-weight:bold; margin-top:5px; color:#4F81BD;">
+    {{ titulo_relatorio or "MAPÃO - CONSELHO DE CLASSE" }}
+  </div>
+</div>
+
+<hr style="border:1px solid #000; margin-bottom:12px;">
+
+<div style="text-align:center; margin-bottom:8px;">
+  <strong>Sala:</strong> {{ sala_nome }} |
+  <strong>Bimestre:</strong> {{ bimestre }} |
+  <strong>ALUNOS ATIVOS:</strong> {{ total_alunos_ativos }}
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="nome">Aluno</th>
+      <th class="nota">↓5</th>
+      {% for d in disciplinas %}
+        <th class="nota">{{ d.abreviacao }}</th>
       {% endfor %}
-    </tbody>
-  </table>
-
-  <div class="assinaturas">
-    {% for prof in professores %}
-      <div class="bloco-ass">
-        <div class="linha">{{ prof }}</div>
-      </div>
+      <th style="width: 190px;">Causas</th>
+      <th style="width: 190px;">Soluções</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for l in linhas %}
+    <tr>
+      <td class="nome">{{ l.aluno_nome }}</td>
+      <td class="nota">{{ l.abaixo_media }}</td>
+      {% for n in l.notas %}
+        <td class="nota">{{ n if n != '' else '-' }}</td>
+      {% endfor %}
+      <td>{{ l.causas }}</td>
+      <td>{{ l.solucoes }}</td>
+    </tr>
     {% endfor %}
-  </div>
+
+    <tr>
+      <td class="nome"><strong>Abaixo da média</strong></td>
+      <td></td>
+      {% for v in linha_abaixo %}
+        <td class="nota">{{ v }}</td>
+      {% endfor %}
+      <td></td><td></td>
+    </tr>
+
+    <tr>
+      <td class="nome"><strong>Na média</strong></td>
+      <td></td>
+      {% for v in linha_media %}
+        <td class="nota">{{ v }}</td>
+      {% endfor %}
+      <td></td><td></td>
+    </tr>
+
+    <tr>
+      <td class="nome"><strong>Aproveitamento</strong></td>
+      <td></td>
+      {% for v in linha_aproveitamento %}
+        <td class="nota">{{ v }}</td>
+      {% endfor %}
+      <td></td><td></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="info-box">
+  <p><strong>Pontos fortes:</strong> {{ pontos_fortes }}</p>
+  <p><strong>Pontos de melhoria:</strong> {{ pontos_melhoria }}</p>
+  <p><strong>Aluno destaque:</strong> {{ aluno_destaque }}</p>
+  <p><strong>Aluno evolução:</strong> {{ aluno_evolucao }}</p>
+</div>
+
+<div class="assinaturas">
+  {% for prof in professores[:3] %}
+    <div class="bloco-ass">
+      <div class="linha">{{ prof }}</div>
+    </div>
+  {% endfor %}
+  {% if professores|length == 0 %}
+    <div class="bloco-ass"><div class="linha">Professor(a)</div></div>
+    <div class="bloco-ass"><div class="linha">Coordenação</div></div>
+    <div class="bloco-ass"><div class="linha">Gestão</div></div>
+  {% endif %}
+</div>
+
 </body>
 </html>

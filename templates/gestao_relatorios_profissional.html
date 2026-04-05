@@ -15,6 +15,7 @@
       <p class="text-slate-400">Visão geral da escola com relatórios, filtros e gráficos.</p>
     </div>
     <div class="flex gap-2 flex-wrap">
+      <button id="btnGerarPdf" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded-lg font-semibold">Gerar PDF</button>
       <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Dashboard Geral</a>
     </div>
   </header>
@@ -61,6 +62,14 @@
       <div class="text-sm font-bold text-rose-400">Atraso e Saída Antecipada</div>
       <div class="text-xs text-slate-400 mt-1">Ranking recorrente</div>
     </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_sem_tutor">
+      <div class="text-sm font-bold text-emerald-300">Alunos sem Tutor</div>
+      <div class="text-xs text-slate-400 mt-1">Vincular tutor rapidamente</div>
+    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado">
+      <div class="text-sm font-bold text-cyan-300">Qtd. de Alunos por Tutor</div>
+      <div class="text-xs text-slate-400 mt-1">Detalhamento com PDF</div>
+    </button>
   </section>
 
   <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-6 gap-3">
@@ -95,18 +104,15 @@
       <input id="filtroMes" type="month" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
     </div>
     <div class="flex items-end">
-      <button onclick="carregarRelatorioAtual()" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar filtros</button>
+      <button id="btnAplicarFiltro" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar filtros</button>
     </div>
   </section>
 
   <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <h2 id="tituloRelatorio" class="text-lg font-bold text-emerald-400 mb-3">Selecione um relatório</h2>
-      <div class="h-[380px]">
-        <canvas id="graficoRelatorio"></canvas>
-      </div>
+      <div class="h-[380px]"><canvas id="graficoRelatorio"></canvas></div>
     </div>
-
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <h2 class="text-lg font-bold text-emerald-400 mb-3">Tabela detalhada</h2>
       <div class="overflow-x-auto">
@@ -119,9 +125,32 @@
   </section>
 </div>
 
+<div id="modalDetalhe" class="hidden fixed inset-0 bg-black/70 items-center justify-center p-4">
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-3xl p-5 space-y-4">
+    <div class="flex justify-between items-center">
+      <h2 id="modalTitulo" class="text-xl font-bold text-emerald-400">Detalhe</h2>
+      <div class="flex gap-2"><button id="btnPdfDetalheTutor" type="button" class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm">Gerar PDF</button><button type="button" onclick="fecharDetalhe()" class="text-slate-300">✕</button></div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="text-left py-2 px-2">Aluno</th>
+            <th class="text-left py-2 px-2">Data</th>
+            <th class="text-left py-2 px-2">Tipo</th>
+          </tr>
+        </thead>
+        <tbody id="tbDetalhe"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <script>
 let reportAtual = 'ocorrencias_por_sala';
 let grafico = null;
+let detalhesAtuais = {};
+let tutorDetalheAtual = "";
 
 function mesAtual() {
   const d = new Date();
@@ -129,7 +158,7 @@ function mesAtual() {
 }
 
 async function carregarFiltrosBase() {
-  const salas = await (await fetch('/api/salas')).json();
+  const salas = await (await fetch('/api/salas')).json().catch(() => []);
   document.getElementById('filtroSala').innerHTML =
     '<option value="">Todas</option>' +
     (Array.isArray(salas) ? salas.map(s => {
@@ -137,34 +166,89 @@ async function carregarFiltrosBase() {
       return `<option value="${nome}">${nome}</option>`;
     }).join('') : '');
 
-  const tutores = await (await fetch('/api/tutores')).json();
+  const tutores = await (await fetch('/api/tutores')).json().catch(() => []);
   document.getElementById('filtroTutor').innerHTML =
     '<option value="">Todos</option>' +
     (Array.isArray(tutores) ? tutores.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('') : '');
 
-  const professores = await (await fetch('/api/professores')).json();
+  const professores = await (await fetch('/api/professores')).json().catch(() => []);
   document.getElementById('filtroProfessor').innerHTML =
     '<option value="">Todos</option>' +
     (Array.isArray(professores) ? professores.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('') : '');
 }
 
-function renderTabela(headers, rows) {
+function renderTabela(headers, rows, reportName) {
   document.getElementById('theadTabela').innerHTML = `
     <tr class="border-b border-slate-700">
       ${headers.map(h => `<th class="text-left py-2 px-2">${h}</th>`).join('')}
     </tr>
   `;
-  document.getElementById('tbodyTabela').innerHTML = rows.map(r => `
-    <tr class="border-b border-slate-800">
-      ${r.map(v => `<td class="py-2 px-2">${v ?? ''}</td>`).join('')}
-    </tr>
-  `).join('');
+
+  document.getElementById('tbodyTabela').innerHTML = rows.map(r => {
+    if (reportName === 'alunos_sem_tutor') {
+      return `<tr class="border-b border-slate-800">
+        <td class="py-2 px-2">${r[0] ?? ''}</td>
+        <td class="py-2 px-2">${r[1] ?? ''}</td>
+        <td class="py-2 px-2"><a href="/gestao_cadastro?acao=editar_tutor&aluno_id=${r[2]}" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded text-xs">Inserir Tutor</a></td>
+      </tr>`;
+    }
+    if (reportName === 'atendimentos_por_tutor') {
+      const tutor = String(r[0] ?? '');
+      return `<tr class="border-b border-slate-800">
+        <td class="py-2 px-2">${tutor}</td>
+        <td class="py-2 px-2">${r[1] ?? ''}</td>
+        <td class="py-2 px-2"><button type="button" onclick='abrirDetalhe(${JSON.stringify(tutor)})' class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Ver detalhe</button></td>
+      </tr>`;
+    }
+    if (reportName === 'alunos_por_tutor_detalhado') {
+      return `<tr class="border-b border-slate-800">
+        <td class="py-2 px-2">${r[0] ?? ''}</td>
+        <td class="py-2 px-2">${r[1] ?? ''}</td>
+        <td class="py-2 px-2"><a href="/relatorio_alunos_tutor?tutor=${encodeURIComponent(r[0] ?? '')}" class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Ver alunos</a></td>
+      </tr>`;
+    }
+    return `<tr class="border-b border-slate-800">${r.map(v => `<td class="py-2 px-2">${v ?? ''}</td>`).join('')}</tr>`;
+  }).join('');
 }
 
 function renderGrafico(config) {
   const ctx = document.getElementById('graficoRelatorio');
   if (grafico) grafico.destroy();
-  grafico = new Chart(ctx, config);
+  grafico = new Chart(ctx, {
+    type: config.type,
+    data: config.data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#e2e8f0' } } },
+      scales: config.type === 'pie' ? {} : {
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+        y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } }
+      }
+    }
+  });
+}
+
+function abrirDetalhe(tutor) {
+  tutorDetalheAtual = tutor;
+  const rows = detalhesAtuais[tutor] || [];
+  document.getElementById('modalTitulo').textContent = `Detalhe de atendimentos - ${tutor}`;
+  document.getElementById('tbDetalhe').innerHTML = rows.length
+    ? rows.map(x => `
+      <tr class="border-b border-slate-800">
+        <td class="py-2 px-2">${x.aluno_nome || ''}</td>
+        <td class="py-2 px-2">${String(x.data_registro || '').replace('T', ' ').slice(0, 16)}</td>
+        <td class="py-2 px-2">${x.tipo_atendimento || ''}</td>
+      </tr>
+    `).join('')
+    : '<tr><td colspan="3" class="py-2 px-2 text-slate-400">Sem detalhes.</td></tr>';
+  document.getElementById('modalDetalhe').classList.remove('hidden');
+  document.getElementById('modalDetalhe').classList.add('flex');
+}
+
+function fecharDetalhe() {
+  document.getElementById('modalDetalhe').classList.add('hidden');
+  document.getElementById('modalDetalhe').classList.remove('flex');
 }
 
 async function carregarRelatorioAtual() {
@@ -176,11 +260,13 @@ async function carregarRelatorioAtual() {
 
   const r = await fetch(`/api/relatorios_dashboard/${reportAtual}?sala=${sala}&tutor=${tutor}&professor=${professor}&periodo=${periodo}&mes=${mes}`);
   const j = await r.json();
+
   if (!r.ok || !j.success) {
     alert(j.error || 'Erro ao carregar relatório');
     return;
   }
 
+  detalhesAtuais = j.data.detalhes || {};
   document.getElementById('tituloRelatorio').textContent = j.data.titulo || 'Relatório';
 
   renderGrafico({
@@ -193,19 +279,10 @@ async function carregarRelatorioAtual() {
         borderWidth: 1,
         fill: j.data.chart_type === 'line'
       }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#e2e8f0' } } },
-      scales: j.data.chart_type === 'pie' ? {} : {
-        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } },
-        y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148,163,184,0.12)' } }
-      }
     }
   });
 
-  renderTabela(j.data.table.headers || [], j.data.table.rows || []);
+  renderTabela(j.data.table.headers || [], j.data.table.rows || [], reportAtual);
 }
 
 document.querySelectorAll('.card-relatorio').forEach(btn => {
@@ -215,8 +292,33 @@ document.querySelectorAll('.card-relatorio').forEach(btn => {
   });
 });
 
+document.getElementById('btnAplicarFiltro').addEventListener('click', carregarRelatorioAtual);
+
+document.getElementById('btnPdfDetalheTutor').addEventListener('click', () => {
+  if (!tutorDetalheAtual) return;
+  const tutor = encodeURIComponent(tutorDetalheAtual);
+  const sala = encodeURIComponent(document.getElementById('filtroSala').value || '');
+  const mes = encodeURIComponent(document.getElementById('filtroMes').value || '');
+  window.open(`/relatorio_atendimentos_tutor_pdf?tutor=${tutor}&sala=${sala}&mes=${mes}`, '_blank');
+});
+
+document.getElementById('btnGerarPdf').addEventListener('click', () => {
+  const sala = encodeURIComponent(document.getElementById('filtroSala').value || '');
+  const tutor = encodeURIComponent(document.getElementById('filtroTutor').value || '');
+  const professor = encodeURIComponent(document.getElementById('filtroProfessor').value || '');
+  const mes = encodeURIComponent(document.getElementById('filtroMes').value || mesAtual());
+  const periodo = encodeURIComponent(document.getElementById('filtroPeriodo').value || 'acumulado');
+
+  window.open(`/relatorio_dashboard_pdf/${reportAtual}?sala=${sala}&tutor=${tutor}&professor=${professor}&mes=${mes}&periodo=${periodo}`, '_blank');
+});
+
 document.getElementById('filtroMes').value = mesAtual();
 carregarFiltrosBase().then(() => carregarRelatorioAtual());
 </script>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
 </body>
 </html>

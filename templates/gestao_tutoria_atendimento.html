@@ -24,4 +24,9 @@ function abrirNovo(){if(!document.getElementById('aluno_id').value) return alert
 async function editar(id){const r=await fetch(`/api/atendimento_tutoria/${id}`); const j=await r.json(); if(!r.ok||!j.success) return alert(j.error||'Erro'); const x=j.data; document.getElementById('form').classList.remove('hidden'); document.getElementById('atendimento_id').value=x.id; document.getElementById('tipo_atendimento').value=x.tipo_atendimento||''; document.getElementById('registro').value=x.registro||''; document.getElementById('proximos_passos').value=x.proximos_passos||'';}
 async function salvarAtendimento(){const tutorId=document.getElementById('tutor_id').value, alunoId=document.getElementById('aluno_id').value; const tutor=tutores.find(t=>String(t.id)===String(tutorId))||{}; const aluno=alunos.find(a=>String(a.id)===String(alunoId))||{}; const payload={tutor_id:tutorId,tutor_nome:tutor.nome||'',aluno_id:alunoId,aluno_nome:aluno.nome||aluno.aluno_nome||'',sala_nome:aluno.sala_nome||'',tipo_atendimento:document.getElementById('tipo_atendimento').value,registro:document.getElementById('registro').value,proximos_passos:document.getElementById('proximos_passos').value}; const id=document.getElementById('atendimento_id').value; let r,j; if(id){r=await fetch(`/api/atendimento_tutoria/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); j=await r.json();} else {r=await fetch('/api/salvar_atendimento_tutoria',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); j=await r.json();} if(!r.ok||!j.success) return alert(j.error||'Erro'); alert('Salvo'); document.getElementById('form').classList.add('hidden'); carregarAtendimentos();}
 document.getElementById('tutor_id').addEventListener('change', carregarAlunosDoTutor); carregarTutores();
-</script></body></html>
+</script>
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
+</body></html>

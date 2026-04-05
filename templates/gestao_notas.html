@@ -83,21 +83,24 @@
     <div>
       <label class="block text-sm font-semibold text-emerald-400 mb-2">Causas</label>
       <div class="grid md:grid-cols-2 gap-2 text-sm">
-        <label><input type="checkbox" class="causa" value="Baixa frequência"> Baixa frequência</label>
-        <label><input type="checkbox" class="causa" value="Dificuldade de aprendizagem"> Dificuldade de aprendizagem</label>
-        <label><input type="checkbox" class="causa" value="Falta de estudo/entrega"> Falta de estudo/entrega</label>
-        <label><input type="checkbox" class="causa" value="Questões comportamentais"> Questões comportamentais</label>
-        <label><input type="checkbox" class="causa" value="Questões familiares/emocionais"> Questões familiares/emocionais</label>
+        <label><input type="checkbox" class="causa" value="Assiduidade"> Assiduidade</label>
+        <label><input type="checkbox" class="causa" value="Falta de estudo"> Falta de estudo</label>
+        <label><input type="checkbox" class="causa" value="Falta de comprometimento"> Falta de comprometimento</label>
+        <label><input type="checkbox" class="causa" value="Indisciplina"> Indisciplina</label>
+        <label><input type="checkbox" class="causa" value="Dif de aprendizagem/defasagem"> Dif de aprendizagem/defasagem</label>
+	 <label><input type="checkbox" class="causa" value="Não utiliza plataformas"> Não utiliza plataformas</label>
       </div>
     </div>
 
     <div>
       <label class="block text-sm font-semibold text-emerald-400 mb-2">Soluções</label>
       <div class="grid md:grid-cols-2 gap-2 text-sm">
-        <label><input type="checkbox" class="solucao" value="Recuperação paralela"> Recuperação paralela</label>
-        <label><input type="checkbox" class="solucao" value="Acompanhamento individual"> Acompanhamento individual</label>
-        <label><input type="checkbox" class="solucao" value="Contato com responsável"> Contato com responsável</label>
-        <label><input type="checkbox" class="solucao" value="Encaminhamento para tutoria/apoio"> Encaminhamento para tutoria/apoio</label>
+        <label><input type="checkbox" class="solucao" value="Compensação de ausências"> Compensação de ausências</label>
+        <label><input type="checkbox" class="solucao" value="Mediação do Professor"> Mediação do Professor</label>
+        <label><input type="checkbox" class="solucao" value="Mediação do Tutor"> Mediação do Tutor</label>
+        <label><input type="checkbox" class="solucao" value="Mediação Equipe Coordenação"> Mediação Equipe Coordenação</label>
+	<label><input type="checkbox" class="solucao" value="Mediação Equipe Gestora"> Mediação Equipe Gestora</label>
+	<label><input type="checkbox" class="solucao" value="Busca Ativa"> Mediação Equipe Gestora</label>
       </div>
     </div>
 
@@ -249,5 +252,10 @@ document.getElementById('bimestre').addEventListener('change', () => { if (aluno
 carregarSalas();
 carregarDisciplinas();
 </script>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
 </body>
 </html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Alunos do Tutor</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; }
+    h1, h2 { text-align:center; margin: 0 0 8px 0; }
+    table { width:100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border:1px solid #333; padding:4px; text-align:left; vertical-align: top; }
+    th { background:#f0f0f0; }
+    .meta { margin-top: 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Relatório de Alunos do Tutor</h1>
+  <h2>{{ tutor }}</h2>
+  <div class="meta"><strong>Quantidade de alunos:</strong> {{ alunos|length }}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Aluno</th>
+        <th>Sala</th>
+        <th>Projeto de Vida</th>
+        <th>Telefone</th>
+        <th>Responsável</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alunos %}
+      <tr>
+        <td>{{ a.nome or a.aluno_nome }}</td>
+        <td>{{ a.sala_nome or '' }}</td>
+        <td>{{ a.projeto_de_vida or '' }}</td>
+        <td>{{ a.telefone_aluno or '' }}</td>
+        <td>{{ a.responsavel_nome or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alunos do Tutor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
+<div class="max-w-6xl mx-auto space-y-5">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-emerald-400">ALUNOS DO TUTOR</h1>
+      <p class="text-slate-400">Lista detalhada de alunos vinculados ao tutor.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/gestao_relatorios" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded">Voltar</a>
+      <a href="/relatorio_alunos_tutor_pdf?tutor={{ tutor|urlencode }}" target="_blank" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded">Gerar PDF</a>
+    </div>
+  </header>
+
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+    <div class="grid md:grid-cols-3 gap-4 text-sm">
+      <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+        <div class="text-slate-400">Tutor</div>
+        <div class="text-lg font-bold text-white">{{ tutor }}</div>
+      </div>
+      <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+        <div class="text-slate-400">Quantidade de alunos</div>
+        <div class="text-lg font-bold text-white">{{ alunos|length }}</div>
+      </div>
+      <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+        <div class="text-slate-400">Salas vinculadas</div>
+        <div class="text-lg font-bold text-white">{{ salas|join(', ') }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="text-left py-2 px-2">Aluno</th>
+            <th class="text-left py-2 px-2">Sala</th>
+            <th class="text-left py-2 px-2">Projeto de Vida</th>
+            <th class="text-left py-2 px-2">Telefone</th>
+            <th class="text-left py-2 px-2">Responsável</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in alunos %}
+          <tr class="border-b border-slate-800">
+            <td class="py-2 px-2">{{ a.nome or a.aluno_nome }}</td>
+            <td class="py-2 px-2">{{ a.sala_nome or '' }}</td>
+            <td class="py-2 px-2">{{ a.projeto_de_vida or '' }}</td>
+            <td class="py-2 px-2">{{ a.telefone_aluno or '' }}</td>
+            <td class="py-2 px-2">{{ a.responsavel_nome or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
+</body>
+</html>

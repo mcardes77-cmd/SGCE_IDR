@@ -66,6 +66,7 @@
               <th class="text-left py-2">Aluno</th>
               <th class="text-left py-2">Sala</th>
               <th class="text-left py-2">Tutor</th>
+              <th class="text-left py-2">Situação</th>
               <th class="text-left py-2">Projeto de Vida</th>
               <th class="text-left py-2">Ações</th>
             </tr>
@@ -124,14 +125,33 @@
   <section id="painel_ocorrencias" class="painel hidden space-y-4">
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-4 gap-3">
       <div>
-        <label class="block text-xs text-slate-400 mb-1">Número da ocorrência</label>
-        <input id="numeroOcorrenciaBusca" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+        <label class="block text-xs text-slate-400 mb-1">Sala</label>
+        <select id="filtroOcSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          <option value="">Selecione a sala</option>
+        </select>
       </div>
-      <div class="flex items-end">
-        <button onclick="buscarOcorrenciaParaEditar()" class="w-full bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg font-semibold">Carregar ocorrência</button>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+        <select id="filtroOcTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          <option value="">Todos</option>
+        </select>
       </div>
-      <div class="md:col-span-2 flex items-end text-xs text-slate-400">
-        Somente os 5 usuários com acesso total podem editar ocorrência.
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Aluno com ocorrência</label>
+        <select id="filtroOcAluno" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          <option value="">Selecione a sala primeiro</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Ocorrência</label>
+        <select id="filtroOcNumero" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          <option value="">Selecione o aluno</option>
+        </select>
+      </div>
+      <div class="md:col-span-4 flex items-end gap-2">
+        <button onclick="carregarOcorrenciasCadastroFiltro()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold">Carregar filtros</button>
+        <button onclick="buscarOcorrenciaParaEditar()" class="bg-amber-700 hover:bg-amber-600 px-4 py-2 rounded-lg font-semibold">Carregar ocorrência</button>
+        <div class="text-xs text-slate-400">Somente os 5 usuários com acesso total podem editar ocorrência.</div>
       </div>
     </div>
 
@@ -199,13 +219,10 @@ async function carregarBases() {
     return `<option value="${nome}">${nome}</option>`;
   }).join('') : '');
   document.getElementById('filtroSalaAluno').innerHTML = salaOptions;
+  const filtroOcSala = document.getElementById('filtroOcSala'); if (filtroOcSala) filtroOcSala.innerHTML = salaOptions;
 
   funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
-  tutores = (Array.isArray(funcionarios) ? funcionarios : []).filter(f => {
-    const tipo = (f.tipo || '').toUpperCase();
-    const funcao = (f.funcao || '').toUpperCase();
-    return tipo === 'PROFESSOR' && !funcao.includes('APOIO');
-  });
+  tutores = await (await fetch('/api/tutores_disponiveis_cadastro')).json();
 
   await listarFuncionarios();
   await listarClubes();
@@ -221,13 +238,19 @@ async function carregarAlunosSala() {
       <td class="py-2">${a.nome || a.aluno_nome || ''}</td>
       <td class="py-2">${a.sala_nome || ''}</td>
       <td class="py-2">${a.tutor_nome || a.nome_tutor || ''}</td>
+      <td class="py-2">${a.situacao_aluno || 'ATIVO'}</td>
       <td class="py-2">${a.projeto_de_vida || a.projeto_vida || ''}</td>
       <td class="py-2">
         <button class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded mr-1" onclick='editarAluno(${JSON.stringify(a)})'>Editar</button>
         <button class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded" onclick='excluirAluno(${a.id})'>Excluir</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="5" class="py-2 text-slate-400">Nenhum aluno encontrado.</td></tr>';
+  `).join('') || '<tr><td colspan="6" class="py-2 text-slate-400">Nenhum aluno encontrado.</td></tr>';
+}
+
+function optionsSituacao(valorAtual) {
+  const situacoes = ['ATIVO', 'REMA', 'TRANS', 'NCOM', 'RECL'];
+  return situacoes.map(s => `<option value="${s}" ${String(valorAtual || 'ATIVO') === s ? 'selected' : ''}>${s}</option>`).join('');
 }
 
 function formAlunoHtml(aluno) {
@@ -236,14 +259,57 @@ function formAlunoHtml(aluno) {
     const nome = s.nome || s.sala || s.sala_nome || '';
     return `<option value="${nome}" ${nome === (aluno.sala_nome || '') ? 'selected' : ''}>${nome}</option>`;
   }).join('') : '');
-  const tutorOptions = '<option value="">Selecione o tutor</option>' + tutores.map(t => `<option value="${t.id}" data-nome="${t.nome}" ${String(t.id) === String(aluno.tutor_id || aluno.id_tutor || '') ? 'selected' : ''}>${t.nome}</option>`).join('');
+
+  const jaTemTutor = !!(aluno.tutor_id || aluno.id_tutor || aluno.tutor_nome || aluno.nome_tutor);
+  const tutorAtualTexto = aluno.tutor_nome || aluno.nome_tutor || '';
+
+  const tutorOptions = '<option value="">Selecione o tutor</option>' + (Array.isArray(tutores) ? tutores.map(t => `
+    <option value="${t.id}" data-nome="${t.nome}" ${String(t.id) === String(aluno.tutor_id || aluno.id_tutor || '') ? 'selected' : ''}>
+      ${t.nome}
+    </option>
+  `).join('') : '');
+
   return `
     <input type="hidden" id="frmAlunoId" value="${aluno.id || ''}">
     <div class="grid md:grid-cols-2 gap-3">
-      <div><label class="block text-xs text-slate-400 mb-1">Nome do aluno</label><input id="frmAlunoNome" value="${aluno.nome || aluno.aluno_nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
-      <div><label class="block text-xs text-slate-400 mb-1">Sala</label><select id="frmAlunoSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${salaOptions}</select></div>
-      <div><label class="block text-xs text-slate-400 mb-1">Tutor</label><select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${tutorOptions}</select></div>
-      <div><label class="block text-xs text-slate-400 mb-1">Projeto de Vida</label><input id="frmAlunoProjeto" value="${aluno.projeto_de_vida || aluno.projeto_vida || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Nome do aluno</label>
+        <input id="frmAlunoNome" value="${aluno.nome || aluno.aluno_nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase()">
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Sala</label>
+        <select id="frmAlunoSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${salaOptions}</select>
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+        ${
+          jaTemTutor
+            ? `
+              <input value="${tutorAtualTexto}" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200" disabled>
+              <input type="hidden" id="frmAlunoTutorBloqueadoId" value="${aluno.tutor_id || aluno.id_tutor || ''}">
+              <input type="hidden" id="frmAlunoTutorBloqueadoNome" value="${tutorAtualTexto}">
+            `
+            : `
+              <select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+                ${tutorOptions}
+              </select>
+            `
+        }
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Situação do Aluno</label>
+        <select id="frmAlunoSituacao" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+          ${optionsSituacao(aluno.situacao_aluno || 'ATIVO')}
+        </select>
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-400 mb-1">Projeto de Vida</label>
+        <input id="frmAlunoProjeto" value="${aluno.projeto_de_vida || aluno.projeto_vida || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+      </div>
     </div>
   `;
 }
@@ -252,10 +318,22 @@ function editarAluno(aluno){ abrirModal('Editar aluno', formAlunoHtml(aluno), sa
 
 async function salvarAlunoModal() {
   const id = document.getElementById('frmAlunoId').value;
+
+  let tutorId = '';
+  let tutorNome = '';
+
   const tutorSelect = document.getElementById('frmAlunoTutor');
-  const tutorId = tutorSelect.value;
-  const opt = tutorSelect.options[tutorSelect.selectedIndex];
-  const tutorNome = opt ? (opt.dataset.nome || '') : '';
+  const tutorBloqueadoId = document.getElementById('frmAlunoTutorBloqueadoId');
+  const tutorBloqueadoNome = document.getElementById('frmAlunoTutorBloqueadoNome');
+
+  if (tutorSelect) {
+    tutorId = tutorSelect.value;
+    tutorNome = tutorSelect.options[tutorSelect.selectedIndex]?.dataset?.nome || '';
+  } else if (tutorBloqueadoId && tutorBloqueadoNome) {
+    tutorId = tutorBloqueadoId.value;
+    tutorNome = tutorBloqueadoNome.value;
+  }
+
   const payload = {
     nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
     aluno_nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
@@ -264,8 +342,10 @@ async function salvarAlunoModal() {
     id_tutor: tutorId || null,
     tutor_nome: tutorNome,
     nome_tutor: tutorNome,
+    situacao_aluno: document.getElementById('frmAlunoSituacao').value || 'ATIVO',
     projeto_de_vida: document.getElementById('frmAlunoProjeto').value
   };
+
   const url = id ? `/api/cadastro/aluno/${id}` : '/api/cadastro/aluno';
   const method = id ? 'PUT' : 'POST';
   const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -274,6 +354,7 @@ async function salvarAlunoModal() {
   fecharModal();
   if (document.getElementById('filtroSalaAluno').value) carregarAlunosSala();
 }
+
 async function excluirAluno(id) {
   if (!confirm('Excluir este aluno?')) return;
   const r = await fetch(`/api/cadastro/aluno/${id}`, {method:'DELETE'});
@@ -282,6 +363,7 @@ async function excluirAluno(id) {
   if (document.getElementById('filtroSalaAluno').value) carregarAlunosSala();
 }
 
+/* resto do arquivo permanece igual */
 async function listarFuncionarios() {
   document.getElementById('tbFuncionarios').innerHTML = (Array.isArray(funcionarios) ? funcionarios : []).map(f => `
     <tr class="border-b border-slate-800">
@@ -301,9 +383,9 @@ function formFuncionarioHtml(func) {
   return `
     <input type="hidden" id="frmFuncId" value="${func.id || ''}">
     <div class="grid md:grid-cols-2 gap-3">
-      <div><label class="block text-xs text-slate-400 mb-1">Nome</label><input id="frmFuncNome" value="${func.nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Nome</label><input id="frmFuncNome" value="${func.nome || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase()"></div>
       <div><label class="block text-xs text-slate-400 mb-1">Tipo/Cargo</label><select id="frmFuncTipo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="PROFESSOR" ${(func.tipo||'')==='PROFESSOR'?'selected':''}>PROFESSOR</option><option value="GESTAO" ${(func.tipo||'')==='GESTAO'?'selected':''}>GESTAO</option><option value="COORDENACAO" ${(func.tipo||'')==='COORDENACAO'?'selected':''}>COORDENACAO</option><option value="SECRETARIA" ${(func.tipo||'')==='SECRETARIA'?'selected':''}>SECRETARIA</option><option value="PEDAGOGICO" ${(func.tipo||'')==='PEDAGOGICO'?'selected':''}>PEDAGOGICO</option></select></div>
-      <div><label class="block text-xs text-slate-400 mb-1">Função</label><input id="frmFuncFuncao" value="${func.funcao || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase()"></div>
+      <div><label class="block text-xs text-slate-400 mb-1">Função</label><input id="frmFuncFuncao" value="${func.funcao || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" oninput="this.value = this.value.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase()"></div>
       <div><label class="block text-xs text-slate-400 mb-1">Usuário com acesso total?</label><select id="frmFuncAcessoTotal" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="false" ${func.acesso_total ? '' : 'selected'}>Não</option><option value="true" ${func.acesso_total ? 'selected' : ''}>Sim</option></select></div>
     </div>
   `;
@@ -326,7 +408,7 @@ async function salvarFuncionarioModal() {
   if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar funcionário.');
   fecharModal();
   funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
-  tutores = (Array.isArray(funcionarios) ? funcionarios : []).filter(f => ((f.tipo || '').toUpperCase()==='PROFESSOR') && !((f.funcao || '').toUpperCase().includes('APOIO')));
+  tutores = await (await fetch('/api/tutores_disponiveis_cadastro')).json();
   listarFuncionarios();
 }
 async function excluirFuncionario(id) {
@@ -337,7 +419,6 @@ async function excluirFuncionario(id) {
   funcionarios = await (await fetch('/api/cadastro/funcionarios')).json();
   listarFuncionarios();
 }
-
 function formSimplesHtml(item) {
   item = item || {};
   return `
@@ -375,7 +456,6 @@ async function excluirClube(id) {
   if (!r.ok || !j.success) return alert(j.error || 'Erro ao excluir.');
   listarClubes();
 }
-
 async function listarEletivas() {
   const e1 = await (await fetch('/api/eletivas?semestre=1')).json().catch(()=>[]);
   const e2 = await (await fetch('/api/eletivas?semestre=2')).json().catch(()=>[]);
@@ -403,9 +483,43 @@ async function excluirEletiva(id) {
   listarEletivas();
 }
 
+async function carregarOcorrenciasCadastroFiltro() {
+  const salaNome = document.getElementById('filtroOcSala').value || '';
+  const tutorSelect = document.getElementById('filtroOcTutor');
+  const alunoSelect = document.getElementById('filtroOcAluno');
+  const numeroSelect = document.getElementById('filtroOcNumero');
+
+  const tutores = await (await fetch(`/api/cadastro/tutores_com_ocorrencia?sala_nome=${encodeURIComponent(salaNome)}`)).json();
+  tutorSelect.innerHTML = '<option value="">Todos</option>' + (Array.isArray(tutores) ? tutores.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('') : '');
+
+  alunoSelect.innerHTML = '<option value="">Selecione o aluno</option>';
+  numeroSelect.innerHTML = '<option value="">Selecione a ocorrência</option>';
+}
+
+async function carregarAlunosOcorrencia() {
+  const salaNome = document.getElementById('filtroOcSala').value || '';
+  const tutorNome = document.getElementById('filtroOcTutor').value || '';
+  const alunoSelect = document.getElementById('filtroOcAluno');
+  const numeroSelect = document.getElementById('filtroOcNumero');
+
+  const dados = await (await fetch(`/api/cadastro/alunos_com_ocorrencia?sala_nome=${encodeURIComponent(salaNome)}&tutor_nome=${encodeURIComponent(tutorNome)}`)).json();
+  alunoSelect.innerHTML = '<option value="">Selecione o aluno</option>' + (Array.isArray(dados) ? dados.map(a => `<option value="${a.id || ''}" data-nome="${a.nome}">${a.nome}</option>`).join('') : '');
+  numeroSelect.innerHTML = '<option value="">Selecione a ocorrência</option>';
+}
+
+async function carregarNumerosOcorrencia() {
+  const alunoSelect = document.getElementById('filtroOcAluno');
+  const alunoId = alunoSelect.value || '';
+  const alunoNome = alunoSelect.options[alunoSelect.selectedIndex]?.dataset?.nome || '';
+  const numeroSelect = document.getElementById('filtroOcNumero');
+
+  const dados = await (await fetch(`/api/cadastro/ocorrencias_do_aluno?aluno_id=${encodeURIComponent(alunoId)}&aluno_nome=${encodeURIComponent(alunoNome)}`)).json();
+  numeroSelect.innerHTML = '<option value="">Selecione a ocorrência</option>' + (Array.isArray(dados) ? dados.map(o => `<option value="${o.numero}">Nº ${o.numero} - ${(o.data_hora || '').toString().slice(0,16).replace('T',' ')}</option>`).join('') : '');
+}
+
 async function buscarOcorrenciaParaEditar() {
-  const numero = document.getElementById('numeroOcorrenciaBusca').value;
-  if (!numero) return alert('Informe o número da ocorrência.');
+  const numero = document.getElementById('filtroOcNumero').value;
+  if (!numero) return alert('Selecione a ocorrência.');
   const r = await fetch(`/api/ocorrencia_detalhes?numero=${encodeURIComponent(numero)}`);
   const j = await r.json();
   if (!r.ok || j.success === false) return alert(j.error || 'Ocorrência não encontrada.');
@@ -417,7 +531,9 @@ async function buscarOcorrenciaParaEditar() {
   document.getElementById('editOcAtGestao').value = j.atendimento_gestao || '';
   document.getElementById('editOcAtResp').value = j.atendimento_responsavel || '';
 }
+
 async function salvarOcorrenciaEditada() {
+
   if (!ocorrenciaAtual) return alert('Carregue a ocorrência primeiro.');
   const payload = {
     descricao: document.getElementById('editOcDescricao').value,
@@ -432,9 +548,94 @@ async function salvarOcorrenciaEditada() {
   if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar ocorrência.');
   alert('Ocorrência atualizada.');
 }
-
 document.querySelectorAll('.card-op').forEach(btn => btn.addEventListener('click', () => showPainel('painel_' + btn.dataset.tab)));
+
+document.getElementById('filtroOcSala')?.addEventListener('change', async () => {
+  await carregarOcorrenciasCadastroFiltro();
+  await carregarAlunosOcorrencia();
+});
+document.getElementById('filtroOcTutor')?.addEventListener('change', carregarAlunosOcorrencia);
+document.getElementById('filtroOcAluno')?.addEventListener('change', carregarNumerosOcorrencia);
+
 carregarBases();
 </script>
+
+<script>
+async function abrirPopupEditarTutorPorQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const acao = params.get('acao');
+  const alunoId = params.get('aluno_id');
+  if (acao !== 'editar_tutor' || !alunoId) return;
+
+  try {
+    const r = await fetch(`/api/cadastro/aluno/${alunoId}`);
+    const aluno = await r.json();
+    if (!r.ok || aluno.success === false) return;
+
+    const tutoresResp = await fetch('/api/tutores_disponiveis_cadastro');
+    const tutoresLista = await tutoresResp.json();
+
+    const tutorOptions = '<option value="">Selecione o tutor</option>' + (Array.isArray(tutoresLista) ? tutoresLista.map(t => `
+      <option value="${t.id}" data-nome="${t.nome}">
+        ${t.nome}
+      </option>
+    `).join('') : '');
+
+    const bodyHtml = `
+      <input type="hidden" id="frmAlunoId" value="${aluno.id || ''}">
+      <div class="grid md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Aluno</label>
+          <input value="${aluno.nome || aluno.aluno_nome || ''}" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200" disabled>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Sala</label>
+          <input value="${aluno.sala_nome || ''}" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200" disabled>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+          <select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            ${tutorOptions}
+          </select>
+        </div>
+      </div>
+    `;
+    abrirModal('Vincular tutor ao aluno', bodyHtml, salvarTutorAlunoPopup);
+  } catch (e) {
+    console.error(e);
+  }
+}
+async function salvarTutorAlunoPopup() {
+  const alunoId = document.getElementById('frmAlunoId').value;
+  const tutorSelect = document.getElementById('frmAlunoTutor');
+  const tutorId = tutorSelect.value;
+  const tutorNome = tutorSelect.options[tutorSelect.selectedIndex]?.dataset?.nome || '';
+
+  if (!tutorId) return alert('Selecione o tutor.');
+
+  const r = await fetch(`/api/salvar_tutor_aluno/${alunoId}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tutor_id: tutorId,
+      id_tutor: tutorId,
+      tutor_nome: tutorNome,
+      nome_tutor: tutorNome
+    })
+  });
+
+  const j = await r.json();
+  if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar tutor.');
+
+  fecharModal();
+  window.location.href = '/gestao_cadastro';
+}
+document.addEventListener('DOMContentLoaded', abrirPopupEditarTutorPorQuery);
+</script>
+
+<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
+  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
+  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
+</footer>
 </body>
 </html>

@@ -41,7 +41,6 @@
   </section>
 
   <section id="painel" class="hidden space-y-4">
-    <div id="badgeStatusAluno" class="flex gap-2"></div>
     <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
       <div id="dadosAluno" class="grid md:grid-cols-2 xl:grid-cols-5 gap-2 text-sm"></div>
     </div>
@@ -203,19 +202,6 @@ function safe(v) { return v == null ? '' : String(v); }
 function normalizar(v) { return String(v || '').trim(); }
 function caixa(html) { return `<div class="bg-slate-900 rounded p-3 border border-slate-700">${html}</div>`; }
 
-function renderBadgesTutor(ficha){
-  const el = document.getElementById('badgeStatusAluno');
-  if (!el) return;
-  let html = '';
-  if (ficha && ficha.aluno_destaque === true) {
-    html += '<span class="bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-semibold">⭐ Aluno Destaque</span>';
-  }
-  if (ficha && ficha.aluno_evolucao === true) {
-    html += '<span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">🚀 Aluno Evolução</span>';
-  }
-  el.innerHTML = html;
-}
-
 function aplicarMascaraTelefone(input) {
   let v = (input.value || '').replace(/\D/g, '').slice(0, 11);
   if (v.length <= 2) {
@@ -332,7 +318,6 @@ async function carregarFicha() {
 
   const aluno = ficha.aluno || {};
   document.getElementById('painel').classList.remove('hidden');
-  renderBadgesTutor(ficha);
 
   let frequenciaLista = Array.isArray(ficha.frequencia) ? ficha.frequencia : [];
   if (!frequenciaLista.length) frequenciaLista = await carregarFrequenciaDireta(alunoId, aluno);
