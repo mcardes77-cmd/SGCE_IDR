@@ -2402,30 +2402,36 @@ def relatorio_aluno_pdf():
         presencas = total_freq - faltas
         frequencia_percentual = round((presencas / total_freq) * 100, 2) if total_freq > 0 else 0
 
-        boletim_resp = db.table("f_notas").select("*").eq("aluno_id", aluno_id).execute().data or []
+        serie = sala_para_serie(sala_nome)
+        disciplinas = db.table("d_disciplinas").select("*").eq("serie", serie).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("aluno_id", aluno_id).execute().data or []
+        mapa_notas = {(n.get("disciplina") or "").strip(): n for n in notas}
+
         boletim = []
-        for n in boletim_resp:
-            vals = [n.get("nota_1b"), n.get("nota_2b"), n.get("nota_3b"), n.get("nota_4b")]
+        for d in disciplinas:
+            nome_disc = (d.get("nome") or "").strip()
+            reg = mapa_notas.get(nome_disc, {})
+            vals = [reg.get("nota_1b"), reg.get("nota_2b"), reg.get("nota_3b"), reg.get("nota_4b")]
             nums = [float(v) for v in vals if v not in (None, "", "null")]
             media = round(sum(nums) / len(nums), 2) if nums else None
             status = "-"
             if media is not None:
                 status = "APROVADO" if media >= 5 else "REPROVADO"
+
             boletim.append({
-                "disciplina": n.get("disciplina"),
-                "nota_1b": n.get("nota_1b"),
-                "nota_2b": n.get("nota_2b"),
-                "nota_3b": n.get("nota_3b"),
-                "nota_4b": n.get("nota_4b"),
+                "disciplina": nome_disc,
+                "nota_1b": reg.get("nota_1b"),
+                "nota_2b": reg.get("nota_2b"),
+                "nota_3b": reg.get("nota_3b"),
+                "nota_4b": reg.get("nota_4b"),
                 "media": media,
                 "status": status
             })
-        boletim.sort(key=lambda x: (x.get("disciplina") or "").upper())
 
         aluno_destaque = False
         aluno_evolucao = False
         if sala_nome and aluno_nome:
-            conselhos = db.table("f_conselho_classe").select("aluno_destaque,aluno_evolucao,bimestre").eq("sala_nome", sala_nome).execute().data or []
+            conselhos = db.table("f_conselho_classe").select("aluno_destaque,aluno_evolucao").eq("sala_nome", sala_nome).execute().data or []
             nome_norm = normalizar_texto(aluno_nome)
             for c in conselhos:
                 if normalizar_texto(c.get("aluno_destaque")) == nome_norm:
@@ -2435,6 +2441,7 @@ def relatorio_aluno_pdf():
 
         return render_template(
             "relatorio_aluno_profissional.html",
+            titulo_relatorio="FICHA PROFISSIONAL DO ALUNO",
             aluno_nome=aluno_nome,
             sala_nome=sala_nome,
             tutor_nome=tutor_nome,
@@ -2452,6 +2459,7 @@ def relatorio_aluno_pdf():
         )
     except Exception as e:
         return f"Erro ao gerar relatório: {e}", 500
+
 
 @app.route("/gestao_relatorios_profissional")
 def gestao_relatorios_profissional():
@@ -2485,15 +2493,7 @@ def api_relatorios_dashboard(report_name):
         ocorr = db.table("ocorrencias").select("*").execute().data or []
         freq = db.table("f_frequencia").select("*").execute().data or []
         atend = db.table("atendimentos_tutoria").select("*").execute().data or []
-        alunos = (
-            db.table("d_alunos")
-            .select("*")
-            .eq("situacao_aluno", "ATIVO")
-            .execute()
-            .data or []
-        )
-
-        # ================= FILTROS =================
+        alunos = db.table("d_alunos").select("*").eq("situacao_aluno", "ATIVO").execute().data or []
 
         if sala:
             ocorr = [x for x in ocorr if (x.get("sala_nome") or "") == sala]
@@ -2504,163 +2504,281 @@ def api_relatorios_dashboard(report_name):
         if tutor:
             ocorr = [x for x in ocorr if (x.get("tutor_nome") or "") == tutor]
             atend = [x for x in atend if (x.get("tutor_nome") or "") == tutor]
-            alunos = [
-                x for x in alunos
-                if (x.get("tutor_nome") or x.get("nome_tutor") or "") == tutor
-            ]
+            alunos = [x for x in alunos if ((x.get("tutor_nome") or x.get("nome_tutor") or "") == tutor)]
 
         if professor:
             ocorr = [x for x in ocorr if (x.get("professor_nome") or "") == professor]
-
-        # ================= RELATÓRIOS =================
 
         if report_name == "ocorrencias_por_sala":
             mapa = {}
             for x in ocorr:
                 k = x.get("sala_nome") or "SEM SALA"
                 mapa[k] = mapa.get(k, 0) + 1
-
             ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Sala",
+                "chart_type": "pie",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Sala", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
 
-            return jsonify({
-                "success": True,
-                "data": {
-                    "titulo": "Ocorrências por Sala",
-                    "chart_type": "pie",
-                    "chart": {
-                        "labels": [k for k, _ in ordered],
-                        "data": [v for _, v in ordered],
-                        "dataset_label": "Ocorrências"
-                    },
-                    "table": {
-                        "headers": ["Sala", "Qtd"],
-                        "rows": [[k, v] for k, v in ordered]
-                    }
-                }
-            })
+        if report_name == "frequencia_por_sala":
+            mapa = {}
+            for x in freq:
+                k = x.get("sala_nome") or "SEM SALA"
+                mapa.setdefault(k, {"presentes": 0, "total": 0})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                p = round((v["presentes"] / v["total"]) * 100, 2) if v["total"] else 0
+                ordered.append((k, p, v["presentes"], v["total"]))
+            ordered.sort(key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Frequência por Sala",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered], "data": [x[1] for x in ordered], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Sala", "Frequência %", "Presentes", "Total"], "rows": [[x[0], x[1], x[2], x[3]] for x in ordered]}
+            }})
+
+        if report_name == "ocorrencias_por_tutor":
+            mapa = {}
+            for x in ocorr:
+                k = x.get("tutor_nome") or "SEM TUTOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Tutor", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "alunos_por_tutor":
+            mapa = {}
+            for x in alunos:
+                k = x.get("tutor_nome") or x.get("nome_tutor") or "SEM TUTOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Alunos por Tutor",
+                "chart_type": "pie",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Alunos"},
+                "table": {"headers": ["Tutor", "Alunos"], "rows": [[k, v] for k, v in ordered]}
+            }})
 
         if report_name == "atendimentos_por_tutor":
             mapa = {}
             detalhes = {}
-
             for x in atend:
                 tutor_nome = x.get("tutor_nome") or "SEM TUTOR"
-
                 mapa.setdefault(tutor_nome, set()).add(x.get("aluno_nome") or "")
-
                 detalhes.setdefault(tutor_nome, []).append({
                     "aluno_nome": x.get("aluno_nome") or "",
                     "data_registro": x.get("data_registro") or "",
                     "tipo_atendimento": x.get("tipo_atendimento") or "",
                 })
-
-            ordered = sorted(
-                [(k, len(v)) for k, v in mapa.items()],
-                key=lambda i: (-i[1], i[0])
-            )
-
-            return jsonify({
-                "success": True,
-                "data": {
-                    "titulo": "Atendimentos por Tutor",
-                    "chart_type": "bar",
-                    "chart": {
-                        "labels": [x[0] for x in ordered],
-                        "data": [x[1] for x in ordered],
-                        "dataset_label": "Qtd. atendimentos"
-                    },
-                    "table": {
-                        "headers": ["Tutor", "Quantidade", "Ação"],
-                        "rows": [[x[0], x[1], "VER DETALHE"] for x in ordered]
-                    },
-                    "detalhes": detalhes
-                }
-            })
-
-        # ================= FREQUÊNCIA (CORRIGIDO) =================
+            ordered = sorted([(k, len(v)) for k, v in mapa.items()], key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Atendimentos por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered], "data": [x[1] for x in ordered], "dataset_label": "Qtd. atendimentos"},
+                "table": {"headers": ["Tutor", "Quantidade", "Ação"], "rows": [[x[0], x[1], "VER DETALHE"] for x in ordered]},
+                "detalhes": detalhes
+            }})
 
         if report_name == "frequencia_periodo":
             from datetime import datetime, timedelta, date
-
             def intervalo_mes(mes_str):
                 if mes_str:
                     inicio = datetime.strptime(mes_str + "-01", "%Y-%m-%d").date()
                 else:
                     hoje = date.today()
                     inicio = hoje.replace(day=1)
-
                 if inicio.month == 12:
                     prox = date(inicio.year + 1, 1, 1)
                 else:
                     prox = date(inicio.year, inicio.month + 1, 1)
-
                 fim = prox - timedelta(days=1)
                 return inicio, fim
 
             inicio, fim = intervalo_mes(mes)
-
             labels, values = [], []
 
             if periodo == "semanal":
                 base = inicio
-
                 while base <= fim:
                     fim_sem = min(base + timedelta(days=6), fim)
-
-                    subset = [
-                        x for x in freq
-                        if x.get("data")
-                        and base <= datetime.strptime(str(x.get("data"))[:10], "%Y-%m-%d").date() <= fim_sem
-                    ]
-
+                    subset = [x for x in freq if x.get("data") and base <= datetime.strptime(str(x.get("data"))[:10], "%Y-%m-%d").date() <= fim_sem]
                     total = len(subset)
                     pres = len([x for x in subset if _status_presenca(x.get("status"))])
-
                     labels.append(f"{base.strftime('%d/%m')} a {fim_sem.strftime('%d/%m')}")
                     values.append(round((pres / total) * 100, 2) if total else 0)
-
                     base = fim_sem + timedelta(days=1)
-
             else:
                 cur = inicio
-
                 while cur <= fim:
                     dstr = cur.strftime("%Y-%m-%d")
-
-                    subset = [
-                        x for x in freq
-                        if str(x.get("data"))[:10] == dstr
-                    ]
-
+                    subset = [x for x in freq if str(x.get("data"))[:10] == dstr]
                     total = len(subset)
                     pres = len([x for x in subset if _status_presenca(x.get("status"))])
-
                     labels.append(cur.strftime("%d/%m"))
                     values.append(round((pres / total) * 100, 2) if total else 0)
-
                     cur += timedelta(days=1)
 
-            return jsonify({
-                "success": True,
-                "data": {
-                    "titulo": "Frequência por Período",
-                    "chart_type": "line",
-                    "chart": {
-                        "labels": labels,
-                        "data": values,
-                        "dataset_label": "Frequência %"
-                    },
-                    "table": {
-                        "headers": ["Período", "Frequência %"],
-                        "rows": [[labels[i], values[i]] for i in range(len(labels))]
-                    }
-                }
-            })
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Frequência Semanal, Mensal e Acumulado",
+                "chart_type": "line",
+                "chart": {"labels": labels, "data": values, "dataset_label": "Frequência %"},
+                "table": {"headers": ["Período", "Frequência %"], "rows": [[labels[i], values[i]] for i in range(len(labels))]}
+            }})
+
+        if report_name == "ranking_frequencia_alunos":
+            mapa = {}
+            for x in freq:
+                k = x.get("aluno_nome") or "SEM ALUNO"
+                mapa.setdefault(k, {"presentes": 0, "total": 0, "sala": x.get("sala_nome") or ""})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                pct = round((v["presentes"] / v["total"]) * 100, 2) if v["total"] else 0
+                ordered.append((k, v["sala"], pct, v["presentes"], v["total"]))
+            ordered.sort(key=lambda i: (-i[2], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Ranking de Alunos com Mais Frequência",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered[:20]], "data": [x[2] for x in ordered[:20]], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Aluno", "Sala", "Frequência %", "Presenças", "Total"], "rows": [[*x] for x in ordered]}
+            }})
+
+        if report_name == "ocorrencias_por_professor":
+            mapa = {}
+            for x in ocorr:
+                k = x.get("professor_nome") or "SEM PROFESSOR"
+                mapa[k] = mapa.get(k, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Ocorrência por Professor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Ocorrências"},
+                "table": {"headers": ["Professor", "Ocorrências"], "rows": [[k, v] for k, v in ordered]}
+            }})
+
+        if report_name == "alunos_baixa_presenca":
+            mapa = {}
+            for x in freq:
+                k = x.get("aluno_nome") or "SEM ALUNO"
+                mapa.setdefault(k, {"presentes": 0, "total": 0, "sala": x.get("sala_nome") or ""})
+                mapa[k]["total"] += 1
+                if _status_presenca(x.get("status")):
+                    mapa[k]["presentes"] += 1
+            rows = []
+            for k, v in mapa.items():
+                pct = round((v["presentes"] / v["total"]) * 100, 2) if v["total"] else 0
+                if pct < 85:
+                    rows.append((k, v["sala"], pct, v["presentes"], v["total"]))
+            rows.sort(key=lambda i: (i[2], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Alunos com Presença abaixo de 85%",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in rows[:20]], "data": [x[2] for x in rows[:20]], "dataset_label": "Frequência %"},
+                "table": {"headers": ["Aluno", "Sala", "Frequência %", "Presenças", "Total"], "rows": [[*x] for x in rows]}
+            }})
+
+        if report_name == "atrasos_saidas":
+            mapa = {}
+            for x in freq:
+                status = (x.get("status") or "").upper()
+                if status in ["PA", "PS", "PSA"]:
+                    k = x.get("aluno_nome") or "SEM ALUNO"
+                    mapa.setdefault(k, {"sala": x.get("sala_nome") or "", "pa": 0, "ps": 0, "psa": 0})
+                    if status == "PA":
+                        mapa[k]["pa"] += 1
+                    if status == "PS":
+                        mapa[k]["ps"] += 1
+                    if status == "PSA":
+                        mapa[k]["psa"] += 1
+            ordered = []
+            for k, v in mapa.items():
+                total = v["pa"] + v["ps"] + v["psa"]
+                ordered.append((k, v["sala"], v["pa"], v["ps"], v["psa"], total))
+            ordered.sort(key=lambda i: (-i[5], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Atraso e Saída Antecipada",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered[:20]], "data": [x[5] for x in ordered[:20]], "dataset_label": "Ocorrências de atraso/saída"},
+                "table": {"headers": ["Aluno", "Sala", "PA", "PS", "PSA", "Total"], "rows": [[*x] for x in ordered]}
+            }})
+
+        if report_name == "alunos_sem_tutor":
+            linhas = []
+            for a in alunos:
+                tutor_nome = ((a.get("tutor_nome") or "").strip())
+                tutor_id = a.get("tutor_id")
+                if not tutor_nome and not tutor_id:
+                    linhas.append([a.get("nome") or a.get("aluno_nome"), a.get("sala_nome"), a.get("id")])
+
+            return jsonify({"success": True, "data": {
+                "titulo": "Lista de Alunos sem Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": ["Sem Tutor"], "data": [len(linhas)], "dataset_label": "Qtd. alunos"},
+                "table": {"headers": ["Aluno", "Sala", "ID"], "rows": linhas}
+            }})
+
+        if report_name == "alunos_por_tutor_detalhado":
+            mapa = {}
+            for a in alunos:
+                tutor_nome = (a.get("tutor_nome") or a.get("nome_tutor") or "SEM TUTOR").strip() or "SEM TUTOR"
+                mapa[tutor_nome] = mapa.get(tutor_nome, 0) + 1
+            ordered = sorted(mapa.items(), key=lambda i: (-i[1], i[0]))
+            return jsonify({"success": True, "data": {
+                "titulo": "Quantidade de Alunos por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Qtd. alunos"},
+                "table": {"headers": ["Tutor", "Quantidade", "Ação"], "rows": [[k, v] for k, v in ordered]}
+            }})
 
         return json_error("Relatório não encontrado.", 404)
 
     except Exception as e:
         return json_error(str(e))
+
+
+@app.route("/relatorio_dashboard_pdf/<report_name>")
+def relatorio_dashboard_pdf(report_name):
+    try:
+        sala = (request.args.get("sala") or "").strip()
+        tutor = (request.args.get("tutor") or "").strip()
+        professor = (request.args.get("professor") or "").strip()
+        periodo = (request.args.get("periodo") or "acumulado").strip()
+        mes = (request.args.get("mes") or "").strip()
+
+        with app.test_request_context(
+            f"/api/relatorios_dashboard/{report_name}?sala={sala}&tutor={tutor}&professor={professor}&periodo={periodo}&mes={mes}"
+        ):
+            resp = api_relatorios_dashboard(report_name)
+
+        data = resp.get_json()
+        if not data or not data.get("success"):
+            return "Erro ao gerar relatório PDF.", 500
+
+        payload = data["data"]
+        return render_template(
+            "relatorio_dashboard_pdf.html",
+            titulo_relatorio=payload.get("titulo", "Relatório"),
+            sala=sala,
+            tutor=tutor,
+            professor=professor,
+            mes=mes,
+            headers=payload.get("table", {}).get("headers", []),
+            rows=payload.get("table", {}).get("rows", [])
+        )
+    except Exception as e:
+        return f"Erro ao gerar PDF: {e}", 500
+
 
 @app.route("/api/relatorios_geral")
 def api_relatorios_geral():
@@ -2751,113 +2869,42 @@ def api_conselho_classe():
         if not sala:
             return json_error("Sala não informada.", 400)
 
-        alunos = (
-            db.table("d_alunos")
-            .select("*")
-            .eq("sala_nome", sala)
-            .order("nome")
-            .execute()
-            .data or []
-        )
+        alunos = db.table("d_alunos").select("*").eq("sala_nome", sala).order("nome").execute().data or []
+        notas = db.table("f_notas").select("*").eq("sala_nome", sala).execute().data or []
 
-        resumo_resp = (
-            db.table("f_conselho_classe")
-            .select("*")
-            .eq("sala_nome", sala)
-            .eq("bimestre", bimestre)
-            .limit(1)
-            .execute()
-            .data or []
-        )
+        resumo_resp = db.table("f_conselho_classe").select("*").eq("sala_nome", sala).eq("bimestre", bimestre).limit(1).execute().data or []
         resumo = resumo_resp[0] if resumo_resp else {}
 
-        ids_alunos = []
-        mapa_alunos = {}
+        criticos = []
         alunos_sala = []
 
         for a in alunos:
-            aid = a.get("id")
-            nome = (a.get("nome") or a.get("aluno_nome") or "").strip()
+            nome = a.get("nome") or a.get("aluno_nome") or ""
             alunos_sala.append(nome)
-            if aid is not None:
-                ids_alunos.append(aid)
-                mapa_alunos[str(aid)] = nome
-
-        notas = []
-        if ids_alunos:
-            notas = (
-                db.table("f_notas")
-                .select("*")
-                .in_("aluno_id", ids_alunos)
-                .execute()
-                .data or []
-            )
-
-        def normalizar_lista(v):
-            if v is None:
-                return []
-            if isinstance(v, list):
-                return [str(x).strip() for x in v if str(x).strip()]
-            if isinstance(v, str):
-                txt = v.strip()
-                if not txt:
-                    return []
-                try:
-                    import json
-                    obj = json.loads(txt)
-                    if isinstance(obj, list):
-                        return [str(x).strip() for x in obj if str(x).strip()]
-                except Exception:
-                    pass
-                if ";" in txt:
-                    return [x.strip() for x in txt.split(";") if x.strip()]
-                if "," in txt:
-                    return [x.strip() for x in txt.split(",") if x.strip()]
-                return [txt]
-            return [str(v).strip()]
-
-        alunos_criticos = []
-        campo_nota = f"nota_{bimestre}b"
-        campo_conselho = f"conselho_{bimestre}b"
 
         for n in notas:
-            valor_nota = n.get(campo_nota)
+            nota = n.get(f"nota_{bimestre}b")
             try:
-                nota_num = float(valor_nota) if valor_nota not in (None, "", "null") else None
+                nota_num = float(nota) if nota not in (None, "", "null") else None
             except Exception:
                 nota_num = None
 
-            conselho = n.get(campo_conselho) or {}
-            if isinstance(conselho, str):
-                try:
-                    import json
-                    conselho = json.loads(conselho)
-                except Exception:
-                    conselho = {}
-
-            if not isinstance(conselho, dict):
-                conselho = {}
-
-            causas = normalizar_lista(conselho.get("causas"))
-            solucoes = normalizar_lista(conselho.get("solucoes"))
-
-            aluno_nome = n.get("aluno_nome") or mapa_alunos.get(str(n.get("aluno_id")), "")
-
-            if ((nota_num is not None and nota_num < 5) or causas or solucoes):
-                alunos_criticos.append({
-                    "aluno_nome": aluno_nome,
-                    "disciplina": n.get("disciplina") or "",
+            if nota_num is not None and nota_num < 5:
+                conselho = n.get(f"conselho_{bimestre}b") or {}
+                criticos.append({
+                    "aluno_nome": n.get("aluno_nome"),
+                    "disciplina": n.get("disciplina"),
                     "nota": nota_num,
-                    "causas": causas,
-                    "solucoes": solucoes
+                    "causas": conselho.get("causas", []),
+                    "solucoes": conselho.get("solucoes", [])
                 })
 
-        alunos_criticos.sort(key=lambda x: ((x.get("aluno_nome") or "").upper(), (x.get("disciplina") or "").upper()))
+        criticos.sort(key=lambda x: ((x.get("aluno_nome") or "").upper(), (x.get("disciplina") or "").upper()))
 
         return jsonify({
             "success": True,
             "data": {
-                "alunos_criticos": alunos_criticos,
+                "alunos_criticos": criticos,
                 "alunos_sala": sorted(alunos_sala),
                 "resumo": {
                     "pontos_fortes": resumo.get("pontos_fortes", ""),
@@ -2968,49 +3015,18 @@ def relatorio_conselho_classe_pdf():
             db.table("d_alunos")
             .select("*")
             .eq("sala_nome", sala)
-            .eq("situacao_aluno", "ATIVO")
             .order("nome")
             .execute()
             .data or []
         )
 
-        serie = sala_para_serie(sala)
-        d_regs = (
-            db.table("d_disciplinas")
-            .select("id,nome,abreviacao,serie")
-            .eq("serie", serie)
-            .order("nome")
+        notas = (
+            db.table("f_notas")
+            .select("*")
+            .eq("sala_nome", sala)
             .execute()
             .data or []
         )
-
-        def normalizar_disciplina(txt):
-            if not txt:
-                return ""
-            txt = txt.upper().strip()
-            substituicoes = {
-                "Á":"A","À":"A","Ã":"A","Â":"A",
-                "É":"E","Ê":"E",
-                "Í":"I",
-                "Ó":"O","Ô":"O","Õ":"O",
-                "Ú":"U","Ü":"U",
-                "Ç":"C",".":"","  ":" "
-            }
-            for k, v in substituicoes.items():
-                txt = txt.replace(k, v)
-            return txt
-
-        disciplinas = []
-        for d in d_regs:
-            disciplinas.append({
-                "nome": d.get("nome"),
-                "abreviacao": d.get("abreviacao") or (d.get("nome") or "")[:4].upper()
-            })
-
-        ids_alunos = [a.get("id") for a in alunos if a.get("id") is not None]
-        notas = []
-        if ids_alunos:
-            notas = db.table("f_notas").select("*").in_("aluno_id", ids_alunos).execute().data or []
 
         resumo_resp = (
             db.table("f_conselho_classe")
@@ -3023,71 +3039,32 @@ def relatorio_conselho_classe_pdf():
         )
         resumo = resumo_resp[0] if resumo_resp else {}
 
+        disciplinas = sorted({n.get("disciplina") for n in notas if n.get("disciplina")})
         mapa = {}
         professores = []
-        mapa_abrev = {}
-        for d in disciplinas:
-            mapa_abrev[normalizar_disciplina(d["nome"])] = d["abreviacao"]
 
         for n in notas:
-            nome_aluno = (n.get("aluno_nome") or "").strip()
-            disc_norm = normalizar_disciplina(n.get("disciplina"))
-            abrev = mapa_abrev.get(disc_norm)
-
-            if not abrev:
-                continue
-
-            mapa.setdefault(nome_aluno, {})
-            mapa[nome_aluno][abrev] = n
+            nome = n.get("aluno_nome") or ""
+            mapa.setdefault(nome, {})
+            mapa[nome][n.get("disciplina")] = n
 
             professor = n.get("professor_nome")
             if professor and professor not in professores:
                 professores.append(professor)
 
-        def normalizar_lista(v):
-            if v is None:
-                return []
-            if isinstance(v, list):
-                return [str(x).strip() for x in v if str(x).strip()]
-            if isinstance(v, str):
-                txt = v.strip()
-                if not txt:
-                    return []
-                try:
-                    import json
-                    obj = json.loads(txt)
-                    if isinstance(obj, list):
-                        return [str(x).strip() for x in obj if str(x).strip()]
-                except Exception:
-                    pass
-                if ";" in txt:
-                    return [x.strip() for x in txt.split(";") if x.strip()]
-                if "," in txt:
-                    return [x.strip() for x in txt.split(",") if x.strip()]
-                return [txt]
-            return [str(v).strip()]
-
-        total_alunos_ativos = len(alunos)
         linhas = []
         qtd_menor_5 = 0
         qtd_maior_igual_5 = 0
-
-        resumo_disciplina = {
-            d["abreviacao"]: {"abaixo": 0}
-            for d in disciplinas
-        }
 
         for a in alunos:
             nome = a.get("nome") or a.get("aluno_nome") or ""
             notas_aluno = []
             causas = []
             solucoes = []
-            abaixo_media_count = 0
             aluno_tem_menor_5 = False
 
             for d in disciplinas:
-                abrev = d["abreviacao"]
-                reg = mapa.get(nome, {}).get(abrev, {})
+                reg = mapa.get(nome, {}).get(d, {})
                 nota = reg.get(f"nota_{bimestre}b")
 
                 try:
@@ -3097,23 +3074,11 @@ def relatorio_conselho_classe_pdf():
 
                 notas_aluno.append(nota if nota not in (None, "", "null") else "")
 
-                conselho = reg.get(f"conselho_{bimestre}b") or {}
-                if isinstance(conselho, str):
-                    try:
-                        import json
-                        conselho = json.loads(conselho)
-                    except Exception:
-                        conselho = {}
-                if not isinstance(conselho, dict):
-                    conselho = {}
-
-                causas.extend(normalizar_lista(conselho.get("causas")))
-                solucoes.extend(normalizar_lista(conselho.get("solucoes")))
-
                 if nota_num is not None and nota_num < 5:
                     aluno_tem_menor_5 = True
-                    abaixo_media_count += 1
-                    resumo_disciplina[abrev]["abaixo"] += 1
+                    conselho = reg.get(f"conselho_{bimestre}b") or {}
+                    causas.extend(conselho.get("causas", []))
+                    solucoes.extend(conselho.get("solucoes", []))
 
             if aluno_tem_menor_5:
                 qtd_menor_5 += 1
@@ -3123,33 +3088,18 @@ def relatorio_conselho_classe_pdf():
             linhas.append({
                 "aluno_nome": nome,
                 "notas": notas_aluno,
-                "abaixo_media": abaixo_media_count,
                 "causas": ", ".join(sorted(set(causas))),
                 "solucoes": ", ".join(sorted(set(solucoes)))
             })
 
-        aproveitamento = round((qtd_maior_igual_5 / total_alunos_ativos) * 100, 2) if total_alunos_ativos > 0 else 0
-
-        linha_abaixo = []
-        linha_media = []
-        linha_aproveitamento = []
-
-        for d in disciplinas:
-            abrev = d["abreviacao"]
-            abaixo = resumo_disciplina[abrev]["abaixo"]
-            na_media = total_alunos_ativos - abaixo
-            ap = round((na_media / total_alunos_ativos) * 100, 1) if total_alunos_ativos > 0 else 0
-
-            linha_abaixo.append(abaixo)
-            linha_media.append(na_media)
-            linha_aproveitamento.append(f"{ap}%")
+        total_alunos = len(alunos)
+        aproveitamento = round((qtd_maior_igual_5 / total_alunos) * 100, 2) if total_alunos > 0 else 0
 
         if not professores:
-            professores = [d["nome"] for d in disciplinas[:3]]
+            professores = disciplinas
 
         return render_template(
             "relatorio_conselho_classe_pdf.html",
-            titulo_relatorio="MAPÃO - CONSELHO DE CLASSE",
             sala_nome=sala,
             bimestre=bimestre,
             disciplinas=disciplinas,
@@ -3161,14 +3111,15 @@ def relatorio_conselho_classe_pdf():
             pontos_fortes=resumo.get("pontos_fortes", ""),
             pontos_melhoria=resumo.get("pontos_melhoria", ""),
             aluno_destaque=resumo.get("aluno_destaque", ""),
-            aluno_evolucao=resumo.get("aluno_evolucao", ""),
-            total_alunos_ativos=total_alunos_ativos,
-            linha_abaixo=linha_abaixo,
-            linha_media=linha_media,
-            linha_aproveitamento=linha_aproveitamento
+            aluno_evolucao=resumo.get("aluno_evolucao", "")
         )
     except Exception as e:
         return f"Erro ao gerar mapão: {e}", 500
+
+
+
+
+
 
 
 @app.route("/api/cadastro/aluno/<int:aluno_id>")
