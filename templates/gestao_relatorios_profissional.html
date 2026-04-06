@@ -12,7 +12,7 @@
   <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
     <div>
       <h1 class="text-3xl font-bold text-emerald-400">DASHBOARD DE RELATÓRIOS</h1>
-      <p class="text-slate-400">Visão geral da escola com relatórios, filtros e gráficos.</p>
+      <p class="text-slate-400">Relatórios profissionais com filtros, gráficos e detalhamento.</p>
     </div>
     <div class="flex gap-2 flex-wrap">
       <button id="btnGerarPdf" class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded-lg font-semibold">Gerar PDF</button>
@@ -21,91 +21,27 @@
   </header>
 
   <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_sala">
-      <div class="text-sm font-bold text-red-400">Ocorrência por Sala</div>
-      <div class="text-xs text-slate-400 mt-1">Pizza/Barra + ranking</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_por_sala">
-      <div class="text-sm font-bold text-amber-400">Frequência por Sala</div>
-      <div class="text-xs text-slate-400 mt-1">Comparativo por turma</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_tutor">
-      <div class="text-sm font-bold text-blue-400">Ocorrência por Tutor</div>
-      <div class="text-xs text-slate-400 mt-1">Tutoria e pendências</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor">
-      <div class="text-sm font-bold text-violet-400">Alunos por Tutor</div>
-      <div class="text-xs text-slate-400 mt-1">Distribuição de tutorandos</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atendimentos_por_tutor">
-      <div class="text-sm font-bold text-fuchsia-400">Atendimento por Tutor</div>
-      <div class="text-xs text-slate-400 mt-1">Tutor e alunos atendidos</div>
-    </button>
-
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo">
-      <div class="text-sm font-bold text-emerald-400">Frequência Semanal/Mensal</div>
-      <div class="text-xs text-slate-400 mt-1">Linha de evolução</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ranking_frequencia_alunos">
-      <div class="text-sm font-bold text-cyan-400">Ranking de Frequência</div>
-      <div class="text-xs text-slate-400 mt-1">Alunos com mais presença</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_professor">
-      <div class="text-sm font-bold text-orange-400">Ocorrência por Professor</div>
-      <div class="text-xs text-slate-400 mt-1">Quem mais registrou</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_baixa_presenca">
-      <div class="text-sm font-bold text-yellow-300">Presença abaixo de 85%</div>
-      <div class="text-xs text-slate-400 mt-1">Risco de frequência</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atrasos_saidas">
-      <div class="text-sm font-bold text-rose-400">Atraso e Saída Antecipada</div>
-      <div class="text-xs text-slate-400 mt-1">Ranking recorrente</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_sem_tutor">
-      <div class="text-sm font-bold text-emerald-300">Alunos sem Tutor</div>
-      <div class="text-xs text-slate-400 mt-1">Vincular tutor rapidamente</div>
-    </button>
-    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado">
-      <div class="text-sm font-bold text-cyan-300">Qtd. de Alunos por Tutor</div>
-      <div class="text-xs text-slate-400 mt-1">Detalhamento com PDF</div>
-    </button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_sala"><div class="text-sm font-bold text-red-400">Ocorrência por Sala</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_por_sala"><div class="text-sm font-bold text-amber-400">Frequência por Sala</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_tutor"><div class="text-sm font-bold text-blue-400">Ocorrência por Tutor</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor"><div class="text-sm font-bold text-violet-400">Alunos por Tutor</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atendimentos_por_tutor"><div class="text-sm font-bold text-fuchsia-400">Atendimento por Tutor</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo"><div class="text-sm font-bold text-emerald-400">Frequência Semanal/Mensal</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ranking_frequencia_alunos"><div class="text-sm font-bold text-cyan-400">Ranking de Frequência</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_professor"><div class="text-sm font-bold text-orange-400">Ocorrência por Professor</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_baixa_presenca"><div class="text-sm font-bold text-yellow-300">Presença abaixo de 85%</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atrasos_saidas"><div class="text-sm font-bold text-pink-400">Atrasos e Saídas</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_sem_tutor"><div class="text-sm font-bold text-emerald-300">Alunos sem Tutor</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado"><div class="text-sm font-bold text-cyan-300">Quantidade por Tutor</div></button>
   </section>
 
   <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700 grid md:grid-cols-6 gap-3">
-    <div>
-      <label class="block text-xs text-slate-400 mb-1">Sala</label>
-      <select id="filtroSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
-        <option value="">Todas</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 mb-1">Tutor</label>
-      <select id="filtroTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
-        <option value="">Todos</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 mb-1">Professor</label>
-      <select id="filtroProfessor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
-        <option value="">Todos</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 mb-1">Período</label>
-      <select id="filtroPeriodo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
-        <option value="acumulado">Acumulado</option>
-        <option value="semanal">Semanal</option>
-        <option value="mensal">Mensal</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 mb-1">Mês</label>
-      <input id="filtroMes" type="month" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
-    </div>
-    <div class="flex items-end">
-      <button id="btnAplicarFiltro" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar filtros</button>
-    </div>
+    <div><label class="block text-xs text-slate-400 mb-1">Sala</label><select id="filtroSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="">Todas</option></select></div>
+    <div><label class="block text-xs text-slate-400 mb-1">Tutor</label><select id="filtroTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="">Todos</option></select></div>
+    <div><label class="block text-xs text-slate-400 mb-1">Professor</label><select id="filtroProfessor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="">Todos</option></select></div>
+    <div><label class="block text-xs text-slate-400 mb-1">Período</label><select id="filtroPeriodo" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"><option value="acumulado">Acumulado</option><option value="semanal">Semanal</option><option value="mensal">Mensal</option></select></div>
+    <div><label class="block text-xs text-slate-400 mb-1">Mês</label><input id="filtroMes" type="month" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></div>
+    <div class="flex items-end"><button id="btnAplicarFiltro" class="w-full bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Aplicar filtros</button></div>
   </section>
 
   <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -115,12 +51,7 @@
     </div>
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <h2 class="text-lg font-bold text-emerald-400 mb-3">Tabela detalhada</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead id="theadTabela"></thead>
-          <tbody id="tbodyTabela"></tbody>
-        </table>
-      </div>
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead id="theadTabela"></thead><tbody id="tbodyTabela"></tbody></table></div>
     </div>
   </section>
 </div>
@@ -129,17 +60,11 @@
   <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-3xl p-5 space-y-4">
     <div class="flex justify-between items-center">
       <h2 id="modalTitulo" class="text-xl font-bold text-emerald-400">Detalhe</h2>
-      <div class="flex gap-2"><button id="btnPdfDetalheTutor" type="button" class="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm">Gerar PDF</button><button type="button" onclick="fecharDetalhe()" class="text-slate-300">✕</button></div>
+      <button type="button" onclick="fecharDetalhe()" class="text-slate-300">✕</button>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-slate-700">
-            <th class="text-left py-2 px-2">Aluno</th>
-            <th class="text-left py-2 px-2">Data</th>
-            <th class="text-left py-2 px-2">Tipo</th>
-          </tr>
-        </thead>
+        <thead><tr class="border-b border-slate-700"><th class="text-left py-2 px-2">Aluno</th><th class="text-left py-2 px-2">Data</th><th class="text-left py-2 px-2">Tipo</th></tr></thead>
         <tbody id="tbDetalhe"></tbody>
       </table>
     </div>
@@ -150,11 +75,10 @@
 let reportAtual = 'ocorrencias_por_sala';
 let grafico = null;
 let detalhesAtuais = {};
-let tutorDetalheAtual = "";
 
 function mesAtual() {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 async function carregarFiltrosBase() {
@@ -178,11 +102,10 @@ async function carregarFiltrosBase() {
 }
 
 function renderTabela(headers, rows, reportName) {
-  document.getElementById('theadTabela').innerHTML = `
-    <tr class="border-b border-slate-700">
-      ${headers.map(h => `<th class="text-left py-2 px-2">${h}</th>`).join('')}
-    </tr>
-  `;
+  document.getElementById('theadTabela').innerHTML =
+    '<tr class="border-b border-slate-700">' +
+    headers.map(h => `<th class="text-left py-2 px-2">${h}</th>`).join('') +
+    '</tr>';
 
   document.getElementById('tbodyTabela').innerHTML = rows.map(r => {
     if (reportName === 'alunos_sem_tutor') {
@@ -207,7 +130,7 @@ function renderTabela(headers, rows, reportName) {
         <td class="py-2 px-2"><a href="/relatorio_alunos_tutor?tutor=${encodeURIComponent(r[0] ?? '')}" class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Ver alunos</a></td>
       </tr>`;
     }
-    return `<tr class="border-b border-slate-800">${r.map(v => `<td class="py-2 px-2">${v ?? ''}</td>`).join('')}</tr>`;
+    return '<tr class="border-b border-slate-800">' + r.map(v => `<td class="py-2 px-2">${v ?? ''}</td>`).join('') + '</tr>';
   }).join('');
 }
 
@@ -230,7 +153,6 @@ function renderGrafico(config) {
 }
 
 function abrirDetalhe(tutor) {
-  tutorDetalheAtual = tutor;
   const rows = detalhesAtuais[tutor] || [];
   document.getElementById('modalTitulo').textContent = `Detalhe de atendimentos - ${tutor}`;
   document.getElementById('tbDetalhe').innerHTML = rows.length
@@ -294,31 +216,17 @@ document.querySelectorAll('.card-relatorio').forEach(btn => {
 
 document.getElementById('btnAplicarFiltro').addEventListener('click', carregarRelatorioAtual);
 
-document.getElementById('btnPdfDetalheTutor').addEventListener('click', () => {
-  if (!tutorDetalheAtual) return;
-  const tutor = encodeURIComponent(tutorDetalheAtual);
-  const sala = encodeURIComponent(document.getElementById('filtroSala').value || '');
-  const mes = encodeURIComponent(document.getElementById('filtroMes').value || '');
-  window.open(`/relatorio_atendimentos_tutor_pdf?tutor=${tutor}&sala=${sala}&mes=${mes}`, '_blank');
-});
-
 document.getElementById('btnGerarPdf').addEventListener('click', () => {
   const sala = encodeURIComponent(document.getElementById('filtroSala').value || '');
   const tutor = encodeURIComponent(document.getElementById('filtroTutor').value || '');
   const professor = encodeURIComponent(document.getElementById('filtroProfessor').value || '');
-  const mes = encodeURIComponent(document.getElementById('filtroMes').value || mesAtual());
   const periodo = encodeURIComponent(document.getElementById('filtroPeriodo').value || 'acumulado');
-
-  window.open(`/relatorio_dashboard_pdf/${reportAtual}?sala=${sala}&tutor=${tutor}&professor=${professor}&mes=${mes}&periodo=${periodo}`, '_blank');
+  const mes = encodeURIComponent(document.getElementById('filtroMes').value || mesAtual());
+  window.open(`/relatorio_dashboard_pdf/${reportAtual}?sala=${sala}&tutor=${tutor}&professor=${professor}&periodo=${periodo}&mes=${mes}`, '_blank');
 });
 
 document.getElementById('filtroMes').value = mesAtual();
 carregarFiltrosBase().then(() => carregarRelatorioAtual());
 </script>
-
-<footer class="mt-8 border-t border-slate-700 pt-4 text-center text-sm text-slate-400">
-  <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
-  <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
-</footer>
 </body>
 </html>
