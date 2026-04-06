@@ -46,7 +46,7 @@ def now_sp_iso():
     return now_sp().isoformat()
 
 USUARIOS_ACESSO_TOTAL = {
-    "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+    "ELAINE CRISTINA ARIEDE KACA DO CARMO",
     "MARCELO ANDRE NOGUEIRA CARDES",
     "GRAZIELLE DA SILVA FEIJO VIANA",
     "MARCILENE MANTOVANI COSSENZO PUPIM",
@@ -418,7 +418,7 @@ def api_editar_ocorrencia_cadastro(numero):
         return json_error(e)
 
 USUARIOS_ACESSO_TOTAL = {
-    "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+    "ELAINE CRISTINA ARIEDE KACA DO CARMO",
     "MARCELO ANDRE NOGUEIRA CARDES",
     "GRAZIELLE DA SILVA FEIJO VIANA",
     "MARCILENE MANTOVANI COSSENZO PUPIM",
@@ -450,21 +450,23 @@ def usuario_tem_acesso_total():
 
 def usuario_pode_ver_gestao():
     return usuario_logado_nome() in {
-        "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+        "ELAINE CRISTINA ARIEDE KACA DO CARMO",
         "MARCELO ANDRE NOGUEIRA CARDES",
         "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
 
 def usuario_pode_ver_coordenacao():
     return usuario_logado_nome() in {
+        "ELAINE CRISTINA ARIEDE KACA DO CARMO",
         "MARCELO ANDRE NOGUEIRA CARDES",
         "GRAZIELLE DA SILVA FEIJO VIANA",
         "MARCOS DE BRITO BORTOLOSSI",
+        "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
 
 def usuario_pode_ver_responsavel():
     return usuario_logado_nome() in {
-        "ELAINE CRISTINA ARIEDE KAÇA DO CARMO",
+        "ELAINE CRISTINA ARIEDE KACA DO CARMO",
         "MARCELO ANDRE NOGUEIRA CARDES",
         "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
