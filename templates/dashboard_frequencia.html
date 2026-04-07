@@ -22,24 +22,25 @@
 
   <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-xs text-slate-400">Presença Acumulada</div>
+      <div class="text-xs text-slate-400">Presença</div>
       <div id="cPresenca" class="text-3xl font-bold mt-2 text-emerald-400">0</div>
     </div>
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-xs text-slate-400">Falta Acumulado</div>
+      <div class="text-xs text-slate-400">Falta</div>
       <div id="cFalta" class="text-3xl font-bold mt-2 text-red-400">0</div>
     </div>
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-slate-400 text-xs">Presentes do dia / Alunos ativos</div>
-      <div class="mt-2 text-2xl font-bold text-blue-400">
-        <span id="cPresentesHoje">0</span> / <span id="cAlunosCadastrados">0</span>
-      </div>
+      <div class="text-xs text-slate-400">Entrada com Atraso</div>
+      <div id="cAtraso" class="text-3xl font-bold mt-2 text-amber-400">0</div>
     </div>
-     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-slate-400 text-xs">Frequência geral em %</div>
-      <div id="cFrequenciaGeralPercentual" class="mt-2 text-2xl font-bold text-cyan-400">0%</div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Saída Antecipada</div>
+      <div id="cSaida" class="text-3xl font-bold mt-2 text-blue-400">0</div>
     </div>
-    
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+      <div class="text-xs text-slate-400">Atraso + Saída</div>
+      <div id="cPSA" class="text-3xl font-bold mt-2 text-fuchsia-400">0</div>
+    </div>
   </section>
 
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -81,9 +82,9 @@ async function carregarDashboard() {
   const c = j.data.cards || {};
   document.getElementById('cPresenca').textContent = c.p_total || 0;
   document.getElementById('cFalta').textContent = c.f_total || 0;
-  document.getElementById('cPresentesHoje').textContent = c.presentes_hoje ?? 0;
-  document.getElementById('cAlunosCadastrados').textContent = c.alunos_cadastrados ?? 0;
-  document.getElementById('cFrequenciaGeralPercentual').textContent = `${c.frequencia_percentual ?? 0}%`;
+  document.getElementById('cAtraso').textContent = c.pa_total || 0;
+  document.getElementById('cSaida').textContent = c.ps_total || 0;
+  document.getElementById('cPSA').textContent = c.psa_total || 0;
 
   const linha = j.data.grafico_presenca || {labels: [], data: []};
   const ctx = document.getElementById('graficoPresencaLinha');
