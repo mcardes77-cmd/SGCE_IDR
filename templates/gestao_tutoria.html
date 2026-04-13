@@ -7,36 +7,72 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
-  <div class="max-w-7xl mx-auto">
-    <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <header class="flex flex-col md:flex-row justify-between items-center gap-4">
       <div>
         <h1 class="text-3xl font-bold text-emerald-400">Gestão de Tutoria</h1>
-        <p class="text-slate-400">Dashboard com alunos, tutores, atendimentos e ficha do aluno.</p>
+        <p class="text-slate-400">Lista prática dos alunos do tutor com atalhos para ficha, atendimento, agendamento e pendências.</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <a href="/dashboard_geral" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Dashboard Geral</a>
       </div>
     </header>
 
-    <section class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+    <section id="painelKpis" class="grid grid-cols-1 md:grid-cols-6 gap-4">
       <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Tutores</div><div id="kpi-tutores" class="text-3xl font-bold mt-2">0</div></div>
-      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Alunos</div><div id="kpi-alunos" class="text-3xl font-bold mt-2">0</div></div>
+      <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Alunos Ativos</div><div id="kpi-alunos" class="text-3xl font-bold mt-2">0</div></div>
       <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Com Tutor</div><div id="kpi-alunos-tutor" class="text-3xl font-bold mt-2">0</div></div>
       <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendamentos</div><div id="kpi-agendamentos" class="text-3xl font-bold mt-2">0</div></div>
       <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Agendados</div><div id="kpi-agendados" class="text-3xl font-bold mt-2">0</div></div>
       <div class="bg-slate-800 rounded-2xl p-5 shadow"><div class="text-slate-400 text-sm">Atendimentos</div><div id="kpi-atendimentos" class="text-3xl font-bold mt-2">0</div></div>
     </section>
 
-    <section class="grid grid-cols-1 md:grid-cols-4 gap-5">
-      <a href="/gestao_tutoria_agendamento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📅 Agendamento</a>
-      <a href="/gestao_tutoria_atendimento" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📝 Atendimento</a>
-      <a href="/gestao_tutoria_ficha" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📘 Ficha do Aluno</a>
-      <a href="/gestao_tutoria_evolucao" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 shadow">📈 Evolução</a>
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+          <select id="tutor_id" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+        </div>
+        <div class="md:col-span-3 flex gap-2 flex-wrap">
+          <button id="btnCarregar" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Carregar alunos</button>
+          
+        </div>
+      </div>
+      <p id="textoModoTutor" class="hidden text-xs text-amber-300 mt-3">Modo tutor ativo: lista carregada diretamente com seus alunos.</p>
+    </section>
+
+    <section class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-300">
+              <th class="text-left py-2 px-2">Nome</th>
+              <th class="text-left py-2 px-2">Projeto de Vida</th>
+              <th class="text-left py-2 px-2">Clube Juvenil 1º Sem.</th>
+              <th class="text-left py-2 px-2">Eletiva 1º Sem.</th>
+              <th class="text-left py-2 px-2">Telefone</th>
+              <th class="text-left py-2 px-2">Responsável</th>
+              <th class="text-left py-2 px-2">Telefone Responsável</th>
+              <th class="text-left py-2 px-2">Ficha</th>
+              <th class="text-left py-2 px-2">Pendência</th>
+              <th class="text-left py-2 px-2">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbAlunos">
+            <tr><td colspan="10" class="py-4 px-2 text-slate-400">Carregue os alunos do tutor para visualizar a tabela.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
+    let tutores = [];
+    let metaAtual = { modo_tutor: false };
+
+    function safe(v){ return v == null ? '' : String(v); }
+
+    async function carregarKpis() {
       try {
         const r = await fetch('/api/dashboard_tutoria');
         const d = await r.json();
@@ -46,9 +82,100 @@
         document.getElementById('kpi-agendamentos').textContent = d.total_agendamentos || 0;
         document.getElementById('kpi-agendados').textContent = d.agendados || 0;
         document.getElementById('kpi-atendimentos').textContent = d.total_atendimentos || 0;
-      } catch(e) {
+      } catch (e) {
         console.error(e);
       }
+    }
+
+    async function carregarTutores() {
+      const r = await fetch('/api/tutores');
+      const dados = await r.json();
+      tutores = Array.isArray(dados) ? dados : [];
+      const s = document.getElementById('tutor_id');
+      s.innerHTML = '<option value="">Selecione...</option>' + tutores.map(t => `<option value="${t.id}">${safe(t.nome)}</option>`).join('');
+
+      if (tutores.length === 1) {
+        s.value = tutores[0].id;
+        s.disabled = true;
+      }
+    }
+
+    function linkResponderPendencia(a) {
+      if (!a.pendencia_tutor) return '<span class="text-slate-500">Sem pendência</span>';
+      const numero = (a.pendencia_numeros || [])[0];
+      if (!numero) return `<span class="text-amber-300">${a.pendencia_tutor} pend.</span>`;
+      return `<a href="/gestao_ocorrencia_editar?numero=${numero}" class="text-amber-300 hover:text-amber-200 underline">${a.pendencia_tutor} pend.</a>`;
+    }
+
+    function abrirModalTutoria(url, titulo) {
+      const modal = document.getElementById('modalTutoria');
+      document.getElementById('modalTitulo').textContent = titulo || 'Tutoria';
+      document.getElementById('frameTutoria').src = url;
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function fecharModalTutoria() {
+      const modal = document.getElementById('modalTutoria');
+      modal.classList.add('hidden');
+      document.getElementById('frameTutoria').src = 'about:blank';
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function botoesAcoes(a) {
+      return `
+        <div class="flex flex-wrap gap-2">
+          <button onclick="abrirModalTutoria('/gestao_tutoria_ficha?aluno_id=${a.id}', 'Ficha do Aluno')" class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Abrir Ficha</button>
+          <button onclick="abrirModalTutoria('/gestao_tutoria_atendimento?tutor_id=${a.tutor_id || ''}&aluno_id=${a.id}&novo=1', 'Atendimento de Tutoria')" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded text-xs">Atender</button>
+          <button onclick="abrirModalTutoria('/gestao_tutoria_agendamento?tutor_id=${a.tutor_id || ''}&aluno_id=${a.id}&novo=1', 'Agendamento de Tutoria')" class="bg-amber-700 hover:bg-amber-600 px-3 py-1 rounded text-xs">Agendar</button>
+        </div>
+      `;
+    }
+
+    async function carregarTabela() {
+      const tutorId = document.getElementById('tutor_id').value || '';
+      const tutorOpt = document.getElementById('tutor_id').selectedOptions[0];
+      const tutorNome = tutorOpt ? tutorOpt.textContent : '';
+      const r = await fetch(`/api/tutoria/alunos_ficha?tutor_id=${encodeURIComponent(tutorId)}&tutor_nome=${encodeURIComponent(tutorNome)}`);
+      const j = await r.json();
+
+      if (!r.ok || !j.success) {
+        alert(j.error || 'Erro ao carregar alunos.');
+        return;
+      }
+
+      metaAtual = j.meta || { modo_tutor: false };
+      document.getElementById('textoModoTutor').classList.toggle('hidden', !metaAtual.modo_tutor);
+      document.getElementById('painelKpis').classList.toggle('hidden', !!metaAtual.modo_tutor);
+
+      const rows = j.data || [];
+      const tbody = document.getElementById('tbAlunos');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="py-4 px-2 text-slate-400">Nenhum aluno vinculado ao tutor.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(a => `
+        <tr class="border-b border-slate-800 ${a.ficha_ok ? 'bg-emerald-950/20' : 'bg-red-950/20'}">
+          <td class="py-2 px-2 font-semibold">${safe(a.nome)}</td>
+          <td class="py-2 px-2">${safe(a.projeto_vida)}</td>
+          <td class="py-2 px-2">${safe(a.clube_1_semestre)}</td>
+          <td class="py-2 px-2">${safe(a.eletiva_1_semestre)}</td>
+          <td class="py-2 px-2">${safe(a.telefone)}</td>
+          <td class="py-2 px-2">${safe(a.responsavel)}</td>
+          <td class="py-2 px-2">${safe(a.telefone_responsavel)}</td>
+          <td class="py-2 px-2 font-semibold ${a.ficha_ok ? 'text-emerald-400' : 'text-red-400'}">${a.ficha_ok ? 'OK' : 'PENDÊNCIA'}</td>
+          <td class="py-2 px-2">${linkResponderPendencia(a)}</td>
+          <td class="py-2 px-2">${botoesAcoes(a)}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('btnCarregar').addEventListener('click', carregarTabela);
+    document.addEventListener('DOMContentLoaded', async () => {
+      await carregarKpis();
+      await carregarTutores();
+      if (tutores.length === 1) await carregarTabela();
     });
   </script>
 
@@ -56,5 +183,17 @@
   <p><strong>Desenvolvido e Registrado por Marcelo André Nogueira Cardes</strong></p>
   <p>Licença Cortesia E. E. Professora Irene Dias Ribeiro</p>
 </footer>
+
+
+  <div id="modalTutoria" class="hidden fixed inset-0 z-50 bg-black/75 p-2 md:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full h-[94vh] max-w-6xl mx-auto flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between p-4 border-b border-slate-700">
+        <h2 id="modalTitulo" class="text-lg font-bold text-emerald-400">Tutoria</h2>
+        <button onclick="fecharModalTutoria()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Fechar</button>
+      </div>
+      <iframe id="frameTutoria" class="w-full flex-1 bg-slate-950 rounded-b-3xl" src="about:blank"></iframe>
+    </div>
+  </div>
+
 </body>
 </html>

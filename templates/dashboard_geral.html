@@ -27,14 +27,16 @@
     </div>
 
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-slate-400 text-xs">Presentes do dia / Alunos ativos</div>
+      <div class="text-slate-400 text-xs">Presenças do dia / Alunos ativos</div>
+      <div class="text-slate-500 text-[11px] mt-1">Segunda a sexta</div>
       <div class="mt-2 text-2xl font-bold text-blue-400">
         <span id="cPresentesHoje">0</span> / <span id="cAlunosCadastrados">0</span>
       </div>
     </div>
 
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <div class="text-slate-400 text-xs">Frequência geral em %</div>
+      <div class="text-slate-400 text-xs">Frequência geral acumulada</div>
+      <div class="text-slate-500 text-[11px] mt-1">Segunda a sexta</div>
       <div id="cFrequenciaGeralPercentual" class="mt-2 text-2xl font-bold text-cyan-400">0%</div>
     </div>
 
@@ -72,7 +74,7 @@
 
     <a href="/dashboard_frequencia" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
       <div class="text-lg font-bold text-amber-400">Frequência</div>
-      <div class="text-xs text-slate-400 mt-2">Chamada e registros</div>
+      <div class="text-xs text-slate-400 mt-2">Indicadores acumulados</div>
     </a>
 
     <a href="/gestao_tutoria" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 shadow text-center">
@@ -113,13 +115,14 @@
     </div>
 
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700">
-      <h2 class="text-lg font-bold text-emerald-400 mb-4">Ranking de Presença por Sala</h2>
+      <h2 class="text-lg font-bold text-emerald-400 mb-4">Ranking de Frequência por Sala</h2>
+      <div class="text-xs text-slate-500 mb-3">Percentual acumulado considerando somente segunda a sexta-feira.</div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-700">
               <th class="text-left py-2">Sala</th>
-              <th class="text-left py-2">Presentes</th>
+              <th class="text-left py-2">Presenças</th>
               <th class="text-left py-2">Total</th>
               <th class="text-left py-2">%</th>
             </tr>

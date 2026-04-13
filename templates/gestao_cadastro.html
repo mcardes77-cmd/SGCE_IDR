@@ -279,7 +279,8 @@ function formAlunoHtml(aluno) {
 
       <div>
         <label class="block text-xs text-slate-400 mb-1">Sala</label>
-        <select id="frmAlunoSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">${salaOptions}</select>
+        <select id="frmAlunoSala" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" onchange="sincronizarSalaAluno()">${salaOptions}</select>
+        <input type="hidden" id="frmAlunoSalaId" value="${aluno.sala_id || ''}">
       </div>
 
       <div>
@@ -290,11 +291,13 @@ function formAlunoHtml(aluno) {
               <input value="${tutorAtualTexto}" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-slate-200" disabled>
               <input type="hidden" id="frmAlunoTutorBloqueadoId" value="${aluno.tutor_id || aluno.id_tutor || ''}">
               <input type="hidden" id="frmAlunoTutorBloqueadoNome" value="${tutorAtualTexto}">
+              <input type="hidden" id="frmAlunoTutorId" value="${aluno.tutor_id || aluno.id_tutor || ''}">
             `
             : `
-              <select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+              <select id="frmAlunoTutor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" onchange="sincronizarTutorAluno()">
                 ${tutorOptions}
               </select>
+              <input type="hidden" id="frmAlunoTutorId" value="${aluno.tutor_id || aluno.id_tutor || ''}">
             `
         }
       </div>
@@ -313,8 +316,29 @@ function formAlunoHtml(aluno) {
     </div>
   `;
 }
-function novoAluno(){ abrirModal('Cadastrar novo aluno', formAlunoHtml({}), salvarAlunoModal); }
-function editarAluno(aluno){ abrirModal('Editar aluno', formAlunoHtml(aluno), salvarAlunoModal); }
+function novoAluno(){ abrirModal('Cadastrar novo aluno', formAlunoHtml({}), salvarAlunoModal); setTimeout(() => { sincronizarSalaAluno(); sincronizarTutorAluno(); }, 0); }
+function editarAluno(aluno){ abrirModal('Editar aluno', formAlunoHtml(aluno), salvarAlunoModal); setTimeout(() => { sincronizarSalaAluno(); sincronizarTutorAluno(); }, 0); }
+
+function sincronizarSalaAluno() {
+  const salaSelect = document.getElementById('frmAlunoSala');
+  const salaIdInput = document.getElementById('frmAlunoSalaId');
+  if (!salaSelect || !salaIdInput) return;
+  const salaNome = salaSelect.value || '';
+  const sala = (Array.isArray(salas) ? salas : []).find(s => (s.nome || s.sala || s.sala_nome || '') === salaNome);
+  salaIdInput.value = sala ? (sala.id || '') : '';
+}
+
+function sincronizarTutorAluno() {
+  const tutorSelect = document.getElementById('frmAlunoTutor');
+  const tutorIdInput = document.getElementById('frmAlunoTutorId');
+  if (!tutorIdInput) return;
+  if (!tutorSelect) {
+    const bloqueado = document.getElementById('frmAlunoTutorBloqueadoId');
+    tutorIdInput.value = bloqueado ? (bloqueado.value || '') : '';
+    return;
+  }
+  tutorIdInput.value = tutorSelect.value || '';
+}
 
 async function salvarAlunoModal() {
   const id = document.getElementById('frmAlunoId').value;
@@ -326,10 +350,13 @@ async function salvarAlunoModal() {
   const tutorBloqueadoId = document.getElementById('frmAlunoTutorBloqueadoId');
   const tutorBloqueadoNome = document.getElementById('frmAlunoTutorBloqueadoNome');
 
+  const tutorIdHidden = document.getElementById('frmAlunoTutorId');
+
   if (tutorSelect) {
-    tutorId = tutorSelect.value;
+    tutorId = tutorIdHidden?.value || tutorSelect.value;
     tutorNome = tutorSelect.options[tutorSelect.selectedIndex]?.dataset?.nome || '';
   } else if (tutorBloqueadoId && tutorBloqueadoNome) {
+    if (tutorIdHidden) tutorIdHidden.value = tutorBloqueadoId.value || '';
     tutorId = tutorBloqueadoId.value;
     tutorNome = tutorBloqueadoNome.value;
   }
@@ -337,6 +364,7 @@ async function salvarAlunoModal() {
   const payload = {
     nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
     aluno_nome: soMaiusculoSemAcento(document.getElementById('frmAlunoNome').value),
+    sala_id: document.getElementById('frmAlunoSalaId')?.value || null,
     sala_nome: document.getElementById('frmAlunoSala').value,
     tutor_id: tutorId || null,
     id_tutor: tutorId || null,
