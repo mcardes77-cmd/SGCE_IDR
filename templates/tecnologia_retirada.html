@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retirada de Equipamentos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Retirada de Equipamentos</h1>
+        <p class="text-sm text-slate-400">Preencha os dados da retirada e siga para vincular os equipamentos.</p>
+      </div>
+      <button type="button" onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-2 font-semibold">Voltar</button>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3">
+          <div class="text-xs text-slate-400">Responsável logado</div>
+          <div id="usuario_nome" class="font-semibold text-slate-100">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3">
+          <div class="text-xs text-slate-400">Data</div>
+          <div id="data_atual" class="font-semibold text-slate-100">-</div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Sala</label>
+        <select id="sala_nome" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3"></select>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Professor</label>
+        <input id="pesquisa_professor" placeholder="Pesquisar professor" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 mb-2">
+        <select id="professor_nome" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3"></select>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm mb-2">Aula</label>
+          <select id="horario_aula" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3"></select>
+        </div>
+        <div>
+          <label class="block text-sm mb-2">Quantidade de Equipamentos</label>
+          <input id="quantidade" type="number" min="1" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3">
+        </div>
+      </div>
+
+      <div class="pt-3 flex flex-col md:flex-row gap-3">
+        <button onclick="salvarRetirada()" class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-semibold">Salvar e continuar</button>
+        <button type="button" onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar</button>
+      </div>
+
+      <p id="mensagem" class="text-sm text-amber-300"></p>
+    </div>
+  </main>
+
+  <script>
+    let professores = [];
+
+    function optionize(values, selected='') {
+      return values.map(v => `<option value="${String(v).replace(/"/g,'&quot;')}" ${v===selected?'selected':''}>${v}</option>`).join('');
+    }
+
+    async function carregarDados() {
+      const resp = await fetch('/api/tecnologia/dados_iniciais');
+      const data = await resp.json();
+      if (!data.success) return;
+
+      document.getElementById('usuario_nome').textContent = data.usuario_nome || '-';
+      document.getElementById('data_atual').textContent = data.data_atual || '-';
+
+      const salaSelect = document.getElementById('sala_nome');
+      const salas = Array.isArray(data.salas) ? data.salas.map(s => s.sala || s.nome || s.sala_nome || '').filter(Boolean) : [];
+      salaSelect.innerHTML = '<option value="">Selecione</option>' + optionize(salas, data.sala || '');
+
+      professores = data.professores || [];
+      renderProfessores(professores);
+
+      const aulas = data.aulas || [];
+      document.getElementById('horario_aula').innerHTML = '<option value="">Selecione</option>' + optionize(aulas);
+    }
+
+    function renderProfessores(lista) {
+      const select = document.getElementById('professor_nome');
+      select.innerHTML = '<option value="">Selecione</option>' + lista.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+    }
+
+    document.getElementById('pesquisa_professor').addEventListener('input', (e) => {
+      const termo = e.target.value.toLowerCase();
+      const filtrados = professores.filter(p => (p.nome || '').toLowerCase().includes(termo));
+      renderProfessores(filtrados);
+    });
+
+    async function salvarRetirada() {
+      const payload = {
+        sala_nome: document.getElementById('sala_nome').value,
+        professor_nome: document.getElementById('professor_nome').value,
+        horario_aula: document.getElementById('horario_aula').value,
+        quantidade: document.getElementById('quantidade').value
+      };
+
+      const resp = await fetch('/api/tecnologia/retirada', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        document.getElementById('mensagem').textContent = data.message || data.error || 'Erro ao salvar';
+        return;
+      }
+      window.location.href = `/tecnologia/retirada/${data.retirada_id}/equipamentos`;
+    }
+
+    carregarDados();
+  </script>
+</body>
+</html>

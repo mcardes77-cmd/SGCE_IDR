@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selecionar Equipamentos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Selecionar Equipamentos</h1>
+        <p class="text-slate-300">Selecione os números dos equipamentos retirados.</p>
+      </div>
+      <button onclick="history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar</button>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-4">
+          <div class="text-slate-400 text-sm">Quantidade solicitada</div>
+          <div id="quantidadeSolicitada" class="text-2xl font-bold text-emerald-400">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-4">
+          <div class="text-slate-400 text-sm">Disponíveis</div>
+          <div id="qtdDisponiveis" class="text-2xl font-bold">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-4">
+          <div class="text-slate-400 text-sm">Selecionados</div>
+          <div id="qtdSelecionados" class="text-2xl font-bold text-cyan-400">0</div>
+        </div>
+      </div>
+
+      <div id="equipamentos" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+      <p id="vazio" class="hidden text-amber-300 mt-2">Nenhum equipamento disponível encontrado no inventário.</p>
+
+      <div class="mt-6 flex gap-3">
+        <button onclick="salvar()" class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-semibold">Salvar equipamentos</button>
+        <button onclick="history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar</button>
+      </div>
+      <p id="mensagem" class="text-sm text-amber-300 mt-3"></p>
+    </div>
+  </main>
+
+  <script>
+    const retiradaId = {{ retirada_id|tojson }};
+    let quantidade = 0;
+    let equipamentos = [];
+
+    function atualizarContador() {
+      const qtd = document.querySelectorAll('.equipamento-check:checked').length;
+      document.getElementById('qtdSelecionados').textContent = qtd;
+    }
+
+    async function carregar() {
+      const msg = document.getElementById('mensagem');
+      msg.textContent = '';
+      try {
+        const resp = await fetch(`/api/tecnologia/retirada/${retiradaId}/equipamentos_disponiveis`);
+        const data = await resp.json();
+        if (!data.success) {
+          msg.textContent = data.message || 'Erro ao carregar equipamentos';
+          return;
+        }
+
+        quantidade = Number(data.retirada?.quantidade || 0);
+        equipamentos = Array.isArray(data.equipamentos) ? data.equipamentos : [];
+        document.getElementById('quantidadeSolicitada').textContent = quantidade;
+        document.getElementById('qtdDisponiveis').textContent = equipamentos.length;
+        const box = document.getElementById('equipamentos');
+        const vazio = document.getElementById('vazio');
+        if (!equipamentos.length) {
+          box.innerHTML = '';
+          vazio.classList.remove('hidden');
+          if (data.debug_erros && data.debug_erros.length) {
+            msg.textContent = data.debug_erros[0];
+          }
+          return;
+        }
+        vazio.classList.add('hidden');
+        box.innerHTML = equipamentos.map(eq => `
+          <label class="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-3 cursor-pointer hover:border-emerald-500">
+            <input type="checkbox" value="${eq.id}" data-numero="${eq.numero}" class="equipamento-check" onchange="atualizarContador()">
+            <span class="font-semibold">${eq.numero}</span>
+          </label>
+        `).join('');
+        atualizarContador();
+      } catch (e) {
+        msg.textContent = 'Erro ao carregar equipamentos';
+      }
+    }
+
+    async function salvar() {
+      const checks = [...document.querySelectorAll('.equipamento-check:checked')];
+      const msg = document.getElementById('mensagem');
+      if (checks.length !== quantidade) {
+        msg.textContent = `Selecione exatamente ${quantidade} equipamento(s).`;
+        return;
+      }
+
+      const payload = {
+        equipamentos: checks.map(c => ({ id: Number(c.value), numero: c.dataset.numero }))
+      };
+
+      const resp = await fetch(`/api/tecnologia/retirada/${retiradaId}/equipamentos`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        msg.textContent = data.message || 'Erro ao salvar';
+        return;
+      }
+      window.location.href = `/tecnologia/retirada/${retiradaId}/responsaveis`;
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

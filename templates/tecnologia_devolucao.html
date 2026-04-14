@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devolução de Equipamentos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-amber-400">Devolução de Equipamentos</h1>
+        <p class="text-sm text-slate-400">Finalize a devolução dos equipamentos que estão em sua posse.</p>
+      </div>
+      <button type="button" onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-2 font-semibold">Voltar</button>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
+      <div class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 inline-block min-w-[260px]">
+        <div class="text-xs text-slate-400">Responsável logado</div>
+        <div id="usuario_nome" class="font-semibold text-slate-100">-</div>
+      </div>
+
+      <p class="text-slate-200 text-lg">Deseja devolver os computadores em sua posse?</p>
+      <div class="flex gap-3 flex-wrap">
+        <button onclick="confirmarDevolucao()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-3 font-semibold">SIM</button>
+        <button type="button" onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-6 py-3 font-semibold">Voltar</button>
+      </div>
+
+      <div id="areaPergunta" class="hidden space-y-4 pt-4 border-t border-slate-700">
+        <p class="text-slate-200 text-lg">HOUVE OCORRÊNCIA?</p>
+        <div class="flex gap-3 flex-wrap">
+          <button onclick="semOcorrencia()" class="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-3 font-semibold">NÃO</button>
+          <button onclick="comOcorrencia()" class="rounded-xl bg-red-600 hover:bg-red-500 px-6 py-3 font-semibold">SIM</button>
+        </div>
+      </div>
+
+      <div id="areaOcorrencia" class="hidden pt-4 border-t border-slate-700">
+        <div id="listaItens" class="space-y-4"></div>
+      </div>
+
+      <p id="mensagem" class="text-sm text-amber-300"></p>
+    </div>
+  </main>
+
+  <script>
+    let itens = [];
+
+    async function confirmarDevolucao() {
+      const data = await fetch('/api/tecnologia/devolucao/pendentes').then(r => r.json());
+      document.getElementById('usuario_nome').textContent = data.usuario_nome || '-';
+      if (!data.success) {
+        document.getElementById('mensagem').textContent = data.message || data.error || 'Erro ao carregar itens';
+        return;
+      }
+      itens = data.itens || [];
+      if (!itens.length) {
+        document.getElementById('mensagem').textContent = 'Não há equipamentos pendentes para devolução em sua posse.';
+        return;
+      }
+      document.getElementById('areaPergunta').classList.remove('hidden');
+    }
+
+    async function semOcorrencia() {
+      const resp = await fetch('/api/tecnologia/devolucao/finalizar_sem_ocorrencia', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ item_ids: itens.map(i => i.id) })
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        document.getElementById('mensagem').textContent = data.message || data.error || 'Erro ao finalizar';
+        return;
+      }
+      alert('Devolução finalizada com sucesso.');
+      window.location.href = '/dashboard_tecnologia';
+    }
+
+    function comOcorrencia() {
+      document.getElementById('areaOcorrencia').classList.remove('hidden');
+      document.getElementById('listaItens').innerHTML = itens.map(item => `
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-4 space-y-3">
+          <div class="font-semibold text-slate-100">Equipamento ${item.numero_equipamento}</div>
+          <div class="text-sm text-slate-300">Responsável: ${item.aluno_responsavel || 'Não informado'}</div>
+          <textarea id="desc_${item.id}" class="w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3" rows="3" placeholder="Descreva o que aconteceu"></textarea>
+          <button onclick="registrarOcorrencia(${item.id})" class="rounded-xl bg-red-600 hover:bg-red-500 px-4 py-2 font-semibold">Registrar ocorrência e devolver</button>
+        </div>
+      `).join('');
+    }
+
+    async function registrarOcorrencia(itemId) {
+      const descricao = document.getElementById(`desc_${itemId}`).value.trim();
+      const resp = await fetch('/api/tecnologia/devolucao/com_ocorrencia', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ item_id: itemId, descricao_ocorrencia: descricao })
+      });
+      const data = await resp.json();
+      if (!data.success) {
+        document.getElementById('mensagem').textContent = data.message || data.error || 'Erro ao registrar';
+        return;
+      }
+      alert('Ocorrência e devolução salvas com sucesso.');
+      window.location.reload();
+    }
+
+    confirmarDevolucao();
+  </script>
+</body>
+</html>

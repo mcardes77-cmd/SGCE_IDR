@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chamada Tutoria</title><script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen p-4">
+<div class="max-w-6xl mx-auto space-y-4">
+  <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-emerald-400">Chamada da Tutoria</h1>
+      <p class="text-slate-400 text-sm">Somente terça, quarta e quinta. Todos os alunos iniciam com presença.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 items-end">
+      <div id="boxTutor" class="hidden">
+        <label class="block text-xs text-slate-400 mb-1">Tutor</label>
+        <select id="tutorSelect" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 min-w-72"></select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Data</label>
+        <input id="dataRef" type="date" class="bg-slate-900 border border-slate-700 rounded px-3 py-2">
+      </div>
+      <button id="btnCarregar" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Carregar</button>
+      <button id="btnSalvar" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-semibold">Salvar chamada</button>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-3">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Tutor</div>
+      <div id="tutorInfo" class="text-lg font-semibold mt-1">-</div>
+    </div>
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Alunos carregados</div>
+      <div id="qtdAlunos" class="text-lg font-semibold mt-1">0</div>
+    </div>
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Modo</div>
+      <div id="modoInfo" class="text-lg font-semibold mt-1">Tutor logado</div>
+    </div>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 overflow-x-auto">
+    <table class="w-full text-sm"><thead><tr class="border-b border-slate-700"><th class="text-left py-2 px-2">Aluno</th><th class="text-left py-2 px-2">Sala</th><th class="text-left py-2 px-2">Status</th></tr></thead><tbody id="tb"></tbody></table>
+    <p id="msg" class="text-amber-300 text-sm mt-3"></p>
+  </div>
+</div>
+<script>
+let rows=[];
+let meta={modo_tutor:true,tutor_nome:''};
+function hojeSP(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function safe(v){ return v==null?'':String(v); }
+function setDefaultDate(){ document.getElementById('dataRef').value = hojeSP(); }
+function selectedTutor(){ return document.getElementById('tutorSelect').value || ''; }
+async function carregarTutores(){
+  const r=await fetch('/api/tutoria/chamada/tutores');
+  const j=await r.json();
+  if(!r.ok||!j.success){ return; }
+  if(j.modo_tutor){ return; }
+  const box=document.getElementById('boxTutor');
+  const sel=document.getElementById('tutorSelect');
+  box.classList.remove('hidden');
+  document.getElementById('modoInfo').textContent='Acesso total';
+  sel.innerHTML='<option value="">Selecione o tutor</option>' + (j.data||[]).map(t=>`<option value="${safe(t.nome)}">${safe(t.nome)}</option>`).join('');
+}
+async function carregar(){
+  const data=document.getElementById('dataRef').value;
+  let url=`/api/tutoria/chamada/alunos?data=${encodeURIComponent(data)}`;
+  if(!meta.modo_tutor && selectedTutor()) url += `&tutor_nome=${encodeURIComponent(selectedTutor())}`;
+  document.getElementById('msg').textContent='';
+  const r=await fetch(url);
+  const j=await r.json();
+  if(!r.ok||!j.success){ document.getElementById('msg').textContent=j.error||'Erro ao carregar chamada'; rows=[]; render(); return; }
+  rows=j.data||[];
+  meta.modo_tutor = j.meta ? !!j.meta.modo_tutor : meta.modo_tutor;
+  meta.tutor_nome = j.meta ? (j.meta.tutor_nome||selectedTutor()||'-') : (selectedTutor()||'-');
+  document.getElementById('tutorInfo').textContent = meta.tutor_nome || '-';
+  document.getElementById('qtdAlunos').textContent = String(rows.length);
+  if(!meta.modo_tutor){ document.getElementById('modoInfo').textContent='Acesso total'; }
+  else { document.getElementById('modoInfo').textContent='Tutor logado'; }
+  render();
+}
+function render(){ const tb=document.getElementById('tb'); if(!rows.length){ tb.innerHTML='<tr><td colspan="3" class="py-3 px-2 text-slate-400">Nenhum aluno para chamada.</td></tr>'; return; } tb.innerHTML=rows.map((a,idx)=>`<tr class="border-b border-slate-800"><td class="py-2 px-2">${safe(a.nome)}</td><td class="py-2 px-2">${safe(a.sala_nome)}</td><td class="py-2 px-2"><button onclick="toggleStatus(${idx})" class="${a.status==='F'?'bg-red-700 hover:bg-red-600':'bg-emerald-700 hover:bg-emerald-600'} px-3 py-1 rounded">${a.status}</button></td></tr>`).join(''); }
+function toggleStatus(i){ rows[i].status = rows[i].status==='F' ? 'P' : 'F'; render(); }
+async function salvar(){ const data=document.getElementById('dataRef').value; const itens=rows.map(a=>({aluno_id:a.id,aluno_nome:a.nome,sala_nome:a.sala_nome,status:a.status})); const r=await fetch('/api/tutoria/chamada/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,itens})}); const j=await r.json(); if(!r.ok||!j.success){ alert(j.error||'Erro ao salvar'); return; } alert(j.message||'Salvo com sucesso'); }
+setDefaultDate();
+document.getElementById('btnCarregar').addEventListener('click',carregar);
+document.getElementById('btnSalvar').addEventListener('click',salvar);
+document.getElementById('tutorSelect').addEventListener('change',carregar);
+document.addEventListener('DOMContentLoaded', async ()=>{ await carregarTutores(); await carregar(); });
+</script>
+</body></html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Responsáveis pelos Equipamentos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Responsáveis pelos Equipamentos</h1>
+        <p class="text-slate-300 text-sm mt-1">Escolha o aluno responsável por cada equipamento retirado.</p>
+      </div>
+      <button onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar</button>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+      <div class="grid md:grid-cols-3 gap-3 mb-6">
+        <div class="rounded-xl bg-slate-900 border border-slate-700 px-4 py-3"><div class="text-sm text-slate-400">Sala da retirada</div><div id="salaInfo" class="font-semibold mt-1">-</div></div>
+        <div class="rounded-xl bg-slate-900 border border-slate-700 px-4 py-3"><div class="text-sm text-slate-400">Equipamentos</div><div id="qtdEquipamentos" class="font-semibold mt-1">0</div></div>
+        <div class="rounded-xl bg-slate-900 border border-slate-700 px-4 py-3"><div class="text-sm text-slate-400">Alunos encontrados na sala</div><div id="qtdAlunos" class="font-semibold mt-1">0</div></div>
+      </div>
+      <div id="lista" class="space-y-4"></div>
+      <div class="mt-6 flex gap-3">
+        <button onclick="salvar()" class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-semibold">Salvar responsáveis</button>
+        <button onclick="window.history.back()" class="rounded-xl bg-slate-700 hover:bg-slate-600 px-4 py-3 font-semibold">Voltar</button>
+      </div>
+      <p id="mensagem" class="text-sm text-amber-300 mt-3"></p>
+    </div>
+  </main>
+
+  <script>
+    const retiradaId = {{ retirada_id|tojson }};
+    let itens = [];
+    let alunos = [];
+
+    function renderLista() {
+      document.getElementById('qtdEquipamentos').textContent = String(itens.length);
+      document.getElementById('qtdAlunos').textContent = String(alunos.length);
+      const lista = document.getElementById('lista');
+      if (!itens.length) {
+        lista.innerHTML = '<div class="rounded-xl bg-slate-900 border border-slate-700 px-4 py-4 text-slate-300">Nenhum equipamento foi encontrado para esta retirada.</div>';
+        return;
+      }
+      const avisoAlunos = !alunos.length ? '<div class="rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-4 text-amber-200">Nenhum aluno ativo foi encontrado para a sala desta retirada. Verifique o cadastro da sala e dos alunos.</div>' : '';
+      const options = '<option value="">Selecione o aluno</option>' + alunos.map(a => `<option value="${a.nome}">${a.nome}</option>`).join('');
+      lista.innerHTML = avisoAlunos + itens.map(item => `
+        <div class="grid md:grid-cols-2 gap-3 bg-slate-900 border border-slate-700 rounded-xl p-4">
+          <div>
+            <label class="block text-sm text-slate-300 mb-2">Equipamento</label>
+            <input class="w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3" value="${item.numero_equipamento || ''}" readonly>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-300 mb-2">Aluno responsável</label>
+            <select class="responsavel w-full rounded-lg bg-slate-800 border border-slate-700 px-4 py-3" data-id="${item.id}">
+              ${options}
+            </select>
+          </div>
+        </div>`).join('');
+      document.querySelectorAll('.responsavel').forEach((select, idx) => {
+        if (itens[idx] && itens[idx].aluno_responsavel) select.value = itens[idx].aluno_responsavel;
+      });
+    }
+
+    async function carregar() {
+      document.getElementById('mensagem').textContent = '';
+      try {
+        const resp = await fetch(`/api/tecnologia/retirada/${retiradaId}/detalhes`);
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          document.getElementById('mensagem').textContent = data.error || data.message || 'Erro ao carregar dados da retirada.';
+          return;
+        }
+        itens = data.itens || [];
+        alunos = data.alunos || [];
+        document.getElementById('salaInfo').textContent = data.sala_nome || (data.retirada && data.retirada.sala_nome) || '-';
+        renderLista();
+      } catch (e) {
+        document.getElementById('mensagem').textContent = 'Erro ao abrir a tela de responsáveis.';
+      }
+    }
+
+    async function salvar() {
+      const selects = [...document.querySelectorAll('.responsavel')];
+      const payload = { itens: selects.map(s => ({ id: Number(s.dataset.id), aluno_responsavel: s.value })) };
+      const semAluno = payload.itens.some(i => !i.aluno_responsavel);
+      if (semAluno) {
+        document.getElementById('mensagem').textContent = 'Selecione o responsável por todos os equipamentos.';
+        return;
+      }
+      const resp = await fetch(`/api/tecnologia/retirada/${retiradaId}/responsaveis`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const data = await resp.json();
+      if (!resp.ok || !data.success) {
+        document.getElementById('mensagem').textContent = data.message || data.error || 'Erro ao salvar';
+        return;
+      }
+      alert('Retirada concluída com sucesso.');
+      window.location.href = '/dashboard_tecnologia';
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

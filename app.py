@@ -52,6 +52,59 @@ def _find_sala_by_nome(db, sala_nome):
     dados = resp.data or []
     return dados[0] if dados else None
 
+
+
+def _buscar_alunos_por_tutor(db, tutor_id=None, tutor_nome=""):
+    """Busca alunos ativos vinculados ao tutor, aceitando campos antigos e novos."""
+    tutor_nome = (tutor_nome or "").strip()
+    resultados = []
+
+    def add_rows(rows):
+        for a in rows or []:
+            aid = str(a.get("id"))
+            if aid and aid not in mapa:
+                mapa[aid] = a
+
+    mapa = {}
+
+    if tutor_id not in (None, "", "None"):
+        try:
+            tutor_id_int = int(tutor_id)
+            for campo in ("tutor_id", "id_tutor"):
+                try:
+                    rows = db.table("d_alunos").select("*").eq(campo, tutor_id_int).eq("situacao_aluno", "ATIVO").order("nome").execute().data or []
+                    add_rows(rows)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if tutor_nome:
+        for campo in ("tutor_nome", "nome_tutor"):
+            try:
+                rows = db.table("d_alunos").select("*").eq(campo, tutor_nome).eq("situacao_aluno", "ATIVO").order("nome").execute().data or []
+                add_rows(rows)
+            except Exception:
+                pass
+
+    # fallback mais amplo: alguns cadastros podem estar com variações em situacao_aluno
+    if not mapa and tutor_nome:
+        try:
+            rows = db.table("d_alunos").select("*").order("nome").execute().data or []
+            for a in rows:
+                situacao = str(a.get("situacao_aluno") or "ATIVO").strip().upper()
+                nome_ok = str(a.get("tutor_nome") or a.get("nome_tutor") or "").strip() == tutor_nome
+                id_raw = a.get("tutor_id") if a.get("tutor_id") not in (None, "", "None") else a.get("id_tutor")
+                try:
+                    id_ok = tutor_id not in (None, "", "None") and int(id_raw) == int(tutor_id)
+                except Exception:
+                    id_ok = False
+                if situacao == "ATIVO" and (nome_ok or id_ok):
+                    mapa[str(a.get("id"))] = a
+        except Exception:
+            pass
+
+    return list(mapa.values())
 def _find_tutor_by_nome(db, tutor_nome):
     tutor_nome = (tutor_nome or "").strip()
     if not tutor_nome:
@@ -143,6 +196,61 @@ def buscar_alunos_ativos_da_sala(db, sala_id):
     dados.sort(key=lambda x: normalize_aluno_nome(x))
     return dados
 
+
+
+def _buscar_alunos_por_sala(db, sala_id=None, sala_nome=""):
+    sala_nome = (sala_nome or "").strip()
+    sala_ref = None
+    if sala_id not in (None, ""):
+        try:
+            sala_ref = db.table("d_salas").select("*").eq("id", int(sala_id)).limit(1).execute().data or []
+            sala_ref = sala_ref[0] if sala_ref else None
+        except Exception:
+            sala_ref = None
+    if not sala_ref and sala_nome:
+        try:
+            salas = db.table("d_salas").select("*").execute().data or []
+            alvo = normalize_sala_nome({"nome": sala_nome, "sala": sala_nome, "sala_nome": sala_nome})
+            for s in salas:
+                if normalize_sala_nome(s) == alvo:
+                    sala_ref = s
+                    break
+        except Exception:
+            sala_ref = None
+    sala_id_final = sala_id
+    sala_nome_final = sala_nome
+    if sala_ref:
+        sala_id_final = sala_ref.get("id") if sala_id_final in (None, "") else sala_id_final
+        sala_nome_final = normalize_sala_nome(sala_ref) or sala_nome_final
+
+    registros = []
+    if sala_id_final not in (None, ""):
+        try:
+            registros.extend(db.table("d_alunos").select("*").eq("sala_id", int(sala_id_final)).eq("situacao_aluno", "ATIVO").order("nome").execute().data or [])
+        except Exception:
+            pass
+    if sala_nome_final:
+        try:
+            registros.extend(db.table("d_alunos").select("*").eq("sala_nome", sala_nome_final).eq("situacao_aluno", "ATIVO").order("nome").execute().data or [])
+        except Exception:
+            pass
+
+    unicos = {}
+    for item in registros:
+        nome = normalize_aluno_nome(item)
+        chave = item.get("id") or f"{nome}|{item.get('sala_nome') or sala_nome_final}"
+        if chave not in unicos:
+            novo = dict(item)
+            novo["nome"] = nome
+            if not novo.get("sala_id") and sala_id_final not in (None, ""):
+                novo["sala_id"] = sala_id_final
+            if not novo.get("sala_nome") and sala_nome_final:
+                novo["sala_nome"] = sala_nome_final
+            unicos[chave] = novo
+    dados = list(unicos.values())
+    dados.sort(key=lambda x: normalize_aluno_nome(x))
+    return dados
+
 def get_next_numero_ocorrencia():
     db = get_supabase()
     resp = db.table("ocorrencias").select("numero").order("numero", desc=True).limit(1).execute()
@@ -160,7 +268,7 @@ def now_sp_iso():
 
 USUARIOS_ACESSO_TOTAL = {
     "ELAINE CRISTINA ARIEDE KACA DO CARMO",
-    "MARCELO ANDRE NOGUEIRA CARDES",
+    "ADMINISTRADOR",
     "GRAZIELLE DA SILVA FEIJO VIANA",
     "MARCILENE MANTOVANI COSSENZO PUPIM",
     "MARCOS DE BRITO BORTOLOSSI",
@@ -198,7 +306,7 @@ def bloquear_cadastro():
 @app.route("/gestao_cadastro")
 def gestao_cadastro():
     if not acesso_total():
-        return redirect("/dashboard_geral")
+        return redirect("/dashboard_tecnologia" if usuario_eh_tecnologia_exclusivo() else "/dashboard_geral")
     return render_template("gestao_cadastro.html")
 
 
@@ -536,7 +644,7 @@ def api_editar_ocorrencia_cadastro(numero):
 
 USUARIOS_ACESSO_TOTAL = {
     "ELAINE CRISTINA ARIEDE KACA DO CARMO",
-    "MARCELO ANDRE NOGUEIRA CARDES",
+    "ADMINISTRADOR",
     "GRAZIELLE DA SILVA FEIJO VIANA",
     "MARCILENE MANTOVANI COSSENZO PUPIM",
     "MARCOS DE BRITO BORTOLOSSI",
@@ -565,17 +673,31 @@ def usuario_logado_nome():
 def usuario_tem_acesso_total():
     return usuario_logado_nome() in USUARIOS_ACESSO_TOTAL
 
+
+def usuario_logado_tipo():
+    user = session.get("user") or {}
+    return normalizar_texto(user.get("tipo"))
+
+def usuario_pode_acessar_tecnologia():
+    return usuario_tem_acesso_total() or usuario_logado_tipo() == "ALUNO"
+
+def usuario_pode_ver_card_tecnologia():
+    return usuario_tem_acesso_total()
+
+def usuario_eh_tecnologia_exclusivo():
+    return usuario_logado_tipo() == "ALUNO" and not usuario_tem_acesso_total()
+
 def usuario_pode_ver_gestao():
     return usuario_logado_nome() in {
         "ELAINE CRISTINA ARIEDE KACA DO CARMO",
-        "MARCELO ANDRE NOGUEIRA CARDES",
+        "ADMINISTRADOR",
         "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
 
 def usuario_pode_ver_coordenacao():
     return usuario_logado_nome() in {
         "ELAINE CRISTINA ARIEDE KACA DO CARMO",
-        "MARCELO ANDRE NOGUEIRA CARDES",
+        "ADMINISTRADOR",
         "GRAZIELLE DA SILVA FEIJO VIANA",
         "MARCOS DE BRITO BORTOLOSSI",
         "MARCILENE MANTOVANI COSSENZO PUPIM",
@@ -584,7 +706,7 @@ def usuario_pode_ver_coordenacao():
 def usuario_pode_ver_responsavel():
     return usuario_logado_nome() in {
         "ELAINE CRISTINA ARIEDE KACA DO CARMO",
-        "MARCELO ANDRE NOGUEIRA CARDES",
+        "ADMINISTRADOR",
         "MARCILENE MANTOVANI COSSENZO PUPIM",
     }
 
@@ -795,6 +917,15 @@ def proteger_rotas():
         return
     if "user" not in session:
         return redirect("/login")
+    if usuario_eh_tecnologia_exclusivo():
+        liberadas = (
+            caminho.startswith("/dashboard_tecnologia")
+            or caminho.startswith("/tecnologia")
+            or caminho.startswith("/api/tecnologia")
+            or caminho == "/logout"
+        )
+        if not liberadas:
+            return redirect("/dashboard_tecnologia")
 
 @app.route("/login")
 def login():
@@ -915,7 +1046,8 @@ def api_login():
             "is_tutor": user.get("is_tutor", False),
         }
 
-        return jsonify({"success": True, "redirect": "/dashboard_geral"})
+        redirect_destino = "/dashboard_tecnologia" if usuario_logado_tipo() == "ALUNO" else "/dashboard_geral"
+        return jsonify({"success": True, "redirect": redirect_destino})
     except Exception as e:
         return json_error(e)
 
@@ -926,7 +1058,7 @@ def api_login():
 def home():
     if "user" not in session:
         return redirect("/login")
-    return redirect("/dashboard_geral")
+    return redirect("/dashboard_tecnologia" if usuario_eh_tecnologia_exclusivo() else "/dashboard_geral")
 
 @app.route("/health")
 def health():
@@ -951,7 +1083,7 @@ def dashboard_ocorrencias():
 
 @app.route("/dashboard_geral")
 def dashboard_geral():
-    return render_template("dashboard_geral.html")
+    return render_template("dashboard_geral.html", mostrar_card_tecnologia=usuario_pode_ver_card_tecnologia())
 
 @app.route("/dashboard_frequencia")
 def dashboard_frequencia():
@@ -2173,29 +2305,11 @@ def api_alunos_do_tutor(tutor_id):
         if not usuario_tem_acesso_total() and normalizar_texto(tutor_nome) != usuario_logado_nome():
             return jsonify([])
 
-        # busca por tutor_id
-        resp_id = (
-            db.table("d_alunos")
-            .select("*")
-            .eq("tutor_id", tutor_id)
-            .order("nome")
-            .execute()
-        )
-        dados_id = resp_id.data or []
-
-        # busca por tutor_nome
-        resp_nome = (
-            db.table("d_alunos")
-            .select("*")
-            .eq("tutor_nome", tutor_nome)
-            .order("nome")
-            .execute()
-        )
-        dados_nome = resp_nome.data or []
+        dados = _buscar_alunos_por_tutor(db, tutor_id=tutor_id, tutor_nome=tutor_nome)
 
         # junta sem duplicar
         mapa = {}
-        for item in dados_id + dados_nome:
+        for item in dados:
             aluno_id = item.get("id")
             if aluno_id is not None:
                 mapa[aluno_id] = item
@@ -2231,16 +2345,7 @@ def api_tutoria_alunos_ficha():
         if not tutor_nome:
             return jsonify({"success": True, "data": [], "meta": {"modo_tutor": not usuario_tem_acesso_total()}})
 
-        by_id = []
-        if tutor_id:
-            by_id = db.table("d_alunos").select("*").eq("tutor_id", int(tutor_id)).eq("situacao_aluno", "ATIVO").order("nome").execute().data or []
-
-        by_nome = db.table("d_alunos").select("*").eq("tutor_nome", tutor_nome).eq("situacao_aluno", "ATIVO").order("nome").execute().data or []
-
-        mapa = {}
-        for a in by_id + by_nome:
-            mapa[str(a.get("id"))] = a
-        alunos = list(mapa.values())
+        alunos = _buscar_alunos_por_tutor(db, tutor_id=tutor_id, tutor_nome=tutor_nome)
 
         def first_nonempty(*vals):
             for v in vals:
@@ -2311,6 +2416,84 @@ def api_tutoria_alunos_ficha():
     except Exception as e:
         return json_error(e)
 
+
+
+
+@app.route("/api/tutoria/chamada/tutores")
+def api_tutoria_chamada_tutores():
+    try:
+        if not usuario_tem_acesso_total():
+            return jsonify({"success": True, "data": [], "modo_tutor": True})
+        db = get_supabase()
+        tutores = []
+        try:
+            tutores = db.table("d_funcionarios").select("id,nome,funcao,is_tutor").or_("funcao.ilike.%TUTOR%,is_tutor.eq.true").order("nome").execute().data or []
+        except Exception:
+            tutores = db.table("d_funcionarios").select("id,nome,funcao,is_tutor").order("nome").execute().data or []
+            tutores = [t for t in tutores if 'TUTOR' in normalizar_texto(t.get('funcao')) or bool(t.get('is_tutor'))]
+        return jsonify({"success": True, "data": tutores, "modo_tutor": False})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/gestao_tutoria_chamada")
+def gestao_tutoria_chamada():
+    aluno_id = (request.args.get("aluno_id") or "").strip()
+    return render_template("gestao_tutoria_chamada.html", aluno_id=aluno_id)
+
+@app.route("/api/tutoria/chamada/alunos")
+def api_tutoria_chamada_alunos():
+    try:
+        db = get_supabase()
+        dia = _parse_date_any(request.args.get("data")) or now_sp().date()
+        if dia.weekday() not in {1,2,3}:
+            return json_error("A chamada da tutoria só pode ser lançada às terças, quartas e quintas.", 400)
+        tutor_id = (request.args.get("tutor_id") or "").strip()
+        tutor_nome = (request.args.get("tutor_nome") or "").strip()
+        if not usuario_tem_acesso_total():
+            tutor_nome = (session.get("user") or {}).get("nome") or ""
+            tutor_id = ""
+        alunos = _buscar_alunos_por_tutor(db, tutor_id=tutor_id, tutor_nome=tutor_nome)
+        try:
+            registros = db.table("f_tutoria_chamada").select("aluno_id,status").eq("data", dia.isoformat()).execute().data or []
+        except Exception:
+            registros = []
+        mapa_reg = {str(x.get("aluno_id")): x.get("status") for x in registros}
+        data = [{"id": a.get("id"), "nome": a.get("nome") or a.get("aluno_nome"), "sala_nome": a.get("sala_nome") or "", "status": mapa_reg.get(str(a.get("id")), "P")} for a in alunos]
+        return jsonify({"success": True, "data": data, "data_ref": dia.isoformat(), "weekday": dia.weekday()})
+    except Exception as e:
+        return json_error(e)
+
+@app.route("/api/tutoria/chamada/salvar", methods=["POST"])
+def api_tutoria_chamada_salvar():
+    try:
+        db = get_supabase()
+        payload = request.get_json(silent=True) or {}
+        data_ref = _parse_date_any(payload.get("data")) or now_sp().date()
+        if data_ref.weekday() not in {1,2,3}:
+            return json_error("A chamada da tutoria só pode ser lançada às terças, quartas e quintas.", 400)
+        itens = payload.get("itens") or []
+        tutor_nome = (session.get("user") or {}).get("nome") or ""
+        if not itens:
+            return json_error("Nenhum aluno informado.", 400)
+        try:
+            db.table("f_tutoria_chamada").delete().eq("data", data_ref.isoformat()).eq("tutor_nome", tutor_nome).execute()
+        except Exception:
+            pass
+        rows = []
+        for item in itens:
+            rows.append({
+                "data": data_ref.isoformat(),
+                "aluno_id": item.get("aluno_id"),
+                "aluno_nome": item.get("aluno_nome"),
+                "sala_nome": item.get("sala_nome") or "",
+                "status": (item.get("status") or "P").strip().upper(),
+                "tutor_nome": tutor_nome,
+                "created_at": now_sp_iso(),
+            })
+        db.table("f_tutoria_chamada").insert(rows).execute()
+        return jsonify({"success": True, "message": "Chamada da tutoria salva com sucesso."})
+    except Exception as e:
+        return json_error(e)
 
 @app.route("/api/ficha_tutoria/<int:aluno_id>")
 def api_ficha_tutoria(aluno_id):
@@ -2829,7 +3012,7 @@ def relatorio_aluno_pdf():
 
 @app.route("/gestao_relatorios_profissional")
 def gestao_relatorios_profissional():
-    return render_template("gestao_relatorios_profissional.html")
+    return render_template("gestao_relatorios_profissional.html", mostrar_relatorio_tecnologia=usuario_tem_acesso_total())
 
 
 
@@ -2954,6 +3137,278 @@ def _aluno_campo(a, *campos):
             return v
     return ""
 
+
+
+
+# =========================================================
+# TECNOLOGIA
+# =========================================================
+@app.route("/dashboard_tecnologia")
+def dashboard_tecnologia():
+    if not usuario_pode_acessar_tecnologia():
+        return redirect("/dashboard_geral")
+    return render_template("dashboard_tecnologia.html")
+
+@app.route("/tecnologia/retirada")
+def tecnologia_retirada():
+    if not usuario_pode_acessar_tecnologia():
+        return redirect("/dashboard_geral")
+    return render_template("tecnologia_retirada.html")
+
+@app.route("/tecnologia/retirada/<int:retirada_id>/equipamentos")
+def tecnologia_retirada_equipamentos(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return redirect("/dashboard_geral")
+    return render_template("tecnologia_retirada_equipamentos.html", retirada_id=retirada_id)
+
+@app.route("/tecnologia/retirada/<int:retirada_id>/responsaveis")
+def tecnologia_retirada_responsaveis(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return redirect("/dashboard_geral")
+    return render_template("tecnologia_retirada_responsaveis.html", retirada_id=retirada_id)
+
+@app.route("/tecnologia/devolucao")
+def tecnologia_devolucao():
+    if not usuario_pode_acessar_tecnologia():
+        return redirect("/dashboard_geral")
+    return render_template("tecnologia_devolucao.html")
+
+@app.route("/api/tecnologia/dados_iniciais")
+def api_tecnologia_dados_iniciais():
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    user = session.get("user") or {}
+    sala_usuario = (user.get("sala_nome") or user.get("sala") or request.args.get("sala_nome") or "").strip()
+
+    professores = []
+    try:
+        professores = db.table("d_funcionarios").select("id,nome,funcao,tipo,ativo").eq("tipo", "PROFESSOR").eq("ativo", True).order("nome").execute().data or []
+    except Exception:
+        try:
+            professores = db.table("d_funcionarios").select("id,nome,funcao,tipo,ativo").eq("tipo", "PROFESSOR").order("nome").execute().data or []
+        except Exception:
+            professores = db.table("d_funcionarios").select("id,nome,funcao,tipo,ativo").eq("funcao", "PROFESSOR").order("nome").execute().data or []
+
+    salas = []
+    try:
+        salas = db.table("d_salas").select("id,nome,nivel_ensino").order("nome").execute().data or []
+        salas = [{**s, "sala": s.get("nome") or s.get("sala") or s.get("sala_nome") or ""} for s in salas]
+    except Exception:
+        try:
+            salas = db.table("d_salas").select("id,sala,nivel_ensino").order("sala").execute().data or []
+            salas = [{**s, "sala": s.get("sala") or s.get("nome") or s.get("sala_nome") or ""} for s in salas]
+        except Exception:
+            salas = db.table("d_salas").select("*").execute().data or []
+            salas = [{**s, "sala": s.get("nome") or s.get("sala") or s.get("sala_nome") or ""} for s in salas if (s.get("nome") or s.get("sala") or s.get("sala_nome"))]
+    salas = sorted(salas, key=lambda s: (s.get("sala") or "").upper())
+
+    alunos = _buscar_alunos_por_sala(db, sala_nome=sala_usuario) if sala_usuario else []
+    try:
+        equipamentos = db.table("d_inventario_equipamentos").select("id,numero,status").eq("status", "DISPONIVEL").order("numero").execute().data or []
+    except Exception:
+        equipamentos = db.table("d_inventario_equipamentos").select("id,numero,status").order("numero").execute().data or []
+    return jsonify({
+        "success": True,
+        "usuario_nome": user.get("nome") or user.get("username") or "",
+        "data_atual": now_sp().strftime("%d/%m/%Y"),
+        "sala": sala_usuario,
+        "salas": salas,
+        "professores": professores,
+        "alunos": alunos,
+        "equipamentos": equipamentos,
+        "aulas": [f"{i}ª Aula" for i in range(1, 10)],
+    })
+
+@app.route("/api/tecnologia/retirada", methods=["POST"])
+def api_tecnologia_retirada():
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    user = session.get("user") or {}
+    data = request.get_json(silent=True) or {}
+    sala_nome = (data.get("sala_nome") or user.get("sala_nome") or user.get("sala") or "").strip()
+    professor_nome = (data.get("professor_nome") or "").strip()
+    horario_aula = (data.get("horario_aula") or "").strip()
+    quantidade = int(data.get("quantidade", 0) or 0)
+    if not sala_nome or not professor_nome or not horario_aula or quantidade <= 0:
+        return json_error("Preencha sala, professor, horário e quantidade.", 400)
+    payload = {"usuario_id": user.get("id"), "usuario_nome": user.get("nome"), "usuario_funcao": user.get("funcao") or user.get("tipo"), "sala_nome": sala_nome, "professor_nome": professor_nome, "horario_aula": horario_aula, "quantidade": quantidade, "status": "RETIRADO", "data_retirada": now_sp_iso()}
+    resp = db.table("tecnologia_retiradas").insert(payload).execute()
+    retirada = (resp.data or [None])[0]
+    if not retirada:
+        return json_error("Não foi possível salvar a retirada.", 500)
+    return jsonify({"success": True, "retirada_id": retirada.get("id")})
+
+@app.route("/api/tecnologia/retirada/<int:retirada_id>/equipamentos_disponiveis")
+def api_tecnologia_equipamentos_disponiveis(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    retirada = (db.table("tecnologia_retiradas").select("id,quantidade,sala_nome").eq("id", retirada_id).limit(1).execute().data or [None])[0]
+    if not retirada:
+        return json_error("Retirada não encontrada.", 404)
+    equipamentos = []
+    erros = []
+    consultas = [
+        lambda: db.table("d_inventario_equipamentos").select("id,numero,status").eq("status", "DISPONIVEL").order("numero").execute().data or [],
+        lambda: db.table("d_inventario_equipamentos").select("id,numero,status").in_("status", ["DISPONIVEL", "Disponível", "disponivel"]).order("numero").execute().data or [],
+        lambda: db.table("d_inventario_equipamentos").select("id,numero,status").order("numero").execute().data or [],
+    ]
+    for consulta in consultas:
+        try:
+            equipamentos = consulta()
+            if equipamentos:
+                break
+        except Exception as e:
+            erros.append(str(e))
+    equipamentos = [e for e in equipamentos if e.get("numero")]
+    return jsonify({"success": True, "retirada": retirada, "equipamentos": equipamentos, "debug_erros": erros[:2]})
+
+@app.route("/api/tecnologia/retirada/<int:retirada_id>/equipamentos", methods=["POST"])
+def api_tecnologia_retirada_equipamentos(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    data = request.get_json(silent=True) or {}
+    equipamentos = data.get("equipamentos") or []
+    if not equipamentos:
+        return json_error("Selecione os equipamentos.", 400)
+    retirada = (db.table("tecnologia_retiradas").select("id,quantidade").eq("id", retirada_id).limit(1).execute().data or [None])[0]
+    if not retirada:
+        return json_error("Retirada não encontrada.", 404)
+    quantidade = int(retirada.get("quantidade") or 0)
+    if quantidade and len(equipamentos) != quantidade:
+        return json_error(f"Selecione exatamente {quantidade} equipamento(s).", 400)
+    try:
+        itens = []
+        for eq in equipamentos:
+            numero = (eq.get("numero") or "").strip()
+            equipamento_id = eq.get("id")
+            if not numero:
+                continue
+            item = {"retirada_id": retirada_id, "numero_equipamento": numero}
+            if equipamento_id:
+                item["equipamento_id"] = equipamento_id
+            itens.append(item)
+        if not itens:
+            return json_error("Nenhum equipamento válido foi informado.", 400)
+        db.table("tecnologia_retirada_itens").insert(itens).execute()
+        for eq in equipamentos:
+            if eq.get("id"):
+                try:
+                    db.table("d_inventario_equipamentos").update({"status": "RETIRADO"}).eq("id", eq.get("id")).execute()
+                except Exception:
+                    db.table("d_inventario_equipamentos").update({"status": "EM_USO"}).eq("id", eq.get("id")).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return json_error(f"Erro ao salvar equipamentos: {str(e)}", 500)
+
+@app.route("/api/tecnologia/retirada/<int:retirada_id>/detalhes")
+def api_tecnologia_retirada_detalhes(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    retirada = (db.table("tecnologia_retiradas").select("id,sala_nome,quantidade").eq("id", retirada_id).limit(1).execute().data or [None])[0]
+    if not retirada:
+        return json_error("Retirada não encontrada.", 404)
+    sala_nome = (retirada.get("sala_nome") or "").strip()
+    itens = db.table("tecnologia_retirada_itens").select("id,numero_equipamento,aluno_responsavel").eq("retirada_id", retirada_id).order("numero_equipamento").execute().data or []
+    alunos_brutos = _buscar_alunos_por_sala(db, sala_nome=sala_nome) if sala_nome else []
+    alunos = []
+    vistos = set()
+    for a in alunos_brutos:
+        nome = (a.get("nome") or a.get("aluno_nome") or "").strip()
+        if not nome:
+            continue
+        chave = (a.get("id"), nome.upper())
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        alunos.append({"id": a.get("id"), "nome": nome})
+    alunos.sort(key=lambda x: (x.get("nome") or "").upper())
+    return jsonify({"success": True, "retirada": retirada, "itens": itens, "alunos": alunos, "sala_nome": sala_nome})
+
+@app.route("/api/tecnologia/retirada/<int:retirada_id>/responsaveis", methods=["POST"])
+def api_tecnologia_responsaveis(retirada_id):
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    itens = (request.get_json(silent=True) or {}).get("itens") or []
+    if not itens:
+        return json_error("Nenhum responsável informado.", 400)
+    for item in itens:
+        if item.get("id"):
+            db.table("tecnologia_retirada_itens").update({"aluno_responsavel": item.get("aluno_responsavel")}).eq("id", item.get("id")).execute()
+    return jsonify({"success": True, "message": "Retirada concluída com sucesso."})
+
+@app.route("/api/tecnologia/devolucao/pendentes")
+def api_tecnologia_devolucao_pendentes():
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    user = session.get("user") or {}
+    retiradas = []
+    if user.get("id") is not None:
+        try:
+            retiradas = db.table("tecnologia_retiradas").select("id,sala_nome,status,usuario_nome").eq("usuario_id", user.get("id")).eq("status", "RETIRADO").execute().data or []
+        except Exception:
+            retiradas = []
+    if not retiradas:
+        usuario_nome = (user.get("nome") or "").strip()
+        if usuario_nome:
+            retiradas = db.table("tecnologia_retiradas").select("id,sala_nome,status,usuario_nome").eq("usuario_nome", usuario_nome).eq("status", "RETIRADO").execute().data or []
+    retirada_ids = [r.get("id") for r in retiradas if r.get("id") is not None]
+    if not retirada_ids:
+        return jsonify({"success": True, "itens": [], "usuario_nome": user.get("nome") or ""})
+    itens = db.table("tecnologia_retirada_itens").select("id,retirada_id,equipamento_id,numero_equipamento,aluno_responsavel,devolvido,houve_ocorrencia").in_("retirada_id", retirada_ids).eq("devolvido", False).order("numero_equipamento").execute().data or []
+    return jsonify({"success": True, "itens": itens, "usuario_nome": user.get("nome") or ""})
+
+@app.route("/api/tecnologia/devolucao/finalizar_sem_ocorrencia", methods=["POST"])
+def api_tecnologia_devolucao_sem_ocorrencia():
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    item_ids = (request.get_json(silent=True) or {}).get("item_ids") or []
+    if not item_ids:
+        return json_error("Nenhum item informado.", 400)
+    for item_id in item_ids:
+        item = (db.table("tecnologia_retirada_itens").select("equipamento_id").eq("id", item_id).limit(1).execute().data or [{}])[0]
+        db.table("tecnologia_retirada_itens").update({"devolvido": True, "data_devolucao": now_sp_iso(), "houve_ocorrencia": False}).eq("id", item_id).execute()
+        if item.get("equipamento_id"):
+            db.table("d_inventario_equipamentos").update({"status": "DISPONIVEL"}).eq("id", item.get("equipamento_id")).execute()
+    return jsonify({"success": True})
+
+@app.route("/api/tecnologia/devolucao/com_ocorrencia", methods=["POST"])
+def api_tecnologia_devolucao_com_ocorrencia():
+    return _api_tecnologia_devolucao(houve_ocorrencia_forcada=True)
+
+@app.route("/api/tecnologia/devolucao", methods=["POST"])
+def api_tecnologia_devolucao():
+    return _api_tecnologia_devolucao(houve_ocorrencia_forcada=None)
+
+def _api_tecnologia_devolucao(houve_ocorrencia_forcada=None):
+    if not usuario_pode_acessar_tecnologia():
+        return json_error("Sem permissão.", 403)
+    db = get_supabase()
+    data = request.get_json(silent=True) or {}
+    item_id = data.get("item_id")
+    houve_ocorrencia = bool(data.get("houve_ocorrencia")) if houve_ocorrencia_forcada is None else houve_ocorrencia_forcada
+    descricao_ocorrencia = (data.get("descricao_ocorrencia") or "").strip()
+    if not item_id:
+        return json_error("Item não informado.", 400)
+    item = (db.table("tecnologia_retirada_itens").select("*").eq("id", item_id).limit(1).execute().data or [None])[0]
+    if not item:
+        return json_error("Item não encontrado.", 404)
+    db.table("tecnologia_retirada_itens").update({"devolvido": True, "data_devolucao": now_sp_iso(), "houve_ocorrencia": houve_ocorrencia, "descricao_ocorrencia": descricao_ocorrencia}).eq("id", item_id).execute()
+    if item.get("equipamento_id"):
+        db.table("d_inventario_equipamentos").update({"status": "DISPONIVEL"}).eq("id", item.get("equipamento_id")).execute()
+    if houve_ocorrencia and descricao_ocorrencia:
+        retirada = (db.table("tecnologia_retiradas").select("sala_nome,professor_nome").eq("id", item.get("retirada_id")).limit(1).execute().data or [{}])[0]
+        numero = get_next_numero_ocorrencia()
+        user = session.get("user") or {}
+        db.table("ocorrencias").insert({"numero": numero, "data_hora": now_sp_iso(), "status": "ATENDIMENTO", "sala_nome": retirada.get("sala_nome") or "", "professor_nome": retirada.get("professor_nome") or user.get("nome") or "", "aluno_nome": item.get("aluno_responsavel") or "", "descricao": f"TECNOLOGIA - {descricao_ocorrencia}", "pendencia": "GESTAO"}).execute()
+    return jsonify({"success": True})
 
 @app.route("/api/relatorios_dashboard/<report_name>")
 def api_relatorios_dashboard(report_name):
@@ -3123,7 +3578,7 @@ def api_relatorios_dashboard(report_name):
                     _aluno_campo(a, "projeto_de_vida", "projeto_vida"),
                     _aluno_campo(a, "telefone_aluno", "telefone"),
                     _aluno_campo(a, "responsavel_nome", "responsavel"),
-                    _aluno_campo(a, "telefone_responsavel"),
+                    _aluno_campo(a, "telefone_responsavel", "responsavel_telefone"),
                     _aluno_campo(a, "clube_1_semestre", "clube_juvenil_1_semestre"),
                     _aluno_campo(a, "eletiva_1_semestre"),
                 ])
@@ -3134,6 +3589,48 @@ def api_relatorios_dashboard(report_name):
                 "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Qtd. alunos"},
                 "table": {"headers": ["Tutor", "Quantidade", "Ação"], "rows": [[k, v, "BAIXAR PDF"] for k, v in ordered]},
                 "detalhes_alunos": detalhes
+            }})
+
+        if report_name == "tecnologia_movimentacao":
+            if not usuario_tem_acesso_total():
+                return json_error("Acesso restrito.", 403)
+            retiradas = _fetch_all_rows(db, "tecnologia_retiradas", "*", order_col="id")
+            itens = _fetch_all_rows(db, "tecnologia_retirada_itens", "*", order_col="id")
+            try:
+                retiradas = _filtra_report_periodo(retiradas, "data_retirada", periodo, mes, data_inicio, data_fim)
+            except Exception:
+                pass
+            ids_validos = {r.get("id") for r in retiradas if r.get("id") is not None}
+            itens = [x for x in itens if x.get("retirada_id") in ids_validos]
+            por_sala = {}
+            rows = []
+            for r in retiradas:
+                sala_nome = (r.get("sala_nome") or "SEM SALA").strip() or "SEM SALA"
+                subset = [i for i in itens if i.get("retirada_id") == r.get("id")]
+                retirados = len(subset)
+                devolvidos = len([i for i in subset if i.get("devolvido")])
+                com_ocorrencia = len([i for i in subset if i.get("houve_ocorrencia")])
+                por_sala.setdefault(sala_nome, {"retirados":0, "devolvidos":0, "com_ocorrencia":0})
+                por_sala[sala_nome]["retirados"] += retirados
+                por_sala[sala_nome]["devolvidos"] += devolvidos
+                por_sala[sala_nome]["com_ocorrencia"] += com_ocorrencia
+                rows.append([
+                    str(r.get("data_retirada") or "")[:10],
+                    r.get("usuario_nome") or "",
+                    sala_nome,
+                    r.get("professor_nome") or "",
+                    r.get("horario_aula") or "",
+                    retirados,
+                    devolvidos,
+                    com_ocorrencia,
+                ])
+            ordered = sorted([(k,v) for k,v in por_sala.items()], key=lambda i: (-i[1]["retirados"], i[0]))
+            rows = sorted(rows, key=lambda r: (r[0], r[2], r[1]), reverse=True)
+            return jsonify({"success": True, "data": {
+                "titulo": f"Relatório de Uso da Tecnologia ({_periodo_label(periodo, mes, data_inicio, data_fim)})",
+                "chart_type": "bar",
+                "chart": {"labels": [x[0] for x in ordered], "data": [x[1]["retirados"] for x in ordered], "dataset_label": "Equipamentos retirados"},
+                "table": {"headers": ["Data", "Responsável", "Sala", "Professor", "Aula", "Equipamentos", "Devolvidos", "Com ocorrência"], "rows": rows}
             }})
 
         return json_error("Relatório não encontrado.", 404)

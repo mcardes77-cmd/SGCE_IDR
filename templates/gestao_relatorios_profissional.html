@@ -27,6 +27,7 @@
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atendimentos_por_tutor"><div class="text-sm font-bold text-violet-400">Atendimento por Tutor</div><div class="text-xs text-slate-400 mt-1">Detalhe com popup amplo e PDF</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo"><div class="text-sm font-bold text-lime-400">Frequência Semanal/Mensal</div><div class="text-xs text-slate-400 mt-1">Somente segunda a sexta</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado"><div class="text-sm font-bold text-pink-400">Lista de Aluno por Tutor</div><div class="text-xs text-slate-400 mt-1">Baixar PDF por tutor</div></button>
+    {% if mostrar_relatorio_tecnologia %}<button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="tecnologia_movimentacao"><div class="text-sm font-bold text-sky-400">Uso da Tecnologia</div><div class="text-xs text-slate-400 mt-1">Retirada, devolução e ocorrência com PDF</div></button>{% endif %}
   </section>
 
   <section id="blocoFiltros" class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
@@ -203,7 +204,7 @@ function abrirDetalhe(tutor) {
   `).join('') : '<tr><td colspan="5" class="py-2 px-2 text-slate-400">Sem detalhes.</td></tr>';
   document.getElementById('btnPdfDetalhe').onclick = () => {
     const p = paramsAtual({ tutor });
-    window.open(`/relatorio_dashboard_pdf/atendimentos_por_tutor?${p.toString()}`, '_blank');
+    window.location.href = `/relatorio_dashboard_pdf/atendimentos_por_tutor?${p.toString()}`;
   };
   document.getElementById('modalDetalhe').classList.remove('hidden');
 }
@@ -244,7 +245,7 @@ document.querySelectorAll('.card-relatorio').forEach(btn => btn.addEventListener
 
 document.getElementById('btnAplicarFiltro').addEventListener('click', carregarRelatorioAtual);
 document.getElementById('btnGerarPdf').addEventListener('click', () => {
-  window.open(`/relatorio_dashboard_pdf/${reportAtual}?${paramsAtual().toString()}`, '_blank');
+  window.location.href = `/relatorio_dashboard_pdf/${reportAtual}?${paramsAtual().toString()}`;
 });
 
 document.getElementById('filtroMes').value = mesAtual();
