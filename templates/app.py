@@ -3201,9 +3201,7 @@ def api_tutores_disponiveis_cadastro():
             tipo = (f.get("tipo") or "").strip().upper()
             funcao = (f.get("funcao") or "").strip().upper()
             if tipo == "PROFESSOR" and "APOIO" not in funcao:
-                qtd = contagem.get(int(f["id"]), 0)
-                if qtd < 22:
-                    tutores.append({"id": f["id"], "nome": f["nome"]})
+                tutores.append({"id": f["id"], "nome": f["nome"]})
         return jsonify(tutores)
     except Exception as e:
         return json_error(e)

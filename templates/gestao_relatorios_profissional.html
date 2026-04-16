@@ -6,6 +6,44 @@
   <title>Relatórios Profissionais</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style id="sgce-responsive-patch">
+  html { font-size: clamp(13px, 0.80rem + 0.25vw, 16px); }
+  body { overflow-x: hidden; }
+  img, svg, canvas, video { max-width: 100%; height: auto; }
+  input, select, textarea, button { max-width: 100%; }
+  @media (max-width: 1280px) {
+    .max-w-7xl, .max-w-6xl, .max-w-5xl, .max-w-4xl { max-width: 100% !important; }
+  }
+  @media (max-width: 1024px) {
+    .text-3xl { font-size: 1.6rem !important; line-height: 2rem !important; }
+    .text-2xl { font-size: 1.35rem !important; line-height: 1.8rem !important; }
+    .text-xl { font-size: 1.15rem !important; line-height: 1.55rem !important; }
+    .p-6, .p-5 { padding: 1rem !important; }
+    .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .py-8 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  }
+  @media (max-width: 768px) {
+    table { display: block; width: 100%; overflow-x: auto; white-space: nowrap; }
+    [class*="grid-cols-2"], [class*="grid-cols-3"], [class*="grid-cols-4"], [class*="grid-cols-5"], [class*="grid-cols-6"] {
+      grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .min-w-72 { min-width: 100% !important; }
+    .text-sm { font-size: 0.82rem !important; }
+    .text-base { font-size: 0.92rem !important; }
+    .text-lg { font-size: 1rem !important; }
+    .rounded-2xl { border-radius: 1rem !important; }
+    [class*="max-w-"] { max-width: 100% !important; }
+  }
+  @media (max-width: 640px) {
+    body[class*="p-6"] { padding: 1rem !important; }
+    .px-4 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+    .py-3, .py-2 { padding-top: 0.65rem !important; padding-bottom: 0.65rem !important; }
+    .gap-4 { gap: 0.75rem !important; }
+    .gap-3 { gap: 0.65rem !important; }
+  }
+</style>
+
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
 <div class="max-w-7xl mx-auto space-y-5">
@@ -26,8 +64,11 @@
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="ocorrencias_por_tutor"><div class="text-sm font-bold text-amber-400">Ocorrência por Tutor</div><div class="text-xs text-slate-400 mt-1">Visão limpa sem filtros</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="atendimentos_por_tutor"><div class="text-sm font-bold text-violet-400">Atendimento por Tutor</div><div class="text-xs text-slate-400 mt-1">Detalhe com popup amplo e PDF</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo"><div class="text-sm font-bold text-lime-400">Frequência Semanal/Mensal</div><div class="text-xs text-slate-400 mt-1">Somente segunda a sexta</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="chamada_tutoria_periodo"><div class="text-sm font-bold text-teal-400">Relatório de Chamada da Tutoria</div><div class="text-xs text-slate-400 mt-1">Somente terça, quarta e quinta</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="fichas_alunos_status"><div class="text-sm font-bold text-fuchsia-400">Fichas de Alunos</div><div class="text-xs text-slate-400 mt-1">Preenchidas e não preenchidas</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado"><div class="text-sm font-bold text-pink-400">Lista de Aluno por Tutor</div><div class="text-xs text-slate-400 mt-1">Baixar PDF por tutor</div></button>
     {% if mostrar_relatorio_tecnologia %}<button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="tecnologia_movimentacao"><div class="text-sm font-bold text-sky-400">Uso da Tecnologia</div><div class="text-xs text-slate-400 mt-1">Retirada, devolução e ocorrência com PDF</div></button>{% endif %}
+    {% if mostrar_relatorio_alunos_sem_tutor %}<a href="/relatorio_alunos_sem_tutor" class="bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left block"><div class="text-sm font-bold text-rose-400">Alunos sem Tutor</div><div class="text-xs text-slate-400 mt-1">Nome, sala e botão Inserir Tutor</div></a>{% endif %}
   </section>
 
   <section id="blocoFiltros" class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
@@ -48,7 +89,8 @@
   <section class="grid grid-cols-1 xl:grid-cols-2 gap-4">
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <h2 id="tituloRelatorio" class="text-lg font-bold text-emerald-400 mb-3">Selecione um relatório</h2>
-      <div class="h-[420px]"><canvas id="graficoRelatorio"></canvas></div>
+      <div id="painelCustom" class="hidden"></div>
+      <div id="painelGrafico" class="h-[420px]"><canvas id="graficoRelatorio"></canvas></div>
     </div>
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
       <h2 class="text-lg font-bold text-emerald-400 mb-3">Tabela detalhada</h2>
@@ -156,6 +198,15 @@ function renderTabela(headers, rows, reportName) {
         <td class="py-2 px-2"><a href="/relatorio_alunos_tutor?tutor=${encodeURIComponent(tutor)}" class="bg-pink-700 hover:bg-pink-600 px-3 py-1 rounded text-xs">Baixar PDF</a></td>
       </tr>`;
     }
+    if (reportName === 'chamada_tutoria_periodo') {
+      const tutor = String(r[0] ?? '');
+      return `<tr class="border-b border-slate-800">
+        <td class="py-2 px-2">${esc(r[0])}</td>
+        <td class="py-2 px-2">${esc(r[1])}</td>
+        <td class="py-2 px-2">${esc(r[2])}</td>
+        <td class="py-2 px-2"><button type="button" onclick='abrirRelatorioChamadaTutor(${JSON.stringify(tutor)})' class="bg-teal-700 hover:bg-teal-600 px-3 py-1 rounded text-xs">Gerar relatório</button></td>
+      </tr>`;
+    }
     return '<tr class="border-b border-slate-800">' + r.map((v, idx) => `<td class="py-2 px-2 ${faixaClasse(v)}">${esc(v)}</td>`).join('') + '</tr>';
   }).join('');
 }
@@ -209,8 +260,75 @@ function abrirDetalhe(tutor) {
   document.getElementById('modalDetalhe').classList.remove('hidden');
 }
 
-function fecharDetalhe() {
-  document.getElementById('modalDetalhe').classList.add('hidden');
+
+function abrirPendenciaDia(label, faltantes){
+  document.getElementById('modalTitulo').textContent = `Tutores sem chamada - ${label}`;
+  document.getElementById('theadDetalhe').innerHTML = '<tr class="border-b border-slate-700"><th class="text-left py-2 px-2">Tutor</th></tr>';
+  document.getElementById('tbDetalhe').innerHTML = (faltantes||[]).length ? faltantes.map(t => `<tr class="border-b border-slate-800"><td class="py-2 px-2">${esc(t)}</td></tr>`).join('') : '<tr><td class="py-2 px-2 text-slate-400">Todos fizeram a chamada.</td></tr>';
+  document.getElementById('btnPdfDetalhe').onclick = () => {
+    const html = `<html><head><meta charset="utf-8"><title>Tutores sem chamada - ${label}</title></head><body><h2>Tutores sem chamada - ${label}</h2><ul>${(faltantes||[]).map(t=>`<li>${esc(t)}</li>`).join('') || '<li>Todos fizeram a chamada.</li>'}</ul></body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html); w.document.close(); w.print();
+  };
+  document.getElementById('modalDetalhe').classList.remove('hidden');
+}
+
+async function abrirRelatorioChamadaTutor(tutor){
+  const r = await fetch(`/api/relatorios_dashboard/chamada_tutoria_periodo?${paramsAtual({tutor}).toString()}`);
+  const j = await r.json();
+  if(!r.ok || !j.success){ alert(j.error || 'Erro ao gerar relatório do tutor'); return; }
+  const headers = j.data.table.headers || [];
+  const rows = j.data.table.rows || [];
+  document.getElementById('modalTitulo').textContent = j.data.titulo || `Relatório de ${tutor}`;
+  document.getElementById('theadDetalhe').innerHTML = '<tr class="border-b border-slate-700">' + headers.map(h=>`<th class="text-left py-2 px-2">${esc(h)}</th>`).join('') + '</tr>';
+  document.getElementById('tbDetalhe').innerHTML = rows.length ? rows.map(r => '<tr class="border-b border-slate-800">' + r.map(v => `<td class="py-2 px-2 ${faixaClasse(v)}">${esc(v)}</td>`).join('') + '</tr>').join('') : '<tr><td class="py-2 px-2 text-slate-400">Sem dados.</td></tr>';
+  document.getElementById('btnPdfDetalhe').onclick = () => {
+    window.location.href = `/relatorio_dashboard_pdf/chamada_tutoria_periodo?${paramsAtual({tutor}).toString()}`;
+  };
+  document.getElementById('modalDetalhe').classList.remove('hidden');
+}
+
+
+function fecharDetalhe(){
+  const modal = document.getElementById('modalDetalhe');
+  modal.classList.add('hidden');
+  document.getElementById('modalTitulo').textContent = 'Detalhe';
+  document.getElementById('theadDetalhe').innerHTML = '';
+  document.getElementById('tbDetalhe').innerHTML = '';
+  document.getElementById('btnPdfDetalhe').onclick = null;
+}
+
+document.getElementById('modalDetalhe').addEventListener('click', (e) => {
+  if (e.target.id === 'modalDetalhe') fecharDetalhe();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('modalDetalhe').classList.contains('hidden')) fecharDetalhe();
+});
+
+function renderPainelCustom(data){
+  const wrap = document.getElementById('painelCustom');
+  const graf = document.getElementById('painelGrafico');
+  if(data.custom_view !== 'chamada_tutoria_controle'){
+    wrap.classList.add('hidden');
+    graf.classList.remove('hidden');
+    return;
+  }
+  graf.classList.add('hidden');
+  wrap.classList.remove('hidden');
+  const itens = data.calendar || [];
+  wrap.innerHTML = `
+    <div class="space-y-3">
+      <div class="text-sm text-slate-300">Controle diário de chamada da tutoria. Verde quando todos os tutores fizeram a chamada; vermelho quando houver tutor pendente.</div>
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+        ${itens.map(d => `<button type="button" onclick='abrirPendenciaDia(${JSON.stringify(d.label)}, ${JSON.stringify(d.faltantes || [])})' class="text-left rounded-2xl border ${d.status==='OK' ? 'border-emerald-700 bg-emerald-950/50' : 'border-red-700 bg-red-950/50'} p-4">
+            <div class="text-xs text-slate-400">${esc(d.data)}</div>
+            <div class="text-lg font-bold mt-1">${esc(d.label)}</div>
+            <div class="mt-2 text-sm font-semibold ${d.status==='OK' ? 'text-emerald-400' : 'text-red-400'}">${d.status==='OK' ? 'Todos fizeram' : 'Tutor pendente'}</div>
+            <div class="text-xs text-slate-400 mt-1">${(d.faltantes||[]).length ? `${d.faltantes.length} tutor(es) sem chamada` : 'Sem pendência'}</div>
+          </button>`).join('')}
+      </div>
+    </div>`;
 }
 
 function atualizarVisibilidadeFiltros(data = {}) {
@@ -228,13 +346,19 @@ async function carregarRelatorioAtual() {
   detalhesAtuais = j.data.detalhes || {};
   atualizarVisibilidadeFiltros(j.data || {});
   document.getElementById('tituloRelatorio').textContent = j.data.titulo || 'Relatório';
-  renderGrafico({
-    type: j.data.chart_type || 'bar',
-    labels: j.data.chart.labels || [],
-    data: j.data.chart.data || [],
-    datasetLabel: j.data.chart.dataset_label || 'Total',
-    backgroundColor: j.data.chart.backgroundColor || null
-  });
+  renderPainelCustom(j.data || {});
+  if ((j.data.custom_view || '') !== 'chamada_tutoria_controle') {
+    renderGrafico({
+      type: j.data.chart_type || 'bar',
+      labels: j.data.chart.labels || [],
+      data: j.data.chart.data || [],
+      datasetLabel: j.data.chart.dataset_label || 'Total',
+      backgroundColor: j.data.chart.backgroundColor || null
+    });
+  } else if (grafico) {
+    grafico.destroy();
+    grafico = null;
+  }
   renderTabela(j.data.table.headers || [], j.data.table.rows || [], reportAtual);
 }
 

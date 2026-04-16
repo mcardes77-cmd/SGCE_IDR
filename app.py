@@ -679,13 +679,16 @@ def usuario_logado_tipo():
     return normalizar_texto(user.get("tipo"))
 
 def usuario_pode_acessar_tecnologia():
-    return usuario_tem_acesso_total() or usuario_logado_tipo() == "ALUNO"
+    return usuario_tem_acesso_total() or usuario_logado_tipo() in {"ALUNO", "PROFESSOR"}
 
 def usuario_pode_ver_card_tecnologia():
-    return usuario_tem_acesso_total()
+    return usuario_tem_acesso_total() or usuario_logado_tipo() == "PROFESSOR"
 
 def usuario_eh_tecnologia_exclusivo():
     return usuario_logado_tipo() == "ALUNO" and not usuario_tem_acesso_total()
+
+def usuario_pode_ver_cadastro_relatorios():
+    return usuario_tem_acesso_total()
 
 def usuario_pode_ver_gestao():
     return usuario_logado_nome() in {
@@ -1083,7 +1086,11 @@ def dashboard_ocorrencias():
 
 @app.route("/dashboard_geral")
 def dashboard_geral():
-    return render_template("dashboard_geral.html", mostrar_card_tecnologia=usuario_pode_ver_card_tecnologia())
+    return render_template(
+        "dashboard_geral.html",
+        mostrar_card_tecnologia=usuario_pode_ver_card_tecnologia(),
+        mostrar_cadastro_relatorios=usuario_pode_ver_cadastro_relatorios(),
+    )
 
 @app.route("/dashboard_frequencia")
 def dashboard_frequencia():
@@ -2449,17 +2456,40 @@ def api_tutoria_chamada_alunos():
             return json_error("A chamada da tutoria só pode ser lançada às terças, quartas e quintas.", 400)
         tutor_id = (request.args.get("tutor_id") or "").strip()
         tutor_nome = (request.args.get("tutor_nome") or "").strip()
-        if not usuario_tem_acesso_total():
+        modo_tutor = not usuario_tem_acesso_total()
+        if modo_tutor:
             tutor_nome = (session.get("user") or {}).get("nome") or ""
             tutor_id = ""
+        elif not tutor_nome and not tutor_id:
+            return jsonify({
+                "success": True,
+                "data": [],
+                "data_ref": dia.isoformat(),
+                "weekday": dia.weekday(),
+                "meta": {"modo_tutor": False, "tutor_nome": ""}
+            })
         alunos = _buscar_alunos_por_tutor(db, tutor_id=tutor_id, tutor_nome=tutor_nome)
         try:
-            registros = db.table("f_tutoria_chamada").select("aluno_id,status").eq("data", dia.isoformat()).execute().data or []
+            query = db.table("f_tutoria_chamada").select("aluno_id,status")                .eq("data", dia.isoformat())
+            if tutor_nome:
+                query = query.eq("tutor_nome", tutor_nome)
+            registros = query.execute().data or []
         except Exception:
             registros = []
         mapa_reg = {str(x.get("aluno_id")): x.get("status") for x in registros}
-        data = [{"id": a.get("id"), "nome": a.get("nome") or a.get("aluno_nome"), "sala_nome": a.get("sala_nome") or "", "status": mapa_reg.get(str(a.get("id")), "P")} for a in alunos]
-        return jsonify({"success": True, "data": data, "data_ref": dia.isoformat(), "weekday": dia.weekday()})
+        data = [{
+            "id": a.get("id"),
+            "nome": a.get("nome") or a.get("aluno_nome"),
+            "sala_nome": a.get("sala_nome") or a.get("nome_sala") or "",
+            "status": mapa_reg.get(str(a.get("id")), "P")
+        } for a in alunos]
+        return jsonify({
+            "success": True,
+            "data": data,
+            "data_ref": dia.isoformat(),
+            "weekday": dia.weekday(),
+            "meta": {"modo_tutor": modo_tutor, "tutor_nome": tutor_nome}
+        })
     except Exception as e:
         return json_error(e)
 
@@ -2473,6 +2503,10 @@ def api_tutoria_chamada_salvar():
             return json_error("A chamada da tutoria só pode ser lançada às terças, quartas e quintas.", 400)
         itens = payload.get("itens") or []
         tutor_nome = (session.get("user") or {}).get("nome") or ""
+        if usuario_tem_acesso_total():
+            tutor_nome = (payload.get("tutor_nome") or "").strip()
+        if not tutor_nome:
+            return json_error("Selecione o tutor para salvar a chamada.", 400)
         if not itens:
             return json_error("Nenhum aluno informado.", 400)
         try:
@@ -3012,7 +3046,13 @@ def relatorio_aluno_pdf():
 
 @app.route("/gestao_relatorios_profissional")
 def gestao_relatorios_profissional():
-    return render_template("gestao_relatorios_profissional.html", mostrar_relatorio_tecnologia=usuario_tem_acesso_total())
+    if not usuario_tem_acesso_total():
+        return redirect("/dashboard_tecnologia" if usuario_eh_tecnologia_exclusivo() else "/dashboard_geral")
+    return render_template(
+        "gestao_relatorios_profissional.html",
+        mostrar_relatorio_tecnologia=usuario_tem_acesso_total(),
+        mostrar_relatorio_alunos_sem_tutor=usuario_tem_acesso_total()
+    )
 
 
 
@@ -3081,6 +3121,19 @@ def _weekday_dates_between(inicio, fim):
     dias = []
     while cur <= fim:
         if cur.weekday() < 5:
+            dias.append(cur)
+        cur += timedelta(days=1)
+    return dias
+
+
+def _tutoria_dates_between(inicio, fim):
+    from datetime import timedelta
+    if not inicio or not fim:
+        return []
+    cur = inicio
+    dias = []
+    while cur <= fim:
+        if cur.weekday() in {1, 2, 3}:
             dias.append(cur)
         cur += timedelta(days=1)
     return dias
@@ -3551,6 +3604,120 @@ def api_relatorios_dashboard(report_name):
                     "backgroundColor": colors
                 },
                 "table": {"headers": ["Dia", "Frequência %", "Faixa"], "rows": rows}
+            }})
+
+        if report_name == "chamada_tutoria_periodo":
+            chamadas = db.table("f_tutoria_chamada").select("*").execute().data or []
+            inicio, fim = _report_period_range(periodo, mes, data_inicio, data_fim)
+            if not inicio and not fim:
+                inicio, fim = _parse_mes_intervalo(mes)
+            dias = _tutoria_dates_between(inicio, fim)
+            alunos_todos = _fetch_all_rows(db, "d_alunos", "*", order_col="id")
+            alunos_ativos = [a for a in alunos_todos if (a.get("situacao_aluno") or "ATIVO").strip().upper() == "ATIVO"]
+            mapa_tutores = {}
+            for a in alunos_ativos:
+                tn = (_aluno_campo(a, "tutor_nome", "nome_tutor") or "").strip()
+                if not tn:
+                    continue
+                mapa_tutores.setdefault(tn, []).append(a)
+            tutores_esperados = sorted(mapa_tutores.keys(), key=normalizar_texto)
+
+            if tutor:
+                alunos_tutor = mapa_tutores.get(tutor)
+                if alunos_tutor is None:
+                    alunos_tutor = _buscar_alunos_por_tutor(db, tutor_nome=tutor)
+                headers = ["Aluno", "Sala"] + [dia.strftime("%d/%m") for dia in dias]
+                rows = []
+                for a in sorted(alunos_tutor or [], key=lambda x: normalizar_texto(_aluno_campo(x, "nome", "aluno_nome"))):
+                    aid = a.get("id")
+                    linha = [
+                        _aluno_campo(a, "nome", "aluno_nome"),
+                        _aluno_campo(a, "sala_nome", "nome_sala"),
+                    ]
+                    for dia in dias:
+                        reg = next((x for x in chamadas if str(x.get("aluno_id")) == str(aid) and (x.get("tutor_nome") or "").strip() == tutor and _parse_date_any(x.get("data")) == dia), None)
+                        linha.append((reg or {}).get("status") or "-")
+                    rows.append(linha)
+                return jsonify({"success": True, "data": {
+                    "titulo": f"Relatório de Chamada da Tutoria - {tutor} ({_periodo_label(periodo, mes, data_inicio, data_fim)})",
+                    "custom_view": "chamada_tutoria_detalhe",
+                    "chart_type": "bar",
+                    "chart": {"labels": [], "data": [], "dataset_label": ""},
+                    "table": {"headers": headers, "rows": rows}
+                }})
+
+            calendario = []
+            for dia in dias:
+                subset = [x for x in chamadas if _parse_date_any(x.get("data")) == dia]
+                tutores_feitos = sorted({(x.get("tutor_nome") or "").strip() for x in subset if (x.get("tutor_nome") or "").strip()}, key=normalizar_texto)
+                faltantes = [t for t in tutores_esperados if t not in tutores_feitos]
+                calendario.append({
+                    "data": dia.isoformat(),
+                    "label": dia.strftime("%d/%m"),
+                    "status": "OK" if not faltantes else "PENDENTE",
+                    "faltantes": faltantes,
+                })
+            rows = []
+            for tutor_nome in tutores_esperados:
+                qtd = len(mapa_tutores.get(tutor_nome) or [])
+                total_registros = len([x for x in chamadas if (x.get("tutor_nome") or "").strip() == tutor_nome])
+                rows.append([tutor_nome, qtd, total_registros, "GERAR RELATÓRIO"])
+            return jsonify({"success": True, "data": {
+                "titulo": f"Relatório de Chamada da Tutoria ({_periodo_label(periodo, mes, data_inicio, data_fim)})",
+                "custom_view": "chamada_tutoria_controle",
+                "hide_filters": False,
+                "chart_type": "bar",
+                "chart": {"labels": [], "data": [], "dataset_label": ""},
+                "calendar": calendario,
+                "table": {"headers": ["Tutor", "Alunos", "Registros", "Ação"], "rows": rows}
+            }})
+
+        if report_name == "fichas_alunos_status":
+            def _first_nonempty(*vals):
+                for v in vals:
+                    if v not in (None, "", "null", "None"):
+                        return v
+                return ""
+
+            linhas = []
+            preenchidas = 0
+            nao_preenchidas = 0
+            for a in alunos:
+                projeto_vida = _first_nonempty(a.get("projeto_de_vida"), a.get("projeto_vida"))
+                clube = _first_nonempty(a.get("clube_1_semestre"), a.get("clube_juvenil_1_semestre"), a.get("clube_juvenil"), a.get("clube"))
+                eletiva = _first_nonempty(a.get("eletiva_1_semestre"), a.get("eletiva"))
+                telefone = _first_nonempty(a.get("telefone_aluno"), a.get("telefone"))
+                responsavel = _first_nonempty(a.get("responsavel_nome"), a.get("nome_responsavel"), a.get("responsavel"))
+                telefone_resp = _first_nonempty(a.get("responsavel_telefone"), a.get("telefone_responsavel"))
+                ficha_ok = all([
+                    str(projeto_vida).strip(),
+                    str(clube).strip(),
+                    str(eletiva).strip(),
+                    str(telefone).strip(),
+                    str(responsavel).strip(),
+                    str(telefone_resp).strip(),
+                ])
+                if ficha_ok:
+                    preenchidas += 1
+                else:
+                    nao_preenchidas += 1
+                linhas.append([
+                    _aluno_campo(a, "nome", "aluno_nome"),
+                    _aluno_campo(a, "sala_nome"),
+                    _aluno_campo(a, "tutor_nome", "nome_tutor") or "SEM TUTOR",
+                    "PREENCHIDA" if ficha_ok else "NÃO PREENCHIDA",
+                ])
+            linhas.sort(key=lambda x: (normalizar_texto(x[1]), normalizar_texto(x[0])))
+            return jsonify({"success": True, "data": {
+                "titulo": "Relatório de Fichas de Alunos Preenchidas e Não Preenchidas",
+                "chart_type": "bar",
+                "chart": {
+                    "labels": ["Preenchidas", "Não preenchidas"],
+                    "data": [preenchidas, nao_preenchidas],
+                    "dataset_label": "Quantidade de fichas",
+                    "backgroundColor": ["#10B981", "#EF4444"]
+                },
+                "table": {"headers": ["Aluno", "Sala", "Tutor", "Status da Ficha"], "rows": linhas}
             }})
 
         if report_name == "ocorrencias_por_professor":
@@ -4066,9 +4233,7 @@ def api_tutores_disponiveis_cadastro():
             tipo = (f.get("tipo") or "").strip().upper()
             funcao = (f.get("funcao") or "").strip().upper()
             if tipo == "PROFESSOR" and "APOIO" not in funcao:
-                qtd = contagem.get(int(f["id"]), 0)
-                if qtd < 22:
-                    tutores.append({"id": f["id"], "nome": f["nome"]})
+                tutores.append({"id": f["id"], "nome": f["nome"]})
         return jsonify(tutores)
     except Exception as e:
         return json_error(e)
@@ -4076,18 +4241,56 @@ def api_tutores_disponiveis_cadastro():
 @app.route("/api/salvar_tutor_aluno/<int:aluno_id>", methods=["PUT"])
 def api_salvar_tutor_aluno(aluno_id):
     try:
+        if not usuario_tem_acesso_total():
+            return json_error("Acesso restrito aos usuários autorizados.", 403)
         db = get_supabase()
         data = request.get_json() or {}
+        tutor_id = data.get("tutor_id") if data.get("tutor_id") not in (None, "", "None") else data.get("id_tutor")
+        tutor_nome = (data.get("tutor_nome") or data.get("nome_tutor") or None)
         payload = {
-            "tutor_id": int(data.get("tutor_id")) if data.get("tutor_id") not in (None, "", "None") else None,
-            "id_tutor": int(data.get("id_tutor")) if data.get("id_tutor") not in (None, "", "None") else None,
-            "tutor_nome": data.get("tutor_nome"),
-            "nome_tutor": data.get("nome_tutor")
+            "tutor_id": int(tutor_id) if tutor_id not in (None, "", "None") else None,
+            "id_tutor": int(tutor_id) if tutor_id not in (None, "", "None") else None,
+            "tutor_nome": tutor_nome,
+            "nome_tutor": tutor_nome
         }
         db.table("d_alunos").update(payload).eq("id", aluno_id).execute()
         return jsonify({"success": True})
     except Exception as e:
         return json_error(e)
+
+@app.route("/relatorio_alunos_sem_tutor")
+def relatorio_alunos_sem_tutor():
+    try:
+        if not usuario_tem_acesso_total():
+            return redirect("/dashboard_tecnologia" if usuario_eh_tecnologia_exclusivo() else "/dashboard_geral")
+        db = get_supabase()
+        filtro_sala = (request.args.get("sala") or "").strip()
+        alunos = _fetch_all_rows(db, "d_alunos", "*", order_col="nome")
+        salas = sorted({(a.get("sala_nome") or "").strip() for a in alunos if (a.get("sala_nome") or "").strip()}, key=normalizar_texto)
+        filtrados = []
+        for a in alunos:
+            situacao = normalizar_texto(a.get("situacao_aluno") or "ATIVO")
+            if situacao and situacao != "ATIVO":
+                continue
+            sala_nome = (a.get("sala_nome") or "").strip()
+            if filtro_sala and sala_nome != filtro_sala:
+                continue
+            tutor_id = a.get("tutor_id") if a.get("tutor_id") not in (None, "", "None") else a.get("id_tutor")
+            tutor_nome = (a.get("tutor_nome") or a.get("nome_tutor") or "").strip()
+            if tutor_id not in (None, "", "None"):
+                continue
+            if tutor_nome:
+                continue
+            filtrados.append({
+                "id": a.get("id"),
+                "nome": a.get("nome") or a.get("aluno_nome") or "",
+                "sala_nome": sala_nome
+            })
+        filtrados.sort(key=lambda x: normalizar_texto(x.get("sala_nome")) + "|" + normalizar_texto(x.get("nome")))
+        return render_template("relatorio_alunos_sem_tutor.html", alunos=filtrados, salas=salas, sala_selecionada=filtro_sala)
+    except Exception as e:
+        return f"Erro ao abrir relatório: {e}", 500
+
 
 @app.route("/relatorio_alunos_tutor")
 def relatorio_alunos_tutor():

@@ -5,6 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ficha de Tutoria - SGCE APP</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
+<style id="sgce-responsive-patch">
+  html { font-size: clamp(13px, 0.80rem + 0.25vw, 16px); }
+  body { overflow-x: hidden; }
+  img, svg, canvas, video { max-width: 100%; height: auto; }
+  input, select, textarea, button { max-width: 100%; }
+  @media (max-width: 1280px) {
+    .max-w-7xl, .max-w-6xl, .max-w-5xl, .max-w-4xl { max-width: 100% !important; }
+  }
+  @media (max-width: 1024px) {
+    .text-3xl { font-size: 1.6rem !important; line-height: 2rem !important; }
+    .text-2xl { font-size: 1.35rem !important; line-height: 1.8rem !important; }
+    .text-xl { font-size: 1.15rem !important; line-height: 1.55rem !important; }
+    .p-6, .p-5 { padding: 1rem !important; }
+    .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .py-8 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  }
+  @media (max-width: 768px) {
+    table { display: block; width: 100%; overflow-x: auto; white-space: nowrap; }
+    [class*="grid-cols-2"], [class*="grid-cols-3"], [class*="grid-cols-4"], [class*="grid-cols-5"], [class*="grid-cols-6"] {
+      grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .min-w-72 { min-width: 100% !important; }
+    .text-sm { font-size: 0.82rem !important; }
+    .text-base { font-size: 0.92rem !important; }
+    .text-lg { font-size: 1rem !important; }
+    .rounded-2xl { border-radius: 1rem !important; }
+    [class*="max-w-"] { max-width: 100% !important; }
+  }
+  @media (max-width: 640px) {
+    body[class*="p-6"] { padding: 1rem !important; }
+    .px-4 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+    .py-3, .py-2 { padding-top: 0.65rem !important; padding-bottom: 0.65rem !important; }
+    .gap-4 { gap: 0.75rem !important; }
+    .gap-3 { gap: 0.65rem !important; }
+  }
+</style>
+
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-6">
 <div class="max-w-7xl mx-auto space-y-5">
@@ -254,6 +292,23 @@ async function salvarFicha(){
   const j = await r.json();
   if (!r.ok || !j.success) return alert(j.error || 'Erro ao salvar ficha.');
   alert('Ficha salva com sucesso!');
+
+  if (window.parent && window.parent !== window) {
+    try {
+      if (typeof window.parent.fecharModalTutoria === 'function') {
+        window.parent.fecharModalTutoria();
+      }
+      if (typeof window.parent.carregarTabela === 'function') {
+        await window.parent.carregarTabela();
+      } else if (window.parent.location) {
+        window.parent.location.reload();
+      }
+      return;
+    } catch (e) {
+      console.warn('Não foi possível atualizar a tela pai automaticamente.', e);
+    }
+  }
+
   await abrirFichaAluno(alunoAtualId);
 }
 
