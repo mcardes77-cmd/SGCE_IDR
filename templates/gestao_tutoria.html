@@ -164,7 +164,7 @@
     function botoesAcoes(a) {
       return `
         <div class="flex flex-wrap gap-2">
-          <button onclick="abrirModalTutoria('/gestao_tutoria_ficha?aluno_id=${a.id}', 'Ficha do Aluno')" class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Abrir Ficha</button>
+          <button onclick="abrirModalTutoria('/gestao_tutoria_ficha?aluno_id=${a.id}', 'Ficha do Aluno')" class="bg-violet-700 hover:bg-violet-600 px-3 py-1 rounded text-xs">Gerar Ficha</button>
           <button onclick="abrirModalTutoria('/gestao_tutoria_atendimento?tutor_id=${a.tutor_id || ''}&aluno_id=${a.id}&novo=1', 'Atendimento de Tutoria')" class="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded text-xs">Atender</button>
           <button onclick="abrirModalTutoria('/gestao_tutoria_agendamento?tutor_id=${a.tutor_id || ''}&aluno_id=${a.id}&novo=1', 'Agendamento de Tutoria')" class="bg-amber-700 hover:bg-amber-600 px-3 py-1 rounded text-xs">Agendar</button>
         </div>

@@ -339,6 +339,11 @@ function formAlunoHtml(aluno) {
   `;
 }
 
+function novoAluno(){
+  abrirModal('Cadastrar novo aluno', formAlunoHtml({situacao_aluno: 'ATIVO'}), salvarAlunoModal);
+  setTimeout(() => { sincronizarSalaAluno(); sincronizarTutorAluno(); const nome=document.getElementById('frmAlunoNome'); if(nome) nome.focus(); }, 0);
+}
+
 function editarAluno(aluno){ abrirModal('Editar aluno', formAlunoHtml(aluno), salvarAlunoModal); setTimeout(() => { sincronizarSalaAluno(); sincronizarTutorAluno(); }, 0); }
 
 function sincronizarSalaAluno() {
