@@ -12,7 +12,8 @@
   .nome { text-align: left; white-space: nowrap; width: 220px; }
   .nota { width: 26px; font-size: 9px; }
   .assinaturas { display:flex; gap:16px; justify-content:space-between; margin-top:20px; }
-  .bloco-ass { width: 32%; text-align:center; }
+  .bloco-ass { width: 30%; min-width: 180px; text-align:center; }
+  .assinaturas { flex-wrap: wrap; row-gap: 10px; }
   .linha { border-top: 1px solid #333; padding-top: 4px; margin-top: 28px; }
   .info-box { margin-top: 10px; font-size: 11px; line-height: 1.45; }
 </style>
@@ -148,7 +149,7 @@
 </div>
 
 <div class="assinaturas">
-  {% for prof in professores[:3] %}
+  {% for prof in professores %}
     <div class="bloco-ass">
       <div class="linha">{{ prof }}</div>
     </div>
