@@ -66,6 +66,7 @@
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="frequencia_periodo"><div class="text-sm font-bold text-lime-400">Frequência Semanal/Mensal</div><div class="text-xs text-slate-400 mt-1">Somente segunda a sexta</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="chamada_tutoria_periodo"><div class="text-sm font-bold text-teal-400">Relatório de Chamada da Tutoria</div><div class="text-xs text-slate-400 mt-1">Somente terça, quarta e quinta</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="fichas_alunos_status"><div class="text-sm font-bold text-fuchsia-400">Fichas de Alunos</div><div class="text-xs text-slate-400 mt-1">Preenchidas e não preenchidas</div></button>
+    <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_sala_tutor"><div class="text-sm font-bold text-orange-400">Alunos por Sala</div><div class="text-xs text-slate-400 mt-1">Nome do aluno, sala e tutor</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="fichas_por_tutor"><div class="text-sm font-bold text-indigo-400">Imprimir Fichas por Tutor</div><div class="text-xs text-slate-400 mt-1">Selecione o tutor e baixe o PDF das fichas</div></button>
     <button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="alunos_por_tutor_detalhado"><div class="text-sm font-bold text-pink-400">Lista de Aluno por Tutor</div><div class="text-xs text-slate-400 mt-1">Baixar PDF por tutor</div></button>
     {% if mostrar_relatorio_tecnologia %}<button class="card-relatorio bg-slate-800 hover:bg-slate-700 rounded-2xl p-4 border border-slate-700 text-left" data-report="tecnologia_movimentacao"><div class="text-sm font-bold text-sky-400">Uso da Tecnologia</div><div class="text-xs text-slate-400 mt-1">Retirada, devolução e ocorrência com PDF</div></button>{% endif %}
@@ -348,7 +349,11 @@ async function carregarRelatorioAtual() {
   atualizarVisibilidadeFiltros(j.data || {});
   document.getElementById('tituloRelatorio').textContent = j.data.titulo || 'Relatório';
   renderPainelCustom(j.data || {});
-  if ((j.data.custom_view || '') !== 'chamada_tutoria_controle') {
+  if (j.data.hide_chart) {
+    document.getElementById('painelGrafico').classList.add('hidden');
+    if (grafico) { grafico.destroy(); grafico = null; }
+  } else if ((j.data.custom_view || '') !== 'chamada_tutoria_controle') {
+    document.getElementById('painelGrafico').classList.remove('hidden');
     renderGrafico({
       type: j.data.chart_type || 'bar',
       labels: j.data.chart.labels || [],
