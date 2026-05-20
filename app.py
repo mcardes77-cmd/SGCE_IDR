@@ -2929,23 +2929,8 @@ def relatorio_aluno_pdf():
         tutor_nome = aluno.get("tutor_nome") or ""
         projeto_vida = aluno.get("projeto_de_vida") or aluno.get("projeto_vida") or aluno.get("eletiva_1_semestre") or ""
 
-        ocorrencias = db.table("ocorrencias").select("*").eq("aluno_id", aluno_id).order("numero", desc=True).execute().data or []
-        if not ocorrencias and aluno_nome:
-            todas_oc = db.table("ocorrencias").select("*").execute().data or []
-            ocorrencias = [x for x in todas_oc if (x.get("aluno_nome") or "").strip() == aluno_nome.strip()]
-
-        atendimentos = db.table("atendimentos_tutoria").select("*").eq("aluno_id", aluno_id).order("data_registro", desc=True).execute().data or []
-        frequencia = db.table("f_frequencia").select("*").eq("aluno_id", aluno_id).order("data", desc=True).execute().data or []
-        if not frequencia and aluno_nome:
-            todas_freq = db.table("f_frequencia").select("*").execute().data or []
-            frequencia = [x for x in todas_freq if (x.get("aluno_nome") or "").strip() == aluno_nome.strip()]
-
-        faltas = len([x for x in frequencia if (x.get("status") or "").upper() == "F"])
-        atrasos = len([x for x in frequencia if (x.get("status") or "").upper() == "PA"])
-        saidas = len([x for x in frequencia if (x.get("status") or "").upper() in ["PS", "PSA"]])
-        total_freq = len(frequencia)
-        presencas = total_freq - faltas
-        frequencia_percentual = round((presencas / total_freq) * 100, 2) if total_freq > 0 else 0
+        # Relatório profissional do aluno: nesta versão, o PDF foca no BOLETIM.
+        # Os dias detalhados de frequência, atendimentos e ocorrências não entram neste relatório.
 
         serie = sala_para_serie(sala_nome)
         disciplinas = db.table("d_disciplinas").select("*").eq("serie", serie).order("nome").execute().data or []
@@ -2993,7 +2978,6 @@ def relatorio_aluno_pdf():
             _build_table([
                 ["Aluno", aluno_nome, "Sala", sala_nome],
                 ["Tutor", tutor_nome, "Projeto de Vida", projeto_vida],
-                ["Frequência", f"{frequencia_percentual}%", "Faltas / Atrasos / Saídas", f"{faltas} / {atrasos} / {saidas}"],
             ], header=False),
             Spacer(1, 8),
             Paragraph("Boletim", styles["SGCESection"]),
@@ -3011,37 +2995,103 @@ def relatorio_aluno_pdf():
                 str(b.get("status") or ""),
             ])
         story.append(_build_table(boletim_rows))
-        story.append(Spacer(1, 8))
-
-        story.append(Paragraph("Atendimentos", styles["SGCESection"]))
-        atend_rows = [["Data", "Tipo", "Registro"]]
-        for a in atendimentos[:40]:
-            atend_rows.append([
-                str(a.get("data_registro") or "")[:16],
-                str(a.get("tipo_atendimento") or ""),
-                str(a.get("registro") or "")[:160],
-            ])
-        if len(atend_rows) == 1:
-            atend_rows.append(["", "", "Sem atendimentos registrados."])
-        story.append(_build_table(atend_rows))
-        story.append(Spacer(1, 8))
-
-        story.append(Paragraph("Ocorrências", styles["SGCESection"]))
-        ocorr_rows = [["Nº", "Data", "Status", "Descrição"]]
-        for o in ocorrencias[:60]:
-            ocorr_rows.append([
-                str(o.get("numero") or ""),
-                str(o.get("data_hora") or "")[:16],
-                str(o.get("status") or ""),
-                str(o.get("descricao") or "")[:180],
-            ])
-        if len(ocorr_rows) == 1:
-            ocorr_rows.append(["", "", "", "Sem ocorrências registradas."])
-        story.append(_build_table(ocorr_rows))
 
         return _pdf_response(f"ficha_profissional_aluno_{aluno_id}.pdf", story)
     except Exception as e:
         return f"Erro ao gerar relatório: {e}", 500
+
+
+def _boletim_aluno_pdf_rows(db, aluno):
+    aluno_id = aluno.get("id")
+    sala_nome = aluno.get("sala_nome") or aluno.get("nome_sala") or ""
+    serie = sala_para_serie(sala_nome)
+    disciplinas = db.table("d_disciplinas").select("*").eq("serie", serie).order("nome").execute().data or []
+    notas = db.table("f_notas").select("*").eq("aluno_id", aluno_id).execute().data or []
+    mapa_notas = {(n.get("disciplina") or "").strip(): n for n in notas}
+    rows = [["Disciplina", "1º", "2º", "3º", "4º", "Média", "Status"]]
+    for d in disciplinas:
+        nome_disc = (d.get("nome") or "").strip()
+        reg = mapa_notas.get(nome_disc, {})
+        vals = [reg.get("nota_1b"), reg.get("nota_2b"), reg.get("nota_3b"), reg.get("nota_4b")]
+        nums = []
+        for v in vals:
+            if v not in (None, "", "null"):
+                try:
+                    nums.append(float(v))
+                except Exception:
+                    pass
+        media = round(sum(nums) / len(nums), 2) if nums else ""
+        status = ""
+        if media != "":
+            status = "APROVADO" if float(media) >= 5 else "REPROVADO"
+        rows.append([
+            nome_disc,
+            str(reg.get("nota_1b") or ""),
+            str(reg.get("nota_2b") or ""),
+            str(reg.get("nota_3b") or ""),
+            str(reg.get("nota_4b") or ""),
+            str(media),
+            status,
+        ])
+    if len(rows) == 1:
+        rows.append(["", "", "", "", "", "", "Sem notas/disciplinas cadastradas."])
+    return rows
+
+
+@app.route("/relatorio_fichas_por_tutor_pdf")
+def relatorio_fichas_por_tutor_pdf():
+    try:
+        if not usuario_tem_acesso_total():
+            return "Acesso restrito.", 403
+        db = get_supabase()
+        tutor = (request.args.get("tutor") or "").strip()
+        if not tutor:
+            return "Selecione um tutor para gerar o PDF.", 400
+
+        alunos = _fetch_all_rows(db, "d_alunos", "*", order_col="id")
+        alunos = [a for a in alunos if (a.get("situacao_aluno") or "ATIVO").strip().upper() == "ATIVO"]
+        alunos = [a for a in alunos if ((a.get("tutor_nome") or a.get("nome_tutor") or "").strip() == tutor)]
+        alunos.sort(key=lambda a: (normalizar_texto(a.get("sala_nome") or a.get("nome_sala") or ""), normalizar_texto(a.get("nome") or a.get("aluno_nome") or "")))
+
+        styles = _pdf_styles()
+        story = [
+            Paragraph("SGCE - Fichas Profissionais por Tutor", styles["SGCETitle"]),
+            Paragraph(f"Tutor: {tutor}", styles["Heading2"]),
+            Paragraph(f"Emitido em {now_sp().strftime('%d/%m/%Y %H:%M')}", styles["SGCESubtitle"]),
+            Spacer(1, 8),
+        ]
+
+        if not alunos:
+            story.append(Paragraph("Nenhum aluno ativo encontrado para este tutor.", styles["Normal"]))
+        else:
+            for idx, aluno in enumerate(alunos):
+                aluno_nome = aluno.get("nome") or aluno.get("aluno_nome") or ""
+                sala_nome = aluno.get("sala_nome") or aluno.get("nome_sala") or ""
+                projeto_vida = aluno.get("projeto_de_vida") or aluno.get("projeto_vida") or ""
+                clube = aluno.get("clube_1_semestre") or aluno.get("clube_juvenil_1_semestre") or aluno.get("clube_juvenil") or aluno.get("clube") or ""
+                eletiva = aluno.get("eletiva_1_semestre") or aluno.get("eletiva") or ""
+                telefone = aluno.get("telefone_aluno") or aluno.get("telefone") or ""
+                responsavel = aluno.get("responsavel_nome") or aluno.get("nome_responsavel") or aluno.get("responsavel") or ""
+                telefone_resp = aluno.get("responsavel_telefone") or aluno.get("telefone_responsavel") or ""
+
+                if idx > 0:
+                    story.append(PageBreak())
+                story.append(Paragraph("Ficha Profissional do Aluno", styles["SGCESection"]))
+                story.append(_build_table([
+                    ["Aluno", aluno_nome, "Sala", sala_nome],
+                    ["Tutor", tutor, "Projeto de Vida", projeto_vida],
+                    ["Clube Juvenil 1º Semestre", clube, "Eletiva 1º Semestre", eletiva],
+                    ["Telefone", telefone, "Responsável", responsavel],
+                    ["Telefone Responsável", telefone_resp, "", ""],
+                ], header=False))
+                story.append(Spacer(1, 8))
+                story.append(Paragraph("Boletim", styles["SGCESection"]))
+                story.append(_build_table(_boletim_aluno_pdf_rows(db, aluno)))
+
+        safe_tutor = normalizar_texto(tutor).replace(" ", "_")[:50] or "tutor"
+        return _pdf_response(f"fichas_profissionais_{safe_tutor}.pdf", story)
+    except Exception as e:
+        return f"Erro ao gerar PDF: {e}", 500
 
 
 @app.route("/gestao_relatorios_profissional")
@@ -3718,6 +3768,58 @@ def api_relatorios_dashboard(report_name):
                     "backgroundColor": ["#10B981", "#EF4444"]
                 },
                 "table": {"headers": ["Aluno", "Sala", "Tutor", "Status da Ficha"], "rows": linhas}
+            }})
+
+        if report_name == "fichas_por_tutor":
+            mapa = {}
+            for a in alunos:
+                tutor_nome = (a.get("tutor_nome") or a.get("nome_tutor") or "SEM TUTOR").strip() or "SEM TUTOR"
+                mapa.setdefault(tutor_nome, []).append(a)
+
+            if tutor:
+                alunos_tutor = mapa.get(tutor, [])
+                linhas = []
+                for a in sorted(alunos_tutor, key=lambda x: (normalizar_texto(_aluno_campo(x, "sala_nome", "nome_sala")), normalizar_texto(_aluno_campo(x, "nome", "aluno_nome")))):
+                    linhas.append([
+                        _aluno_campo(a, "nome", "aluno_nome"),
+                        _aluno_campo(a, "sala_nome", "nome_sala"),
+                        "Ficha no PDF",
+                    ])
+                return jsonify({"success": True, "data": {
+                    "titulo": f"Imprimir Fichas por Tutor - {tutor}",
+                    "chart_type": "bar",
+                    "chart": {"labels": [tutor], "data": [len(alunos_tutor)], "dataset_label": "Alunos"},
+                    "table": {"headers": ["Aluno", "Sala", "Ficha"], "rows": linhas},
+                    "custom_pdf": "fichas_por_tutor"
+                }})
+
+            ordered = sorted([(k, len(v)) for k, v in mapa.items()], key=lambda i: (normalizar_texto(i[0])))
+            return jsonify({"success": True, "data": {
+                "titulo": "Imprimir Fichas por Tutor",
+                "chart_type": "bar",
+                "chart": {"labels": [k for k, _ in ordered], "data": [v for _, v in ordered], "dataset_label": "Alunos"},
+                "table": {"headers": ["Tutor", "Quantidade de alunos"], "rows": [[k, v] for k, v in ordered]},
+                "custom_pdf": "fichas_por_tutor"
+            }})
+
+        if report_name == "alunos_por_sala_tutor":
+            linhas = []
+            for a in alunos:
+                aluno_nome = _aluno_campo(a, "nome", "aluno_nome")
+                sala_nome = _aluno_campo(a, "sala_nome", "nome_sala", "sala") or "SEM SALA"
+                tutor_nome = _aluno_campo(a, "tutor_nome", "nome_tutor") or "SEM TUTOR"
+                linhas.append([aluno_nome, sala_nome, tutor_nome])
+            linhas.sort(key=lambda x: (normalizar_texto(x[1]), normalizar_texto(x[0])))
+            return jsonify({"success": True, "data": {
+                "titulo": f"Relatório de Alunos por Sala com Tutor ({_periodo_label(periodo, mes, data_inicio, data_fim)})",
+                "chart_type": "bar",
+                "chart": {
+                    "labels": [],
+                    "data": [],
+                    "dataset_label": ""
+                },
+                "hide_chart": True,
+                "table": {"headers": ["Aluno", "Sala", "Tutor"], "rows": linhas}
             }})
 
         if report_name == "ocorrencias_por_professor":
