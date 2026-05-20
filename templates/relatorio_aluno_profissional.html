@@ -67,15 +67,14 @@
     </div>
     <div style="width:20%; text-align:right;"><img src="{{ url_for('static', filename='logo_sp.png') }}" style="height:70px;"></div>
   </div>
-  <div style="font-size:20px; font-weight:bold; margin-top:5px; color:#4F81BD;">{{ titulo_relatorio or "FICHA PROFISSIONAL DO ALUNO" }}</div>
+  <div style="font-size:20px; font-weight:bold; margin-top:5px; color:#4F81BD;">{{ titulo_relatorio or "BOLETIM PROFISSIONAL DO ALUNO" }}</div>
 </div>
 <hr style="border:1px solid #000; margin-bottom:15px;">
 
 <table class="grid">
   <tr><td><strong>Aluno:</strong> {{ aluno_nome }}</td><td><strong>Sala:</strong> {{ sala_nome }}</td></tr>
   <tr><td><strong>Tutor:</strong> {{ tutor_nome }}</td><td><strong>Projeto de Vida:</strong> {{ projeto_vida }}</td></tr>
-  <tr><td><strong>Data:</strong> {{ data_emissao }}</td><td><strong>Frequência:</strong> {{ frequencia_percentual }}%</td></tr>
-  <tr><td colspan="2"><strong>Faltas / Atrasos / Saídas:</strong> {{ faltas }} / {{ atrasos }} / {{ saidas }}</td></tr>
+  <tr><td colspan="2"><strong>Data:</strong> {{ data_emissao }}</td></tr>
 </table>
 
 {% if aluno_destaque == true or aluno_evolucao == true %}
@@ -103,24 +102,5 @@
   </tbody>
 </table>
 
-<h3>Atendimentos</h3>
-<table>
-  <thead><tr><th>Data</th><th>Tipo</th><th>Registro</th></tr></thead>
-  <tbody>
-    {% for a in atendimentos %}
-    <tr><td>{{ a.data_registro or '' }}</td><td>{{ a.tipo_atendimento or '' }}</td><td>{{ a.registro or '' }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<h3>Ocorrências</h3>
-<table>
-  <thead><tr><th>Nº</th><th>Data</th><th>Status</th><th>Descrição</th></tr></thead>
-  <tbody>
-    {% for o in ocorrencias %}
-    <tr><td>{{ o.numero or '' }}</td><td>{{ o.data_hora or '' }}</td><td>{{ o.status or '' }}</td><td>{{ o.descricao or '' }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
 </body>
 </html>
