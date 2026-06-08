@@ -42,6 +42,41 @@
     .gap-4 { gap: 0.75rem !important; }
     .gap-3 { gap: 0.65rem !important; }
   }
+
+
+  /* Impressão especial: Relatório Alunos por Sala em A4 retrato */
+  @media print {
+    @page { size: A4 portrait; margin: 8mm; }
+    body { background: #fff !important; color: #000 !important; padding: 0 !important; }
+    body.print-alunos-sala > *:not(#printAlunosSala) { display: none !important; }
+    #printAlunosSala { display: block !important; }
+    .print-sala-page {
+      page-break-after: always;
+      break-after: page;
+      width: 100%;
+      min-height: 277mm;
+      box-sizing: border-box;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #000;
+      background: #fff;
+      overflow: hidden;
+    }
+    .print-sala-page:last-child { page-break-after: auto; break-after: auto; }
+    .print-cabecalho { border-bottom: 2px solid #111; padding-bottom: 4mm; margin-bottom: 4mm; }
+    .print-titulo { font-size: 16px; font-weight: 800; text-align: center; margin: 0; text-transform: uppercase; }
+    .print-subtitulo { font-size: 11px; text-align: center; margin: 1mm 0 0; }
+    .print-info { display: flex; justify-content: space-between; font-size: 10px; margin-top: 3mm; }
+    .print-tabela { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; line-height: 1.12; }
+    .print-tabela th, .print-tabela td { border: 1px solid #333; padding: 2px 4px; vertical-align: middle; word-wrap: break-word; }
+    .print-tabela th { background: #e5e7eb !important; font-weight: 700; text-align: left; }
+    .print-num { width: 8%; text-align: center; }
+    .print-aluno { width: 52%; }
+    .print-sala { width: 12%; text-align: center; }
+    .print-tutor { width: 28%; }
+    .print-rodape { margin-top: 3mm; font-size: 9px; display: flex; justify-content: space-between; }
+  }
+
 </style>
 
 </head>
@@ -121,6 +156,8 @@
     </div>
   </div>
 </div>
+
+<div id="printAlunosSala" class="hidden"></div>
 
 <script>
 let reportAtual = 'ocorrencias_por_sala';
@@ -348,6 +385,7 @@ async function carregarRelatorioAtual() {
   detalhesAtuais = j.data.detalhes || {};
   atualizarVisibilidadeFiltros(j.data || {});
   document.getElementById('tituloRelatorio').textContent = j.data.titulo || 'Relatório';
+  document.getElementById('btnGerarPdf').textContent = reportAtual === 'alunos_por_sala_tutor' ? 'Imprimir retrato' : 'Baixar PDF';
   renderPainelCustom(j.data || {});
   if (j.data.hide_chart) {
     document.getElementById('painelGrafico').classList.add('hidden');
@@ -373,8 +411,73 @@ document.querySelectorAll('.card-relatorio').forEach(btn => btn.addEventListener
   carregarRelatorioAtual();
 }));
 
+
+function hojeBR(){
+  return new Date().toLocaleDateString('pt-BR');
+}
+
+function normalizaHeader(h){
+  return String(h || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function montarImpressaoAlunosPorSala(){
+  const headers = Array.from(document.querySelectorAll('#theadTabela th')).map(th => th.textContent.trim());
+  const linhas = Array.from(document.querySelectorAll('#tbodyTabela tr')).map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()));
+  if (!linhas.length) {
+    alert('Não há alunos carregados para imprimir.');
+    return false;
+  }
+
+  const idxSala = Math.max(0, headers.findIndex(h => normalizaHeader(h).includes('sala')));
+  const idxAluno = Math.max(0, headers.findIndex(h => normalizaHeader(h).includes('aluno') || normalizaHeader(h).includes('nome')));
+  const idxTutor = Math.max(0, headers.findIndex(h => normalizaHeader(h).includes('tutor')));
+
+  const grupos = new Map();
+  linhas.forEach(cols => {
+    const sala = cols[idxSala] || document.getElementById('filtroSala').value || 'Sem sala';
+    if (!grupos.has(sala)) grupos.set(sala, []);
+    grupos.get(sala).push({
+      aluno: cols[idxAluno] || '',
+      sala,
+      tutor: cols[idxTutor] || ''
+    });
+  });
+
+  const ordenados = Array.from(grupos.entries()).sort((a,b) => a[0].localeCompare(b[0], 'pt-BR', {numeric:true}));
+  const html = ordenados.map(([sala, alunos]) => `
+    <section class="print-sala-page">
+      <div class="print-cabecalho">
+        <h1 class="print-titulo">Relatório de Alunos por Sala</h1>
+        <p class="print-subtitulo">Sala: <strong>${esc(sala)}</strong> &nbsp;|&nbsp; Total de alunos: <strong>${alunos.length}</strong></p>
+        <div class="print-info"><span>SGCE - Relatórios Profissionais</span><span>Data: ${hojeBR()}</span></div>
+      </div>
+      <table class="print-tabela">
+        <thead><tr><th class="print-num">Nº</th><th class="print-aluno">Aluno</th><th class="print-sala">Sala</th><th class="print-tutor">Tutor</th></tr></thead>
+        <tbody>
+          ${alunos.map((a, i) => `<tr><td class="print-num">${i+1}</td><td class="print-aluno">${esc(a.aluno)}</td><td class="print-sala">${esc(a.sala)}</td><td class="print-tutor">${esc(a.tutor)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="print-rodape"><span>Impresso em modo retrato</span><span>1 página por sala</span></div>
+    </section>
+  `).join('');
+
+  document.getElementById('printAlunosSala').innerHTML = html;
+  return true;
+}
+
+function imprimirAlunosPorSalaRetrato(){
+  if (!montarImpressaoAlunosPorSala()) return;
+  document.body.classList.add('print-alunos-sala');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-alunos-sala'), 800);
+}
+
 document.getElementById('btnAplicarFiltro').addEventListener('click', carregarRelatorioAtual);
 document.getElementById('btnGerarPdf').addEventListener('click', () => {
+  if (reportAtual === 'alunos_por_sala_tutor') {
+    imprimirAlunosPorSalaRetrato();
+    return;
+  }
   if (reportAtual === 'fichas_por_tutor') {
     const tutor = document.getElementById('filtroTutor').value || '';
     if (!tutor) {
